@@ -1697,3 +1697,30 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .fl-live.lk-sf .lk-sfh .lk-sfile { flex: 0 1 auto; min-width: 0; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fl-live.lk-sf > .lk-col:has(> .knob) { justify-content: center !important; }
 .fl-live.lk-sf .lk-sfh { padding: var(--sp-2) var(--sp-3); } .fl-live.lk-sf .lk-sfh .lv-btn.lk-sfile { width: auto; max-width: 78%; padding: 0 var(--sp-4); font-weight: var(--fw-sb); font-size: var(--fs-3); display: block; line-height: 22px; }
+/* FLM synth cards: narrower (one Live section per tab mostly); DirectWave has no zone side panel any more */
+#dbody .dev-scroll > .card.flm-card, #dbody .dev-scroll > .card.flm-card.flm-t30 { width: min(500px, 100%); }
+.fw-fit > .card.flm-card, .fw-fit > .card.flm-card.flm-t30 { width: 500px; }
+/* FX tab = one panel: the effect list (switch square + name) left, the chosen effect's section right */
+.flm-fxw { flex: 1 1 auto; display: flex; align-items: stretch; gap: var(--sp-3); min-width: 0; padding: var(--sp-2) var(--sp-3); }
+.flm-fxw > .flm-fxsel { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: var(--sp-2); }
+.flm-fxw > .flm-fxsel .lv-tab { display: flex; align-items: center; gap: var(--sp-3); height: var(--ctl-s); min-width: 96px; padding: 0 var(--sp-4) 0 var(--sp-2); border: 1px solid var(--lv-edge); border-radius: 2px; background: var(--lv-ctl); color: var(--lv-ink); font: var(--fw-sb) var(--fs-3)/1 var(--font); }
+.flm-fxw > .flm-fxsel .lv-tab.on { background: var(--lv-or); color: #111; }
+.flm-fxw > .flm-fxsel .lv-tab .chk { flex: none; width: 14px; height: 14px; border: 1px solid var(--lv-edge); border-radius: 2px; background: #3a3a3e; position: relative; }
+.flm-fxw > .flm-fxsel .lv-tab .chk::before { content: ''; position: absolute; inset: -6px; }
+.flm-fxw > .flm-fxsel .lv-tab.lit .chk { background: var(--lv-or); box-shadow: inset 0 0 0 2px #1d1d1f; }
+.flm-fxw > .flm-fxh { flex: 1 1 auto; display: flex; min-width: 0; } .flm-fxw > .flm-fxh > .flm-sec { padding: 0; border: 0; }
+/* tab strip in the title bar as Live Sampler's: rounded tabs, an LED that lights when the section is in use */
+.card > h4 > .lv-tabs.flm-ltabs { gap: 2px; }
+.card > h4 > .lv-tabs.flm-ltabs .lv-tab, .lv-tabs.flm-ltabs .lv-tab { display: inline-flex; align-items: center; gap: 4px; padding: 0 7px 0 5px; border: 0; border-radius: 4px 4px 0 0; background: rgba(0, 0, 0, .16); color: var(--lv-ink); text-transform: none; }
+.card > h4 > .lv-tabs.flm-ltabs .lv-tab.on, .lv-tabs.flm-ltabs .lv-tab.on { background: var(--lv-body); box-shadow: inset 0 2px 0 var(--lv-or); }
+.lv-tabs.flm-ltabs .lv-tab .led { flex: none; width: 6px; height: 6px; border-radius: 50%; border: 0; background: #4a4a4e; }
+.lv-tabs.flm-ltabs .lv-tab.lit .led { background: var(--lv-or); }
+/* title-bar buttons (swap, float, menu, fold, preset): one size, one look */
+.card > h4 .dv-swap { width: 20px; min-width: 20px; height: 20px; padding: 0; border: 1.5px solid var(--lv-edge); border-radius: 50%; background: transparent; color: var(--lv-ink); display: inline-flex; align-items: center; justify-content: center; font: 700 11px/1 var(--font); flex: none; order: 4; }
+.card > h4 .dv-swap:active { background: var(--lv-ctl); }
+.card > h4 button.pre { height: 20px; border-radius: 10px; order: 5; }
+.card > h4 .fw-pop { order: 6; } .card > h4 button.dv-more.dv-more:not(.pw) { order: 7; }
+.card > h4 .dv-swap, .card > h4 .fw-pop, .card > h4 .fold-b, .card > h4 button.dv-more, .card > h4 button.pre { margin-left: 3px; position: relative; }
+.card > h4 .dv-swap::after, .card > h4 .fw-pop::after, .card > h4 button.dv-more::after { content: ''; position: absolute; inset: -5px -2px; }   /* touch room */
+/* long menus stay on screen and scroll */
+.menu { max-height: calc(100vh - 12px); max-height: calc(100dvh - 12px); overflow-y: auto; overscroll-behavior: contain; }

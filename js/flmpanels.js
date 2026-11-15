@@ -6,7 +6,7 @@
 // modulation kind, sample + zone map, unison and chorus voices, arpeggiator pattern / glide, delay taps, distortion / decimator, chorus,
 // phaser response, GMS FX X / Y pads (drag the point).
 import { h } from './ui.js';
-import { lvTabs, lvPath, lvRing, lvEnvPts, DISPC } from './liveui.js';
+import { lvTabs, lvBtn, lvPath, lvRing, lvEnvPts, DISPC } from './liveui.js';
 import { Biquad } from './engine/dsp.js';
 import { cutHz, syncBeats, GMS_SCALE, FLM_SYNC } from './engine/flmsyn.js';
 import { SS_ARP_BEATS, SS_DELAY_BEATS } from './engine/hdsaw.js';
@@ -32,13 +32,13 @@ const freqAxis = (g, w, hh, top, bot) => {
 
 // ---- frame: tab strip + page; titled sections; controls --------------------------------------------------------------------------
 const TAB = new Map();
-function tabs(k, names, pages) {
+function tabs(k, names, pages, leds = {}) {   // leds: { tab index: () => the section is in use } = Live Sampler's tab LEDs
   const key = k.d.id + ':' + k.d.type, page = h('div', { class: 'flm-pg' });
   let raf = 0;
   const refit = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; if (page.isConnected) fit(page); }); };
   const show = (j) => { TAB.set(key, j); page.replaceChildren(...[].concat(pages[j]())); refit(); };
   const cur = Math.min(TAB.get(key) || 0, names.length - 1);
-  const tb = lvTabs(names.map((label) => ({ label })), cur, show, { cls: 'lk-tabs flm-tabs lk-flmtabs' }); show(cur);
+  const tb = lvTabs(names.map((label, j) => ({ label, lit: leds[j] || (() => false) })), cur, show, { cls: 'lk-tabs flm-tabs lk-flmtabs flm-ltabs' }); show(cur); k.reg(tb, -1);
   const root = h('div', { class: 'lk-flm lk-flmpg' }, tb, page);
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(refit).observe(root);
   return root;
@@ -327,7 +327,7 @@ function dwSample(k) {
     const t = P.state.tracks[i], zs = (t && t.inst && t.inst.zones) || [], kb = 18, wh = hh - kb - 2, mid = wh / 2 + 1;
     const zi = zs.findIndex((z) => z && z.sample), z = zs[zi], s = z && z.sample;
     hl(g, mid, 0, w, DISPC.grid2);
-    if (!s) txt(g, zs.length ? 'Belum ada sample: ketuk zona di kiri' : 'Tambah zona di kiri', w / 2, mid - 6, DISPC.ink, 10, 'center');
+    if (!s) { g.strokeStyle = WH; g.lineWidth = 2; g.beginPath(); g.moveTo(w / 2 - 9, mid - 16); g.lineTo(w / 2 + 9, mid - 16); g.moveTo(w / 2, mid - 25); g.lineTo(w / 2, mid - 7); g.stroke(); txt(g, 'Ketuk untuk menambahkan sample', w / 2, mid + 14, DISPC.ink, 10, 'center'); }
     else {
       const pk = s.peaks || [], n = pk.length, rev = k.get(8) > 0.5, A = mid - 12;
       g.fillStyle = 'rgba(79,195,240,.82)';
@@ -340,7 +340,8 @@ function dwSample(k) {
     g.fillStyle = '#1c1c1e'; g.fillRect(0, y0, w, kb);
     for (let m = 0; m <= 120; m += 12) { vl(g, X(m), y0, hh, '#3a3a3e'); if (m % 24 === 0) txt(g, 'C' + (m / 12 - 1), X(m) + 2, hh - 3, DISPC.ink, 8); }
     zs.forEach((q, j) => { if (!q) return; const x0 = X(q.lo), x1 = X(q.hi + 1); g.fillStyle = j === zi ? 'rgba(79,195,240,.5)' : 'rgba(79,195,240,.28)'; g.fillRect(x0, y0 + 2, Math.max(2, x1 - x0), kb - 4); g.fillStyle = OR; g.fillRect(X(q.root), y0, Math.max(2, X(1)), kb); });
-  });
+  }, { onDown: () => ({ moved: false }), onMove: (x, y, dx, dy, st) => { if (Math.abs(dx) + Math.abs(dy) > 8) st.moved = true; },   // tap: add a sample (empty) or edit the zone
+    onUp: (x, y, st) => { if (st.moved) return; const t = P.state.tracks[i], zs = (t && t.inst && t.inst.zones) || [], zi = Math.max(0, zs.findIndex((z) => z && z.sample)); document.dispatchEvent(new CustomEvent('mdaw-zone', { detail: { i, k: zi } })); } });
 }
 // ---- effects ----------------------------------------------------------------------------------------------------------------------
 // delay taps over the beat grid: dry (grey), then each repeat at the tempo time, height = mix x feedback^n, fading with the filter
@@ -485,6 +486,17 @@ function ssArp(k) {
   });
 }
 
+// FX tab: ONE panel. The effects are listed on the left, each with its on / off switch (a square, lit = on); the chosen effect's display and
+// settings fill the panel. The choice is remembered per instrument.
+const FXSEL = new Map();
+function fxPage(k, list) {
+  const key = k.d.id + ':' + k.d.type + ':fx', host = h('div', { class: 'flm-fxh' });
+  const show = (j) => { FXSEL.set(key, j); host.replaceChildren(list[j].build()); };
+  const cur = Math.min(FXSEL.get(key) || 0, list.length - 1);
+  const tb = lvTabs(list.map((f) => (f.on != null ? { label: f.name, check: () => k.get(f.on) > 0.5, onCheck: () => k.set(f.on, k.get(f.on) > 0.5 ? 0 : 1) } : { label: f.name })), cur, show, { cls: 'flm-fxsel' });
+  show(cur); k.reg(tb, -1);
+  return h('div', { class: 'flm-fxw' }, tb, host);
+}
 // ================================================================================================ panels
 export function addFlmPanels(VI) {
   // DirectWave: zones (sample / root / key and velocity range / level / pan) are edited in the zone list next to this panel
@@ -493,14 +505,14 @@ export function addFlmPanels(VI) {
   const dwA = (x) => { const v = clamp(x / 100, 0, 1); return v <= 0 ? 0 : 0.28768 * 500 * Math.pow(v, 4) / 0.0002 / 44100; }, dwD = (x) => 3 * 50 * Math.pow(clamp(x / 100, 0, 1), 4) / 0.0002 / 44100;
   const dwLaw = { a: dwA, d: dwD, r: dwD }, dwHz = (x) => Math.min(22000, Math.pow(2, 4 + 10.4 * clamp(x / 100, 0, 1))), dwBeats = (i) => [0.125, 0.25, 0.5, 0.75, 1, 2, 4, 8, 16, 32][clamp(Math.round(i), 0, 9)];
   VI[30] = (k) => tabs(k, ['SAMPLE', 'FILTER', 'FLT ENV', 'FRQ ENV', 'LFO'], [
-    () => [DS('Sample', { g: dwSample(k), w: 2, rows: [[NUM(k, 0, 'Pitch'), NUM(k, 1, 'Fine'), NUM(k, 7, 'PB Range'), NUM(k, 6, 'Slide'), TG(k, 8, 'Reverse', 58), TG(k, 9, 'Loop', 46), TG(k, 10, 'Legato', 54), TG(k, 11, 'Mono', 46)]] }),
+    () => [DS('Sample', { g: dwSample(k), w: 2, rows: [[lvBtn('Zona', (e) => document.dispatchEvent(new CustomEvent('mdaw-zone', { detail: { i: k.ctx.i, list: true, rect: e.currentTarget.getBoundingClientRect() } })), { cls: 'lk-t' }), NUM(k, 0, 'Pitch'), NUM(k, 1, 'Fine'), NUM(k, 7, 'PB Range'), NUM(k, 6, 'Slide'), TG(k, 8, 'Reverse', 58), TG(k, 9, 'Loop', 46), TG(k, 10, 'Legato', 54), TG(k, 11, 'Mono', 46)]] }),
       DS('Amp Envelope', { g: env(k, 2, 3, 4, 5), rows: [ADSRN(k, 2, 3, 4, 5)] }), OUT(k, 34)],
     () => [DS('Filter', { k: [KN(k, 12, 'Cutoff'), KN(k, 13, 'Reso')], g: filt(k, 12, 13, () => Math.round(k.get(16)) - 1, null, dwHz), rows: [CHH(k, 16, ['Off', 'Lowpass', 'Highpass', 'Bandpass']), [NUM(k, 14, 'Kbd Trk'), NUM(k, 15, 'Vel Trk')]] })],
     () => [DS('Filter Envelope', { g: env(k, 17, 18, 19, 20, OR, () => 'Amount ' + Math.round(k.get(21)), dwLaw), rows: [ADSRN(k, 17, 18, 19, 20)], r: [KN(k, 21, 'Amount')] })],
     () => [DS('Frequency Envelope', { g: env(k, 22, 23, 24, 25, OR, () => 'Amount ' + Math.round(k.get(26)) + '  =  ' + (48 * Math.pow(k.get(26) / 100, 3)).toFixed(1) + ' st', dwLaw), rows: [ADSRN(k, 22, 23, 24, 25)], r: [KN(k, 26, 'Amount')] })],
     () => [DS('LFO', { k: [KN(k, 32, 'Amount')], g: lfo(k, { shape: 30, amt: 32, mode: 27, rate: 28, sync: 29, att: 31, beats: dwBeats, depth: (x) => Math.sign(x) * (x / 100) ** 2 }),
       rows: [CHH(k, 27, ['Hertz', 'One Shot', 'Tmp Sync']), [lfoRateN(k, 27, 28, 29), MEN(k, 30, 'Shape'), NUM(k, 31, 'Attack')], CHH(k, 33, ['Filter', 'Frequency', 'Level', 'Pan'])] })],
-  ]);
+  ], { 0: () => ((P.state.tracks[k.ctx.i].inst.zones) || []).some((z) => z && z.sample), 1: () => Math.round(k.get(16)) > 0, 2: () => k.get(21) !== 0, 3: () => k.get(26) !== 0, 4: () => k.get(32) !== 0 });
   // GMS (js/engine/hdgms.js): envelope knobs are FLM's sliders (the curves show their time: attack 2.53 v^4 s, decay 3 x 22.7 v^7 s)
   const gmA = (x) => 2.53 * Math.pow(clamp(x / 100, 0, 1), 4), gmD = (x) => 3 * 22.7 * Math.pow(clamp(x / 100, 0, 1), 7) + 0.0003;
   const gmLaw = { a: gmA, d: gmD, r: (x) => 3 * (clamp(x / 100, 0, 1) + 0.001) / 8.82 }, gmLawEg = { a: gmA, d: gmD, r: (x) => 3 * (200 * Math.pow(clamp(x / 100, 0, 1), 4) + 0.001) / 8.82 }, gmLawAD = { a: gmA, d: gmD, r: gmD };
@@ -515,9 +527,9 @@ export function addFlmPanels(VI) {
     () => [DS('Envelope Generator', { g: env(k, 29, 30, 31, 32, OR, () => 'Contour ' + Math.round(k.get(28)) + ' → ' + item(k, 34), gmLawEg), rows: [[...ADSRN(k, 29, 30, 31, 32), TG(k, 33, 'Vel', 40)], CHH(k, 34, ['Filter', 'Osc. Mod', 'Pitch'])], r: [KN(k, 28, 'Contour')] })],
     () => [DS('LFO', { k: [KN(k, 35, 'Contour')], g: lfo(k, { shape: 36, amt: 35, sync: 38, beats: gmBeats }), rows: [[MEN(k, 38, 'Rate'), MEN(k, 36, 'Shape'), MEN(k, 37, 'Dest', 84)]] })],
     () => [DS('Voices', { g: gmsVoices(k), rows: [[MEN(k, 45, 'Voices'), MEN(k, 46, 'Scale'), NUM(k, 41, 'Detune'), NUM(k, 42, 'Stereo')], [NUM(k, 39, 'Transpose', 56), NUM(k, 40, 'Slide'), TG(k, 43, 'Mono', 46), TG(k, 44, 'Auto', 46)]] })],
-    () => [0, 1, 2].map((s) => { const o = 47 + s * 7, xy = (j) => k.swapN(o + 1, (m) => NUM(k, o + 3 + j, (GMS_XY[m] || ['X', 'Y'])[j]));   // X / Y named by the kind
-      return DS('FX ' + (s + 1), { sw: SW(k, o), g: fxPad(k, o), rows: [[MEN(k, o + 1, 'Kind', 74), xy(0), xy(1)], [MEN(k, o + 5, 'LFO Rate', 74), NUM(k, o + 2, 'LFO Amt'), MEN(k, o + 6, 'Shape', 60)]] }); }),
-  ]);
+    () => [fxPage(k, [0, 1, 2].map((n) => { const o = 47 + n * 7, xy = (j) => k.swapN(o + 1, (m) => NUM(k, o + 3 + j, (GMS_XY[m] || ['X', 'Y'])[j]));   // X / Y named by the kind
+      return { name: 'FX ' + (n + 1), on: o, build: () => DS('FX ' + (n + 1), { g: fxPad(k, o), rows: [[MEN(k, o + 1, 'Kind', 74), xy(0), xy(1)], [MEN(k, o + 5, 'LFO Rate', 74), NUM(k, o + 2, 'LFO Amt'), MEN(k, o + 6, 'Shape', 60)]] }) }; }))],
+  ], { 2: () => k.get(14) !== 0, 4: () => k.get(28) !== 0, 5: () => k.get(35) !== 0, 7: () => [47, 54, 61].some((o) => k.get(o) > 0.5) });
   // MiniSynth (js/engine/hdmini.js): the displays use the engine's own laws; envelope knobs are FLM's sliders (the curve shows their time)
   const msT = 1 / 44100, msLaw = { a: (x) => { const v = x / 100; return v < 0.001 ? 0 : 0.28768 / msAttackRate(v) * msT; }, d: (x) => { const v = x / 100; return v < 0.0177 ? 0 : 3 / msDecayRate(v) * msT; }, r: (x) => 3 / msAmpReleaseRate(x / 100) * msT };
   const msLawF = { ...msLaw, r: msLaw.d }, msHz = (x) => Math.min(20000, Math.pow(2, 4 + 10.3 * clamp(x / 100, 0, 1)));
@@ -528,11 +540,12 @@ export function addFlmPanels(VI) {
     () => [DS('LFO', { k: [KN(k, 13, 'Amount')], g: lfo(k, { shape: 15, amt: 13, sync: 14, beats: (i) => MS_RATE_BEATS[clamp(Math.round(i), 0, 11)], depth: (x) => Math.sign(x) * (x / 100) ** 2 }),
       rows: [[MEN(k, 14, 'Rate', 70), MEN(k, 15, 'Shape', 70), MEN(k, 16, 'Dest', 70)], [NUM(k, 17, 'Mod Wheel'), MEN(k, 18, 'MW Dest', 70)]] })],
     () => [DS('Master Envelope', { g: env(k, 19, 20, 21, 22, CY, null, msLaw), rows: [ADSRN(k, 19, 20, 21, 22), CHH(k, 23, ['Poly', 'Mono', 'Lead'])], r: [KN(k, 24, 'Slide')] })],
-    () => [DS('Distortion', { sw: SW(k, 25), g: distWave(k, { on: 25, drive: 26, dmax: 20, decim: 27, min: 84, flm: true }), rows: [[NUM(k, 26, 'Drive'), NUM(k, 27, 'Decim')]] }),
-      DS('Delay', { sw: SW(k, 28), g: taps(k, { on: 28, time: 32, fb: 29, filt: 30, mix: 31, min: 84, flm: true, beats: (i) => MS_DELAY_BEATS[clamp(Math.round(i), 0, 3)] }), rows: [[MEN(k, 32, 'Time', 56), NUM(k, 29, 'Feedback'), NUM(k, 30, 'Filter'), NUM(k, 31, 'Mix')]] }),
-      DS('Chorus', { sw: SW(k, 33), g: chorusDisp(k, { on: 33, rate: 34, mod: 35, mix: 36, min: 84, flm: true }), rows: [[NUM(k, 34, 'Rate'), NUM(k, 35, 'Mod'), NUM(k, 36, 'Mix')]] }),
-      DS('Phaser', { sw: SW(k, 37), g: phaserDisp(k, { on: 37, speed: 38, width: 39, fb: 40, freq: 41, mix: 42, min: 84, flm: true }), rows: [[NUM(k, 38, 'Speed'), NUM(k, 39, 'Width'), NUM(k, 40, 'Feedback')], [NUM(k, 41, 'Freq'), NUM(k, 42, 'Mix')]] })],
-  ]);
+    () => [fxPage(k, [
+      { name: 'Distortion', on: 25, build: () => DS('Distortion', { g: distWave(k, { on: 25, drive: 26, dmax: 20, decim: 27, min: 84, flm: true }), rows: [[NUM(k, 26, 'Drive'), NUM(k, 27, 'Decim')]] }) },
+      { name: 'Delay', on: 28, build: () => DS('Delay', { g: taps(k, { on: 28, time: 32, fb: 29, filt: 30, mix: 31, min: 84, flm: true, beats: (i) => MS_DELAY_BEATS[clamp(Math.round(i), 0, 3)] }), rows: [[MEN(k, 32, 'Time', 56), NUM(k, 29, 'Feedback'), NUM(k, 30, 'Filter'), NUM(k, 31, 'Mix')]] }) },
+      { name: 'Chorus', on: 33, build: () => DS('Chorus', { g: chorusDisp(k, { on: 33, rate: 34, mod: 35, mix: 36, min: 84, flm: true }), rows: [[NUM(k, 34, 'Rate'), NUM(k, 35, 'Mod'), NUM(k, 36, 'Mix')]] }) },
+      { name: 'Phaser', on: 37, build: () => DS('Phaser', { g: phaserDisp(k, { on: 37, speed: 38, width: 39, fb: 40, freq: 41, mix: 42, min: 84, flm: true }), rows: [[NUM(k, 38, 'Speed'), NUM(k, 39, 'Width'), NUM(k, 40, 'Feedback'), NUM(k, 41, 'Freq'), NUM(k, 42, 'Mix')]] }) }])],
+  ], { 2: () => k.get(12) !== 0, 3: () => k.get(13) !== 0, 5: () => [25, 28, 33, 37].some((o) => k.get(o) > 0.5) });
   VI[33] = (k) => tabs(k, ['OSC', 'FILTER', 'LFO', 'LEVEL', 'MOD', 'VOICES', 'FX'], [
     () => [DS('Oscillator', { g: ssWave(k), rows: [CHH(k, 1, ['Supersaw', 'Supersync']), [TG(k, 0, 'Pulse', 46), TG(k, 2, 'Retrig', 50), NUM(k, 3, 'PW'), NUM(k, 4, 'Sub Osc')]] }),
       DS('Unison', { k: [KN(k, 6, 'Detune')], g: ssUnison(k), rows: [[MEN(k, 5, 'Voices', 66), NUM(k, 9, 'Phase'), NUM(k, 8, 'Spread'), NUM(k, 7, 'Pan')]] }),
@@ -544,7 +557,8 @@ export function addFlmPanels(VI) {
     () => [DS('Amp Envelope', { g: env(k, 36, 37, 38, 39), rows: [ADSRN(k, 36, 37, 38, 39)] }), OUT(k, 34, 35)],
     () => [DS('Wheels', { g: ssWheels(k), rows: [[NUM(k, 40, 'PW Range'), NUM(k, 41, 'MW Amount', 56), MEN(k, 42, 'MW Dest', 108)]] })],
     () => [DS('Voices / Arpeggiator', { g: ssArp(k), rows: [[NUM(k, 43, 'Poly'), NUM(k, 44, 'Transpose', 56), NUM(k, 45, 'Slide'), TG(k, 46, 'Legato', 52), TG(k, 47, 'Constant', 62), TG(k, 48, 'Mono', 46)], [MEN(k, 51, 'Mode', 92), MEN(k, 49, 'Rate', 70), MEN(k, 50, 'Range', 70)]] })],
-    () => [DS('Distortion', { k: [KN(k, 52, 'Drive')], g: distWave(k, { drive: 52, dmax: 99, gain: 53 }), rows: [[NUM(k, 53, 'Gain')]] }),
-      DS('Delay', { g: taps(k, { time: 54, fb: 55, filt: 56, mix: 57, beats: (i) => SS_DELAY_BEATS[clamp(Math.round(i), 0, 4)] }), rows: [[MEN(k, 54, 'Time', 64), NUM(k, 55, 'Feedback'), NUM(k, 56, 'Filter'), NUM(k, 57, 'Mix')]] })],
-  ]);
+    () => [fxPage(k, [
+      { name: 'Distortion', build: () => DS('Distortion', { k: [KN(k, 52, 'Drive')], g: distWave(k, { drive: 52, dmax: 99, gain: 53 }), rows: [[NUM(k, 53, 'Gain')]] }) },
+      { name: 'Delay', build: () => DS('Delay', { g: taps(k, { time: 54, fb: 55, filt: 56, mix: 57, beats: (i) => SS_DELAY_BEATS[clamp(Math.round(i), 0, 4)] }), rows: [[MEN(k, 54, 'Time', 64), NUM(k, 55, 'Feedback'), NUM(k, 56, 'Filter'), NUM(k, 57, 'Mix')]] }) }])],
+  ], { 2: () => k.get(32) !== 0, 6: () => k.get(52) > 0 || k.get(57) > 0 });
 }

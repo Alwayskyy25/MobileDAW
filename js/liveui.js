@@ -86,12 +86,12 @@ export function lvSel(items, get, set, o = {}) {
 export function lvTabs(tabs, cur, onSel, o = {}) {
   const row = h('div', { class: 'lv-tabs' + (o.cls ? ' ' + o.cls : '') });
   const bs = tabs.map((t, k) => {
-    const led = t.led ? h('i', { class: 'led' }) : null;
+    const led = t.led || t.lit ? h('i', { class: 'led' }) : null;
     const chk = t.check ? h('i', { class: 'chk' }) : null;
     const b = h('button', { class: 'lv-tab' + (k === cur ? ' on' : ''), onclick: (e) => { if (e.target.classList && e.target.classList.contains('chk') && t.onCheck) { t.onCheck(); paint(); return; } sel(k); } }, chk, led, t.label);
     return b;
   });
-  const paint = () => tabs.forEach((t, k) => { if (t.check) bs[k].classList.toggle('lit', !!t.check()); });
+  const paint = () => tabs.forEach((t, k) => { const f = t.check || t.lit; if (f) bs[k].classList.toggle('lit', !!f()); });   // check = switch on the tab, lit = Live's LED (the section is in use)
   function sel(k) { cur = k; bs.forEach((b, m) => b.classList.toggle('on', m === k)); onSel(k); }
   row.append(...bs); row.update = paint; paint();
   row.select = sel;

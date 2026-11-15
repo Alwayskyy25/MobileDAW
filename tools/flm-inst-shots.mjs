@@ -34,6 +34,27 @@ for (const [k, ty, name] of [[0, 30, 'directwave'], [1, 31, 'gms'], [2, 32, 'min
     if (el && await el.isVisible()) { await el.screenshot({ path: path.join(out, `${name}-${String(j + 1).padStart(2, '0')}-${tabs[j].replace(/\W+/g, '').toLowerCase()}.png`) }); }
   }
 }
+// DirectWave: no zone side panel; a tap on the sample display asks for a sample (the zone event the device view answers with the browser)
+{ await ev(async () => { const P = await import('./js/project.js'); P.selectTrack(P.state.tracks.findIndex((t) => t.inst && t.inst.type === 30)); }); await page.waitForTimeout(500);
+  await ev(() => { window.__zone = 0; document.addEventListener('mdaw-zone', () => { window.__zone++; }); document.querySelectorAll('.lk-flmtabs .lv-tab')[0].click(); }); await page.waitForTimeout(300);
+  const side = await ev(() => document.querySelectorAll('.card.flm-card .inst-side').length), cv = await page.$('.card.flm-card .flm-dbox canvas'), bx = await cv.boundingBox();
+  await page.mouse.click(bx.x + bx.width / 2, bx.y + bx.height * 0.4); await page.waitForTimeout(300);
+  ok(side === 0 && (await ev(() => window.__zone)) === 1, `DirectWave: no zone side panel (${side}), a tap on the display asks for a sample`);
+  await page.keyboard.press('Escape'); await ev(() => { for (const b of document.querySelectorAll('.scrim')) b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); }); await page.waitForTimeout(200); }
+// MiniSynth FX: one panel; the switch on an effect's entry turns it on, choosing an entry shows that effect
+{ await ev(async () => { const P = await import('./js/project.js'); P.selectTrack(P.state.tracks.findIndex((t) => t.inst && t.inst.type === 32)); }); await page.waitForTimeout(500);
+  await ev(() => [...document.querySelectorAll('.lk-flmtabs .lv-tab')].find((x) => x.textContent === 'FX').click()); await page.waitForTimeout(300);
+  const get = () => ev(async () => { const P = await import('./js/project.js'); const t = P.state.tracks.find((x) => x.inst && x.inst.type === 32); return t.inst.params[28] || 0; });
+  const n0 = await ev(() => ({ secs: document.querySelectorAll('.flm-fxw .flm-ds').length, list: [...document.querySelectorAll('.flm-fxsel .lv-tab')].map((x) => x.textContent) })), v0 = await get();
+  await ev(() => document.querySelectorAll('.flm-fxsel .lv-tab')[1].querySelector('.chk').click()); await page.waitForTimeout(200); const v1 = await get();
+  await ev(() => document.querySelectorAll('.flm-fxsel .lv-tab')[1].click()); await page.waitForTimeout(200);
+  const title = await ev(() => document.querySelector('.flm-fxw .flm-dt').textContent), led = await ev(() => [...document.querySelectorAll('.lk-flmtabs .lv-tab')].find((x) => x.textContent === 'FX').classList.contains('lit'));
+  ok(n0.secs === 1 && n0.list.join('/') === 'Distortion/Delay/Chorus/Phaser' && v0 < 0.5 && v1 > 0.5 && title === 'Delay' && led, `MiniSynth FX: one panel (${n0.list.join(' / ')}), Delay switch ${v0} -> ${v1}, panel shows ${title}, FX tab LED lit ${led}`); }
+// title bar: the quick swap button lists the instruments; the long list stays on screen (it scrolls)
+{ await ev(() => document.querySelector('.card.flm-card > h4 .dv-swap').click()); await page.waitForTimeout(450);
+  const m = await ev(() => { const e = document.querySelector('.menu'); if (!e) return null; const r = e.getBoundingClientRect(); return { n: e.querySelectorAll('.mi').length, top: r.top, bottom: r.bottom, H: innerHeight }; });
+  ok(m && m.n >= 20 && m.top >= 0 && m.bottom <= m.H, `quick swap: ${m && m.n} instruments listed, menu inside the screen (${m && Math.round(m.top)}..${m && Math.round(m.bottom)} of ${m && m.H})`);
+  await ev(() => { for (const b of document.querySelectorAll('.scrim')) b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); }); await page.waitForTimeout(300); }
 // a knob turned on the panel reaches the project (and the engine)
 const moved = await ev(async () => { const P = await import('./js/project.js'); const i = P.state.tracks.findIndex((t) => t.inst && t.inst.type === 32); P.selectTrack(i); P.setInstParam(i, 4, 37); return P.state.tracks[i].inst.params[4]; });
 ok(moved === 37, 'MiniSynth Cutoff set through the project API: ' + moved);

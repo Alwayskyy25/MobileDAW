@@ -78,6 +78,13 @@ function zoneEditor(i, k) {
   modal(multi ? `Zona ${k + 1}` : 'Sample DirectWave', body, acts);
 }
 
+// DirectWave's display (flmpanels.js dwSample) asks for a zone: tap = pick / edit its sample, the Zona button = the zone list
+const zonesMenu = (i, r) => { const t = state.tracks[i]; if (!t || !t.inst) return; const zs = t.inst.zones || [];
+  menu([...zs.map((z, k) => ({ label: `Zona ${k + 1}: ${z.sample ? z.sample.name : '(kosong)'}`, fn: () => zoneEditor(i, k) })), { sep: true },
+    { label: '+ Zona', dim: zs.length >= P.MAX_ZONES, fn: () => { const k = P.addZone(i); if (k !== null) zoneEditor(i, k); } }], r.left, r.bottom + 1); };
+document.addEventListener('mdaw-zone', (e) => { const { i, k, list, rect } = e.detail; const t = state.tracks[i]; if (!t || !t.inst) return;
+  if (list) { zonesMenu(i, rect); return; }
+  const z = (t.inst.zones || [])[k]; if (z && z.sample) zoneEditor(i, k); else BR.openBrowser('file', { track: i, zone: k || 0 }); });
 function zonePanel(i, t) {
   const zs = t.inst.zones || [];
   const multi = t.inst.type === INST.KEYSTONE || t.inst.type === INST.FLM_DW;   // FLM DirectWave: several layers / zones
@@ -131,6 +138,7 @@ function pitchKnob(i, t) {
 //   window minimised -> "Klik Tampilkan untuk menampilkan plugin." + Tampilkan   (the explicit message the owner asked for)
 //   window open & visible -> "Terbuka di jendela mengambang." + Tampilkan (raise) + Tutup
 //   window closed (float-only mode) -> "Plugin tampil di jendela mengambang." + Tampilkan (opens it)
+const swapBtn = (label, pick) => h('button', { class: 'dv-swap', 'aria-label': label, title: label, onclick: (e) => { e.stopPropagation(); pick(e.currentTarget.getBoundingClientRect()); } }, '\u21C4');   // quick swap of the module
 const popBtn = (open) => h('button', { class: 'fw-pop', 'aria-label': 'Buka di jendela mengambang', title: 'Jendela mengambang', onclick: (e) => { e.stopPropagation(); open(); } }, '\u29C9');
 const bigMod = (def) => !!(def && def.big);   // a module large enough to default to a floating window (MiniMeters and the like)
 function floatedCard(key, name, open, o = {}) {
@@ -202,9 +210,16 @@ function instCard(i, t, o = {}) {
     } }, 'Preset'));
   }
   if (!o.floating && (FW.isOpen('i:' + t.id) || (prefs.floatPlugins && bigMod(def)))) return floatedCard('i:' + t.id, def.name, () => openInstWindow(t.id), { head });
+  const instPick = (r) => menu(INST_LIST.map((k) => ({ label: INSTRUMENTS[k].name, check: t.inst.type === k, fn: () => P.setInstrument(i, k) })), r.left - 60, r.bottom);
+  if (t.kind === 'midi') head.append(swapBtn('Ganti instrumen', instPick));
   if (!o.floating) head.append(popBtn(() => openInstWindow(t.id)));
+  head.append(h('button', { class: 'dv-more', 'aria-label': 'Menu instrumen', onclick: (e) => { const r = e.currentTarget.getBoundingClientRect();
+    menu([...(o.floating ? [] : [{ label: 'Buka di jendela mengambang', fn: () => openInstWindow(t.id) }, { label: 'Lipat', fn: () => setFolded(fk, true) }, { sep: true }]),
+      ...(t.kind === 'midi' ? [{ label: 'Ganti instrumen\u2026', fn: () => instPick(r) }] : []),
+      ...(def.zones ? [{ label: 'Zona sample\u2026', fn: () => zonesMenu(i, r) }] : []),
+      ...(t.kind === 'midi' ? [{ label: 'Simpan preset\u2026', fn: () => ask('Nama preset', '', (n) => { const x = PRS.saveInstrumentPreset(i, n); toast(x.error || 'Preset tersimpan di Presets/Instruments.'); }) }] : [])], r.left - 120, r.bottom); } }, '\u22EF'));
   if (!o.floating) head.append(foldBtn(fk, false));
-  if (def.view === 'kit') { const kv = instKitView(i, t, o.every || every); if (kv) return h('div', { class: 'card lkcard lvcard' + (def.flm ? ' flm-card flm-t' + t.inst.type : '') }, head, def.zones ? h('div', { class: 'inst-row' }, h('div', { class: 'inst-side' }, zonePanel(i, t)), kv.el) : kv.el); }   // FLM DirectWave: zone list + panel   // Live 12 instruments (fxkit.js VI)
+  if (def.view === 'kit') { const kv = instKitView(i, t, o.every || every); if (kv) return h('div', { class: 'card lkcard lvcard' + (def.flm ? ' flm-card flm-t' + t.inst.type : '') }, head, def.zones && t.inst.type !== INST.FLM_DW ? h('div', { class: 'inst-row' }, h('div', { class: 'inst-side' }, zonePanel(i, t)), kv.el) : kv.el); }   // FLM DirectWave: zone list + panel   // Live 12 instruments (fxkit.js VI)
   if (def.view === 'irack') { const rv = irackView(i, t, o.every || every); return h('div', { class: 'card lkcard lvcard' }, head, rv.el); }   // Instrument Rack (fxkit.js rackPanel)
   if (def.view === 'lsampler' || def.view === 'lwavetable') {
     const pn = def.view === 'lsampler' ? samplerPanel(i, t) : wavetablePanel(i, t);
@@ -405,7 +420,7 @@ function fxCard(i, d, di, n, o = {}) {
   const ctx = { i, di, d, def, every: o.every || every, set: (k, v) => P.setDeviceParam(i, di, k, v), refreshKnobs: () => { for (const c of knobsDiv.children) if (c.update) c.update(); } };
   if (def.kit) {                                                                   // Live 12 panel (js/fxkit.js): the panel lays out every control itself
     let kv = null; try { kv = kitView(ctx); } catch (e) { console.error('fxkit', e); }
-    if (kv) return h('div', { class: 'card lkcard' + (d.bypass ? ' off' : '') }, grip(titleFold(h('h4', {}, pw, h('span', {}, def.name), wetChip(i, di, d), o.floating ? null : popBtn(() => openDeviceWindow(d.id)), more, o.floating ? null : foldBtn(d.id, false)), d.id)), kv.el);
+    if (kv) return h('div', { class: 'card lkcard' + (d.bypass ? ' off' : '') }, grip(titleFold(h('h4', {}, pw, h('span', {}, def.name), wetChip(i, di, d), o.nested ? null : swapBtn('Ganti modul', (r) => fxPick(r, (ty) => P.replaceDevice(i, di, ty))), o.floating ? null : popBtn(() => openDeviceWindow(d.id)), more, o.floating ? null : foldBtn(d.id, false)), d.id)), kv.el);
   }
   if (VIEWS[d.type]) { try { view = VIEWS[d.type](ctx); } catch (e) { console.error('fxviz', e); view = null; } }
   // knobs sit beside the display and flow in columns (the number of rows follows the panel height), so a half-height panel needs no scrolling
@@ -424,7 +439,7 @@ function fxCard(i, d, di, n, o = {}) {
   });
   if (view && view.el) sideLayout(view.el);
   const body = view ? h('div', { class: 'fxv' }, view.el, knobsDiv.children.length ? knobsDiv : null) : knobsDiv;
-  return h('div', { class: 'card' + (d.bypass ? ' off' : '') }, grip(titleFold(h('h4', {}, pw, h('span', {}, def.name), wetChip(i, di, d), o.floating ? null : popBtn(() => openDeviceWindow(d.id)), more, o.floating ? null : foldBtn(d.id, false)), d.id)), body);
+  return h('div', { class: 'card' + (d.bypass ? ' off' : '') }, grip(titleFold(h('h4', {}, pw, h('span', {}, def.name), wetChip(i, di, d), o.nested ? null : swapBtn('Ganti modul', (r) => fxPick(r, (ty) => P.replaceDevice(i, di, ty))), o.floating ? null : popBtn(() => openDeviceWindow(d.id)), more, o.floating ? null : foldBtn(d.id, false)), d.id)), body);
 }
 
 // Device chain of the selected strip. A re-render of the same strip keeps the scroll position, and cards that moved (reorder, fold,
@@ -472,7 +487,7 @@ function hoistAll(card, lk) {
   const head = card.querySelector(':scope > h4'); if (!head || !lk) return false;
   let moved = false;
   for (const s of [...head.querySelectorAll(':scope > .lk-htabs')]) if (s._ph && !s._ph.isConnected) { s.remove(); moved = true; }
-  const strips = [...lk.querySelectorAll('.lv-tabs, .sp-h:has(> .st + .st)')].filter((t) => !t.classList.contains('lk-htabs') && t.closest('.card') === card && !t.closest('h4'));   // .sp-h: the classic synths' section tabs
+  const strips = [...lk.querySelectorAll('.lv-tabs, .sp-h:has(> .st + .st)')].filter((t) => !t.classList.contains('lk-htabs') && !t.classList.contains('flm-fxsel') && t.closest('.card') === card && !t.closest('h4'));   // .sp-h: the classic synths' section tabs
   if (!strips.length) return moved;
   const first = !lk.dataset.htabs; if (first) lk.style.minWidth = lk.offsetWidth + 'px';
   const name = head.querySelector('.dv-name') || [...head.children].find((c) => c.tagName === 'SPAN' && c.textContent.trim());
