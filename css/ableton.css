@@ -1729,3 +1729,16 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .thm-adj { display: grid; grid-template-columns: 132px 1fr 84px; align-items: center; gap: var(--sp-4); font: var(--fw-r) var(--fs-3)/1.2 var(--font); color: var(--text); }
 .thm-adj input[type=range] { width: 100%; min-width: 0; }
 .thm-adj .thm-av { text-align: right; font-variant-numeric: tabular-nums; color: var(--dim); }
+/* Control bar after Live 12: separate flat buttons (no joined groups, no outlines), one height, small radius; the state colours fill the button */
+#top .grp { gap: 2px; } #top .grp .b + .b { margin-left: 0; }
+#top .b.ic, #top .grp .b, #top .grp .b:first-child, #top .grp .b:last-child { border: 0; border-radius: 4px; background: var(--lv-ctl); color: var(--lv-ink); box-shadow: none; }
+#top .b.ic { width: 34px; min-width: 34px; height: var(--cb-h); }
+#top .tport .b { width: 40px; min-width: 40px; height: var(--cb-h); }
+#top .b.ic svg { width: 16px; height: 16px; }
+#top .b.ic:disabled, #top .b.ic[disabled] { opacity: .45; }
+#top .tport #btn-play.on { background: var(--play); color: #0b1a0e; }
+#top .tport #btn-rec { color: var(--rec); } #top .tport #btn-rec.on { background: var(--rec); color: #fff; }
+#top .tport #btn-metro.on { background: var(--lv-or, var(--accent)); color: #1a1100; }
+#top #btn-browser.on { background: var(--lv-or, var(--accent)); color: #1a1100; }
+[data-w="s"] #top .tport .b, [data-w="xs"] #top .tport .b { width: 36px; min-width: 36px; }
+#top .tport, #top .grp.hist { gap: 2px; border: 0; border-radius: 0; overflow: visible; background: transparent; } #top .tport .b + .b, #top .grp.hist .b + .b { border-left: 0; }

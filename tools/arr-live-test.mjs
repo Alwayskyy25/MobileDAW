@@ -1,5 +1,4 @@
-// Arrangement after Live 12 (manual ch. 6) + theme adjustments, in a real browser (Chromium, landscape phone): the Overview strip (tap, double
-// tap = whole Arrangement), Set / Previous / Next Locator, Optimize Height (H) / Width (W), and the theme sliders (brightness, tone, hue).
+// Arrangement after Live 12 (manual ch. 6) + theme adjustments, in a real browser (Chromium, landscape phone): Set / Previous / Next Locator, Optimize Height (H) / Width (W), and the theme sliders (brightness, tone, hue).
 // Usage: node tools/arr-live-test.mjs [out-dir]     (screenshots: docs/redesign/arr)
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url'; import { createRequire } from 'node:module';
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -37,11 +36,11 @@ await tap(g0.cw - 198 + 9, g0.h - 9); await page.waitForTimeout(700); const gh =
 const fits = await ev(async () => { const T = await import('./js/timeline.js'), P = await import('./js/project.js'); const end = P.state.tracks.reduce((m, t) => t.clips.reduce((a, c) => Math.max(a, c.start + c.len), m), 0); const r = document.querySelector('#arr canvas').getBoundingClientRect(); return { endPx: (end - T.view.x0) * T.view.ppt, cw: r.width - T.headWidth(), lastTop: T.probe(0, P.state.tracks.length - 1).top, h: r.height }; });
 ok(Math.abs(gw.ppt - g0.ppt) > 1e-6 && fits.endPx <= fits.cw + 2 && fits.endPx > fits.cw * 0.7, `W fits the Arrangement into the width (end at ${Math.round(fits.endPx)} of ${Math.round(fits.cw)} px)`);
 ok(gh.rowH !== gw.rowH && fits.lastTop < fits.h - 30, `H fits the tracks into the height (row ${Math.round(gw.rowH)} -> ${Math.round(gh.rowH)} px, last track at ${Math.round(fits.lastTop)} of ${Math.round(fits.h)})`);
-// Overview: drag up / down zooms, double tap = the whole Arrangement
-await page.mouse.move(bx.x + 200 * K, bx.y + 4 * K); await page.mouse.down(); await page.mouse.move(bx.x + 200 * K, bx.y + 70 * K, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(500); const gz = await geo();
-await page.mouse.click(bx.x + 200 * K, bx.y + 4 * K); await page.waitForTimeout(90); await page.mouse.click(bx.x + 200 * K, bx.y + 4 * K); await page.waitForTimeout(900); const gf = await geo();
-ok(gz.ppt > gh.ppt * 1.5 && Math.abs(gf.ppt - gw.ppt) / gw.ppt < 0.05, `Overview: dragging down zooms in (${(gz.ppt / gh.ppt).toFixed(2)}x), a double tap shows the whole Arrangement again`);
 await page.screenshot({ path: path.join(out, 'arr-fit.png') });
+// control bar: separate flat buttons of one size; Play lights green while playing, the metronome orange
+{ const q = await ev(() => { const r = (id) => { const e = document.querySelector(id), b = e.getBoundingClientRect(), c = getComputedStyle(e); return { w: Math.round(b.width), h: Math.round(b.height), rad: c.borderTopLeftRadius, svg: !!e.querySelector('svg') }; }; return ['#btn-browser', '#btn-rew', '#btn-play', '#btn-rec', '#btn-metro', '#btn-menu'].map(r); });
+  ok(q.every((x) => x.svg && x.h === q[0].h && x.rad !== '0px') && q.slice(1, 5).every((x) => x.w === q[1].w), `control bar: six icon buttons, one height (${q[0].h} px), rounded (${q[0].rad}), transport buttons one width (${q[1].w} px)`);
+  await page.locator('#top').screenshot({ path: path.join(out, 'controlbar.png') }); }
 // theme adjustments on top of a theme: brightness lifts the greys, tone tints them, hue turns the accent; reset restores the theme exactly
 const tok = () => ev(() => { const s = getComputedStyle(document.documentElement); return { bg: s.getPropertyValue('--bg').trim(), acc: s.getPropertyValue('--accent').trim() }; });
 const t0 = await tok();

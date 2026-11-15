@@ -41,7 +41,7 @@ const panes = {};
 
 // ------------------------------------------------------------------ transport + readouts
 function icons() {
-  for (const [id, n] of [['browser', 'list'], ['play', 'play'], ['stop', 'stop'], ['rew', 'rew'], ['rec', 'rec'], ['metro', 'metro'], ['undo', 'undo'], ['redo', 'redo'], ['menu', 'menu']]) setIcon($('#btn-' + id), n);
+  for (const [id, n] of [['browser', 'panel'], ['play', 'play'], ['stop', 'stop'], ['rew', 'rew'], ['rec', 'rec'], ['metro', 'metro'], ['undo', 'undo'], ['redo', 'redo'], ['menu', 'menu']]) setIcon($('#btn-' + id), n);
 }
 function tapTempo() { const b = openTapChip(); return b; }
 function openTapChip() { const b = Tempo.tapPress(); if (b) toast(b.toFixed(1) + ' BPM', 900); return b; }

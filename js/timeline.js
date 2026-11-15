@@ -24,7 +24,7 @@ const { state, PPQ, SWATCHES } = P;
 // headers on the RIGHT: a title bar in the track colour, the mixer buttons under it, volume / pan sliders when the row is tall enough
 // and a level meter along the right edge of every header.
 let HEAD = 140;                                                 // header width: prefs.headW (drag the header's left edge), else chosen from the canvas width
-const OV = 9, RULER = 43, MROW = 21;   // OV: Live's Overview strip on top; MROW = bottom of the locator strip under it
+const OV = 0, RULER = 34, MROW = 12;   // OV: height of a strip above the locator strip (none: the owner removed the Overview); MROW = bottom of the locator strip
 const BOT = 19, HANDLE = 18, TH = 20, METW = 9;   // top ruler (locators + beats) / bottom time ruler / header title bar / meter strip
 const FOLD_H = 24, MIN_ROW = 52, ADD_H = 44, XROW_H = 26;                // folded row (title bar only) / smallest open row (title + buttons) / "+" row / Master + FX rows (thin, as Live's return / main rows)
 export const view = { x0: 0, ppt: 0.06, y0: 0, rowH: 60 };   // 60: the three header rows (buttons, volume + pan, sends + output) fit with their borders
@@ -77,7 +77,7 @@ const LANE_B = () => H - BOT;                                  // bottom edge of
 const cornerRects = () => { const y = 8, h = RULER - 16, x = CW + 6, bw = 24, sw = 30; return { set: { x, y, w: sw, h }, prev: { x: x + sw + 3, y, w: bw, h }, next: { x: x + sw + 3 + bw + 1, y, w: bw, h }, snap: { x: x + sw + 2 * bw + 9, y, w: Math.max(40, HEAD - 12 - (sw + 2 * bw + 9)), h } }; };
 const snapRect = () => cornerRects().snap;
 const songEnd = () => state.tracks.reduce((m, t) => t.clips.reduce((a, c) => Math.max(a, c.start + c.len), m), 0);
-const ovSpan = () => Math.max(songEnd() + 8 * BAR, view.x0 + CW / view.ppt, 16 * BAR);   // ticks shown by the Overview
+
 const followRect = () => ({ x: CW + 6, y: H - BOT + 3, w: HEAD - 12, h: BOT - 6 });
 const badges = () => (CW < 170 ? [] : [['gridbtn', 'Grid ' + (SNAPS[cfg.snap][0] === 'Auto' ? gridName() : SNAPS[cfg.snap][0]), { x: CW - 150, y: H - BOT + 3, w: 92, h: BOT - 6 }], ['zoombtn', (view.ppt / 0.06).toFixed(2) + 'x', { x: CW - 54, y: H - BOT + 3, w: 50, h: BOT - 6 }], ...(CW < 330 ? [] : [['fith', 'H', { x: CW - 198, y: H - BOT + 3, w: 19, h: BOT - 6 }], ['fitw', 'W', { x: CW - 177, y: H - BOT + 3, w: 19, h: BOT - 6 }]])]);
 let pressed = null;                                           // which corner / badge button is under the finger (drawn highlighted)
@@ -422,13 +422,6 @@ function drawDragAids() {
 let loopA = 0;                                                   // drawn brightness of the loop brace (eases to 1 when the loop is on)
 const PUon = () => state.punch.on && state.punch.end > state.punch.start;
 function drawRuler(g) {
-  // Overview (Live): the whole Arrangement in a thin strip, every clip a line in its colour, the shown part outlined; drag = scroll / zoom
-  { const span = ovSpan(), n = Math.max(1, state.tracks.length), lh = Math.max(1, Math.min(2, (OV - 3) / n));
-    ctx.fillStyle = C('#161617'); ctx.fillRect(0, 0, CW, OV);
-    state.tracks.forEach((t, i) => { const y = 1 + (i / n) * (OV - 3); for (const c of t.clips) { ctx.fillStyle = c.color || t.color || '#888'; ctx.fillRect(c.start / span * CW, y, Math.max(1, c.len / span * CW), lh); } });
-    const a = view.x0 / span * CW, b = Math.min(CW, (view.x0 + CW / view.ppt) / span * CW);
-    ctx.fillStyle = 'rgba(255,255,255,.10)'; ctx.fillRect(a, 0, b - a, OV - 1); ctx.strokeStyle = T('--text'); ctx.lineWidth = 1; ctx.strokeRect(Math.round(a) + 0.5, 0.5, Math.max(3, Math.round(b - a) - 1), OV - 2);
-    ctx.fillStyle = C('#08080a'); ctx.fillRect(0, OV - 1, CW, 1); }
   ctx.fillStyle = C('#202022'); ctx.fillRect(0, OV, CW, MROW - OV);                         // locator strip
   ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(0, MROW, CW, RULER - MROW);                   // beat time ruler
   ctx.fillStyle = C('#08080a'); ctx.fillRect(0, MROW - 1, CW, 1); ctx.fillRect(0, RULER - 2, CW, 2);
@@ -809,7 +802,6 @@ function edgeScroll(x) {
 function hit(x, y) {
   if (y < RULER) {
     if (x >= CW) { const q = cornerRects(); return inRect(q.set, x, y, 2) ? { type: 'locset' } : inRect(q.prev, x, y, 1) ? { type: 'locprev' } : inRect(q.next, x, y, 1) ? { type: 'locnext' } : { type: 'corner' }; }
-    if (y < OV + 1) return { type: 'ov', tick: x / CW * ovSpan() };
     if (y < MROW + 2) { let best = null, bd = 18; for (const m of state.markers) { const d = Math.abs(x - tx(m.t)); if (d < bd) { bd = d; best = m; } } return best ? { type: 'marker', m: best } : { type: 'mrow', tick: xt(x) }; }
     if (PUon() && y > RULER - 11) {
       const dl = Math.abs(x - tx(state.punch.start)), dr = Math.abs(x - tx(state.punch.end));
@@ -1278,7 +1270,6 @@ function setup() {
         case 'locset': { const m = P.addMarker(Math.round(state.playing ? P.currentTick() : snapT(P.currentTick()))); toast('Locator \u201c' + m.name + '\u201d ditambahkan.', 1400); return invalidate(); }
         case 'locprev': P.jumpMarker(-1); return invalidate();
         case 'locnext': P.jumpMarker(1); return invalidate();
-        case 'ov': glideTo(Math.max(0, t.tick - CW / (2 * view.ppt)), view.ppt); return;                 // Overview: tap = show that part
         case 'fitw': { const e = songEnd(); if (e) fitTo(0, e); return; }                              // Live's Optimize Width (W)
         case 'fith': { const avail = LANE_B() - RULER - ADD_H - nX() * XROW_H, used = contentH() - ADD_H - nX() * XROW_H; if (used > 0) { for (const tr of state.tracks) animRow(tr); view.rowH = clamp(view.rowH * avail / used, 30, ROW_MAX); view.y0 = 0; clampView(); invalidate(); } return; }   // Optimize Height (H)
         case 'cornerMenu': return menu([...SNAPS.map((s, k) => ({ label: s[0], check: cfg.snap === k, fn: () => { cfg.snap = k; invalidate(); } })), { sep: true }, { label: 'Ikuti playhead', check: cfg.follow, fn: () => { cfg.follow = !cfg.follow; } }, { label: 'Pilih semua klip', fn: () => selAll() }, { label: 'Batal pilihan', dim: !msel.size, fn: () => clearSel() }, { sep: true }, { label: 'Lipat semua track', fn: () => foldAll(true) }, { label: 'Buka semua track', fn: () => foldAll(false) }], canvasOrigin().left + Math.max(0, CW - 20), canvasOrigin().top + RULER);
@@ -1319,7 +1310,7 @@ function setup() {
       }
     },
     dtap(x, y, t) {
-      if (t.type === 'ov') { const e = songEnd(); if (e) fitTo(0, e); return; }                           // Live: double-click the Overview = the whole Arrangement
+
       if (t.type === 'headw') return setHeadW(0);                                                // double-tap the edge: back to the automatic width
       if (t.type === 'rowh') { const tr = state.tracks[t.i]; if (tr && tr.hx) { animRow(tr); delete tr.hx; invalidate(); } return; }   // double-tap the grip: back to the normal height
       clearTimeout(menuWait); menuWait = 0;
@@ -1359,7 +1350,6 @@ function setup() {
       if (t.type === 'loop' || t.type === 'loopL' || t.type === 'loopR') { drag = { k: t.type, s0: state.loop.start, e0: state.loop.end, t0: t.tick }; return true; }
       if (t.type === 'head' && (t.btn === 3 || t.btn === 4)) { const rc = hdr(t.i)[t.btn === 3 ? 'vol' : 'pan']; if (rc) { const tr = state.tracks[t.i]; drag = { k: t.btn === 3 ? 'hvol' : 'hpan', i: t.i, rc, x0, y0, u0: t.btn === 3 ? Math.sqrt(clamp(tr.vol / VMAX, 0, 1)) : (clamp(tr.pan, -1, 1) + 1) / 2, fine: false }; return true; } }
       if (t.type === 'head' && (t.btn === 8 || t.btn === 9)) { const rc = hdr(t.i)[t.btn === 8 ? 'sa' : 'sb']; if (rc) { const tr = state.tracks[t.i]; drag = { k: 'hsend', s: t.btn - 8, i: t.i, rc, x0, y0, u0: (tr.send && tr.send[t.btn - 8]) || 0 }; return true; } }
-      if (t.type === 'ov') { stopMotion(); drag = { k: 'ov', p0: view.ppt }; return true; }               // Overview: sideways = scroll, up / down = zoom
       if (t.type === 'ruler') { drag = { k: 'rpend', a: snapT(t.tick), tick0: t.tick, p0: view.ppt }; return true; }   // direction decides: Live zoom (vertical) or time selection (horizontal)
       if (t.type === 'clip' && msel.has(t.c.id)) {                // group move / group resize of every picked clip
         checkpoint(); P.selectClip(t.i, t.c.id);
@@ -1399,7 +1389,6 @@ function setup() {
       if (drag.k === 'marker') { P.editMarker(drag.id, { t: Math.max(0, snapT(tick)) }); invalidate(); return; }
       if (drag.k === 'punchL') { P.setPunch({ start: Math.min(snapT(tick), state.punch.end - BEAT) }); invalidate(); return; }
       if (drag.k === 'punchR') { P.setPunch({ end: Math.max(snapT(tick), state.punch.start + BEAT) }); invalidate(); return; }
-      if (drag.k === 'ov') { const span = ovSpan(); view.ppt = clamp(drag.p0 * Math.exp(dy * 0.011), PMIN, PMAX); view.x0 = Math.max(0, clamp(x, 0, CW) / CW * span - CW / (2 * view.ppt)); clampView(); invalidate(); return; }
       if (drag.k === 'rpend') {
         if (Math.abs(dy) > Math.abs(dx) * 1.15) { drag.k = 'rzoom'; stopMotion(); } else { drag.k = 'sel'; sel = { a: drag.a, b: drag.a }; }
       }
