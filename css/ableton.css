@@ -1724,3 +1724,8 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .card > h4 .dv-swap::after, .card > h4 .fw-pop::after, .card > h4 button.dv-more::after { content: ''; position: absolute; inset: -5px -2px; }   /* touch room */
 /* long menus stay on screen and scroll */
 .menu { max-height: calc(100vh - 12px); max-height: calc(100dvh - 12px); overflow-y: auto; overscroll-behavior: contain; }
+/* theme adjustments (Settings): label | slider | value, one row each */
+.thm-adjs { display: grid; gap: var(--sp-3); margin: var(--sp-3) 0 var(--sp-4); }
+.thm-adj { display: grid; grid-template-columns: 132px 1fr 84px; align-items: center; gap: var(--sp-4); font: var(--fw-r) var(--fs-3)/1.2 var(--font); color: var(--text); }
+.thm-adj input[type=range] { width: 100%; min-width: 0; }
+.thm-adj .thm-av { text-align: right; font-variant-numeric: tabular-nums; color: var(--dim); }

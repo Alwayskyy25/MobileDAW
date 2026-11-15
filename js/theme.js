@@ -13,6 +13,9 @@ const LIB = {
   middark:  { name: 'Mid Dark',                 base: 'dark',  a: 22, b: 0.96 },
   lowc:     { name: 'Dark Neutral Low Contrast', base: 'dark',  a: 26, b: 0.82 },
   highc:    { name: 'Dark Neutral High Contrast', base: 'dark', a: -8, b: 1.14 },
+  medc:     { name: 'Dark Neutral Medium Contrast', base: 'dark', a: 10, b: 0.98 },
+  lightmc:  { name: 'Light Neutral Medium Contrast', base: 'light', a: -26, b: 1.04 },
+  lightlc:  { name: 'Light Neutral Low Contrast', base: 'light', a: -8, b: 0.86 },
   midlight: { name: 'Mid Light',                base: 'light', a: -42, b: 1.0 },
   lighthc:  { name: 'Light Neutral High Contrast', base: 'light', a: -14, b: 1.1 },
   // the device panels of the owner's Ableton Live screenshots, colours measured in them: title bar #a5a5a5, body #878787, dark display #282828,
@@ -35,10 +38,38 @@ for (const [id, t] of Object.entries(LIB)) {
 }
 // the Light theme IS the Ableton Live reference palette (owner's request: 'pakai tema light'); the derived Mid Light / High Contrast themes were built from the old values above
 THEMES.light = THEMES.ableton; delete THEMES.ableton;
-export const THEME_TONE = { light: 'light', midlight: 'light', lighthc: 'light' };
-export const THEME_NAMES = { dark: 'Dark', middark: 'Mid Dark', lowc: 'Dark Neutral Low Contrast', highc: 'Dark Neutral High Contrast', live: 'Live Classic', black: 'Darkest (OLED)', midlight: 'Mid Light', light: 'Light (Ableton Live)', lighthc: 'Light Neutral High Contrast' };
+export const THEME_TONE = { light: 'light', midlight: 'light', lighthc: 'light', lightmc: 'light', lightlc: 'light' };
+export const THEME_NAMES = { dark: 'Dark', middark: 'Mid Dark', lowc: 'Dark Neutral Low Contrast', medc: 'Dark Neutral Medium Contrast', highc: 'Dark Neutral High Contrast', live: 'Live Classic', black: 'Darkest (OLED)', midlight: 'Mid Light', light: 'Light (Ableton Live)', lightmc: 'Light Neutral Medium Contrast', lightlc: 'Light Neutral Low Contrast', lighthc: 'Light Neutral High Contrast' };
 // swatches for the theme picker: background, panel, control, text
 export const themeSwatch = (id) => { const t = THEMES[id] || THEMES.dark; return [t['--bg'], t['--panel2'], t['--raise2'], t['--text']]; };
+// ---- Live 12's theme adjustments (Settings -> Tema): every theme can be shifted without making a new one.
+//   brightness / contrast: the neutral greys (lightness around mid grey)      tone: greys tinted cool (-1) .. warm (+1)
+//   intensity: saturation of the accent / state colours                         hue: their hue, in degrees
+const ADJ = { brightness: 0, contrast: 0, tone: 0, intensity: 0, hue: 0 };
+const adjOn = () => ADJ.brightness || ADJ.contrast || ADJ.tone || ADJ.intensity || ADJ.hue;
+const KEEP = new Set(['--c0', '--c255', '--scrim', '--shadow', '--toast', '--toast-ink', '--key-w', '--key-b']);
+function hsl(r, g, b) { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn; if (!d) return [0, 0, l];
+  const sat = d / (1 - Math.abs(2 * l - 1)), hh = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return [hh * 60, sat, l]; }
+function unhsl(hh, sat, l) { const c = (1 - Math.abs(2 * l - 1)) * sat, x = c * (1 - Math.abs((hh / 60) % 2 - 1)), m = l - c / 2, q = Math.floor(((hh % 360) + 360) % 360 / 60);
+  const [r, g, b] = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]][q]; return [(r + m) * 255, (g + m) * 255, (b + m) * 255]; }
+function adjust(map) {
+  if (!adjOn()) return map;
+  const out = {}, cl = (v) => Math.max(0, Math.min(255, Math.round(v))), h2 = (n) => cl(n).toString(16).padStart(2, '0');
+  for (const [k, v] of Object.entries(map)) {
+    if (typeof v !== 'string' || !/^#[0-9a-f]{6}/i.test(v) || KEEP.has(k)) { out[k] = v; continue; }
+    const R = parseInt(v.slice(1, 3), 16), G = parseInt(v.slice(3, 5), 16), B = parseInt(v.slice(5, 7), 16), tail = v.slice(7);
+    if (Math.max(R, G, B) - Math.min(R, G, B) < 14) {                       // a neutral: brightness, contrast, then the tone tint
+      let L = (R + G + B) / 3; L = 128 + (L - 128) * (1 + 0.6 * ADJ.contrast) + 46 * ADJ.brightness; L = Math.max(0, Math.min(255, L));
+      const t = ADJ.tone * 9 * (1 - Math.abs(L - 128) / 160);              // strongest on the mid greys, none on black / white
+      out[k] = '#' + h2(L + t) + h2(L + t * 0.25) + h2(L - t) + tail;
+    } else { const [hh, sat, l] = hsl(R, G, B), c = unhsl(hh + ADJ.hue, Math.max(0, Math.min(1, sat * (1 + 0.9 * ADJ.intensity))), l); out[k] = '#' + h2(c[0]) + h2(c[1]) + h2(c[2]) + tail; }
+  }
+  return out;
+}
+let ACT = THEMES.dark;                                    // the applied theme: the chosen one with the adjustments
+export function setThemeAdjust(a) { for (const k of Object.keys(ADJ)) if (a && typeof a[k] === 'number' && isFinite(a[k])) ADJ[k] = k === 'hue' ? Math.max(-180, Math.min(180, a[k])) : Math.max(-1, Math.min(1, a[k])); applyTheme(current); }
+export const themeAdjust = () => ({ ...ADJ });
+export const currentTone = () => THEME_TONE[current] || 'dark';
 let current = 'dark';
 const cache = new Map();
 
@@ -50,7 +81,7 @@ const EXACT = { '#ffa722': '--accent', '#e5484d': '--rec', '#7ac555': '--ok', '#
 const rgb = (hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
 const hx = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
 let ramp = [];
-function buildRamp() { ramp = ANCHORS.map(([tok, key]) => [key, rgb(THEMES[current][tok])]); }
+function buildRamp() { ramp = ANCHORS.map(([tok, key]) => [key, rgb(ACT[tok])]); }
 function mapNeutral(v) {          // v: 0..255 grey of the dark design -> [r, g, b] of the current theme
   for (let i = 1; i < ramp.length; i++) {
     if (v <= ramp[i][0]) { const [k0, c0] = ramp[i - 1], [k1, c1] = ramp[i], t = (v - k0) / (k1 - k0 || 1); return c0.map((c, j) => c + (c1[j] - c) * t); }
@@ -66,23 +97,23 @@ export function C(hex) {
   if (h.length === 8) { a = h.slice(6); h = h.slice(0, 6); }
   const [R, G, B] = rgb('#' + h);
   const tok = EXACT['#' + h.toLowerCase()];
-  if (tok) r = THEMES[current][tok] + a;
-  else if (current === 'dark' || Math.max(R, G, B) - Math.min(R, G, B) >= 14) r = hex;
+  if (tok) r = ACT[tok].slice(0, 7) + a;
+  else if ((current === 'dark' && !adjOn()) || Math.max(R, G, B) - Math.min(R, G, B) >= 14) r = hex;
   else { const m = mapNeutral((R + G + B) / 3); r = '#' + hx(m[0]) + hx(m[1]) + hx(m[2]) + a; }
   cache.set(hex, r);
   return r;
 }
-export const T = (token) => THEMES[current][token];     // theme token for canvas code, e.g. T('--mute')
+export const T = (token) => ACT[token];     // theme token for canvas code, e.g. T('--mute')
 export const currentTheme = () => current;
 export function applyTheme(name) {
   if (!THEMES[name]) name = 'dark';
-  current = name; cache.clear(); buildRamp();
+  current = name; ACT = adjust(THEMES[name]); cache.clear(); buildRamp();
   const root = document.documentElement;
-  for (const [k, v] of Object.entries(THEMES[name])) root.style.setProperty(k, v);
+  for (const [k, v] of Object.entries(ACT)) root.style.setProperty(k, v);
   const tone = THEME_TONE[name] || name;              // derived themes reuse the CSS rules of their base
   root.dataset.theme = tone; root.dataset.themeId = name;
   root.style.colorScheme = tone === 'light' ? 'light' : 'dark';
   const cs = document.querySelector('meta[name=color-scheme]'); if (cs) cs.content = tone === 'light' ? 'light' : 'dark';
-  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = THEMES[name]['--panel'];
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = ACT['--panel'];
   window.dispatchEvent(new Event('themechange'));
 }

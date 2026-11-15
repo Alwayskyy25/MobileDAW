@@ -5,7 +5,7 @@ import { eng, backend } from './engine.js';
 import { prefs, savePrefs, resetPrefs } from './prefs.js';
 import { enableMidi, midiNames } from './midi.js';
 import { applyTimelinePrefs } from './timeline.js';
-import { applyTheme, THEME_NAMES, themeSwatch } from './theme.js';
+import { applyTheme, THEME_NAMES, themeSwatch, setThemeAdjust, themeAdjust } from './theme.js';
 import { applyViewportMeta, relayoutSoon } from './layout.js';
 import { EDGE_LEVELS } from './edgeguard.js';
 import * as P from './project.js';
@@ -298,6 +298,20 @@ export function openSettings() {
     return h('button', { class: 'thm' + (prefs.theme === k ? ' on' : ''), 'aria-label': n, onclick: (e) => { prefs.theme = k; savePrefs(); applyTheme(k); for (const x of e.currentTarget.parentElement.children) x.classList.toggle('on', x === e.currentTarget); } },
       h('span', { class: 'thm-pv', style: `background:${bg}` }, h('i', { style: `background:${pn}` }), h('i', { style: `background:${ctl}` }), h('b', { style: `color:${tx}` }, 'Aa')), h('span', { class: 'thm-n' }, n));
   }));
+  // Live 12's theme adjustments: Tone, Brightness, Contrast, Color Intensity, Color Hue, Grid Line Intensity - on top of the chosen theme
+  const adjRow = (label, key, min, max, step, fmt) => { const cur = () => (key === 'gridInt' ? (prefs.gridInt == null ? 0.5 : prefs.gridInt) : themeAdjust()[key]);
+    const val = h('span', { class: 'thm-av' }), sl = h('input', { type: 'range', min, max, step, value: cur(), 'aria-label': label });
+    const show = () => { val.textContent = fmt(+sl.value); sl.style.setProperty('--p', ((+sl.value - min) / (max - min) * 100) + '%'); };
+    const put = () => { if (key === 'gridInt') { prefs.gridInt = +sl.value; window.dispatchEvent(new Event('themechange')); } else { prefs.themeAdj = { ...themeAdjust(), [key]: +sl.value }; setThemeAdjust(prefs.themeAdj); } show(); };
+    sl.addEventListener('input', put); sl.addEventListener('change', savePrefs); sl.addEventListener('dblclick', () => { sl.value = key === 'gridInt' ? 0.5 : 0; put(); savePrefs(); }); show();
+    return h('label', { class: 'thm-adj' }, h('span', { class: 'thm-al' }, label), sl, val); };
+  const pct = (v) => (v > 0 ? '+' : '') + Math.round(v * 100) + ' %';
+  const themeAdj = h('div', { class: 'thm-adjs' },
+    adjRow('Tone', 'tone', -1, 1, 0.05, (v) => (Math.abs(v) < 0.03 ? 'Netral' : (v < 0 ? 'Dingin ' : 'Hangat ') + Math.round(Math.abs(v) * 100) + ' %')),
+    adjRow('Brightness', 'brightness', -1, 1, 0.05, pct), adjRow('Contrast', 'contrast', -1, 1, 0.05, pct),
+    adjRow('Color Intensity', 'intensity', -1, 1, 0.05, pct), adjRow('Color Hue', 'hue', -180, 180, 5, (v) => (v > 0 ? '+' : '') + v + '\u00b0'),
+    adjRow('Grid Line Intensity', 'gridInt', 0, 1, 0.05, (v) => Math.round(v * 100) + ' %'),
+    h('button', { class: 'b', onclick: (e) => { prefs.themeAdj = { tone: 0, brightness: 0, contrast: 0, intensity: 0, hue: 0 }; prefs.gridInt = 0.5; savePrefs(); setThemeAdjust(prefs.themeAdj); for (const sl of e.currentTarget.parentElement.querySelectorAll('input[type=range]')) { sl.value = sl.getAttribute('aria-label') === 'Grid Line Intensity' ? 0.5 : 0; sl.dispatchEvent(new Event('input')); } savePrefs(); } }, 'Reset penyesuaian'));
   const fsBox = [];
   const tabs = {
     Audio: [
@@ -321,7 +335,7 @@ export function openSettings() {
       isNativeApp() ? null : section('MIDI', midiLine, midiBox, h('div', { class: 'sv', style: 'margin-top:6px' }, 'Tekan lama pada knob/fader lalu pilih \"Hubungkan ke MIDI CC\". Pad drum: nada 48\u201353. Transport: MMC dan pesan Start/Stop MIDI.')),
     ],
     Tampilan: [
-      section('Tampilan', h('div', { class: 'sv' }, 'Tema'), themeRow,
+      section('Tampilan', h('div', { class: 'sv' }, 'Tema'), themeRow, h('div', { class: 'sv' }, 'Penyesuaian tema (seperti Live 12): geser, ketuk dua kali = kembali'), themeAdj,
         h('div', { class: 'sv', style: 'margin-top:8px' }, 'Skala UI'),
         h('div', { class: 'scalebox' }, h('div', { class: 'srow' }, stepScale(-5, '\u2212', 'Perkecil'), scaleSlider, stepScale(5, '+', 'Perbesar'), scaleVal), h('div', { class: 'marks' }, h('span', {}, 'Kecil'), h('span', {}, 'Besar'))),
         h('div', { class: 'sv' }, 'Zona tepi layar: sentuhan yang mulai di tepi atas, bawah dan samping diabaikan agar status bar dan bilah navigasi tidak terbuka tak sengaja.'),

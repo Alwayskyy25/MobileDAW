@@ -2,7 +2,7 @@
 // Gestures follow FL Studio Mobile (tap clip = controls, double-tap = editor, long-tap = menus,
 // right-edge handle = resize, ruler drag = time selection) on an Ableton-style layout.
 import { densify } from './autocurve.js';
-import { C, T } from './theme.js';
+import { C, T, currentTone } from './theme.js';
 import { attachGestures, gestureTiming, haptic } from './gesture.js';
 import { menu, ask, modal, toast, clamp } from './ui.js';
 import { checkpoint, revertLast } from './history.js';
@@ -24,7 +24,8 @@ const { state, PPQ, SWATCHES } = P;
 // headers on the RIGHT: a title bar in the track colour, the mixer buttons under it, volume / pan sliders when the row is tall enough
 // and a level meter along the right edge of every header.
 let HEAD = 140;                                                 // header width: prefs.headW (drag the header's left edge), else chosen from the canvas width
-const RULER = 34, MROW = 12, BOT = 19, HANDLE = 18, TH = 20, METW = 9;   // top ruler (locators + beats) / bottom time ruler / header title bar / meter strip
+const OV = 9, RULER = 43, MROW = 21;   // OV: Live's Overview strip on top; MROW = bottom of the locator strip under it
+const BOT = 19, HANDLE = 18, TH = 20, METW = 9;   // top ruler (locators + beats) / bottom time ruler / header title bar / meter strip
 const FOLD_H = 24, MIN_ROW = 52, ADD_H = 44, XROW_H = 26;                // folded row (title bar only) / smallest open row (title + buttons) / "+" row / Master + FX rows (thin, as Live's return / main rows)
 export const view = { x0: 0, ppt: 0.06, y0: 0, rowH: 60 };   // 60: the three header rows (buttons, volume + pan, sends + output) fit with their borders
 let CW = 0;                                                    // width of the clip area = canvas width - HEAD
@@ -72,9 +73,13 @@ const xt = (x) => view.x0 + x / view.ppt;
 const LANE_B = () => H - BOT;                                  // bottom edge of the lanes (the time ruler sits below)
 // rows have individual heights: a folded track is FOLD_H tall, the others view.rowH (gliding while a fold animates)
 // below the tracks: the Master row and one row per effect track (Return A/B stay in the mixer), then the "+" row
-const snapRect = () => ({ x: CW + 6, y: 7, w: HEAD - 12, h: RULER - 14 });
+// top corner over the headers (Live: Set Locator, Previous / Next Locator, then our Snap switch)
+const cornerRects = () => { const y = 8, h = RULER - 16, x = CW + 6, bw = 24, sw = 30; return { set: { x, y, w: sw, h }, prev: { x: x + sw + 3, y, w: bw, h }, next: { x: x + sw + 3 + bw + 1, y, w: bw, h }, snap: { x: x + sw + 2 * bw + 9, y, w: Math.max(40, HEAD - 12 - (sw + 2 * bw + 9)), h } }; };
+const snapRect = () => cornerRects().snap;
+const songEnd = () => state.tracks.reduce((m, t) => t.clips.reduce((a, c) => Math.max(a, c.start + c.len), m), 0);
+const ovSpan = () => Math.max(songEnd() + 8 * BAR, view.x0 + CW / view.ppt, 16 * BAR);   // ticks shown by the Overview
 const followRect = () => ({ x: CW + 6, y: H - BOT + 3, w: HEAD - 12, h: BOT - 6 });
-const badges = () => (CW < 170 ? [] : [['gridbtn', 'Grid ' + (SNAPS[cfg.snap][0] === 'Auto' ? gridName() : SNAPS[cfg.snap][0]), { x: CW - 150, y: H - BOT + 3, w: 92, h: BOT - 6 }], ['zoombtn', (view.ppt / 0.06).toFixed(2) + 'x', { x: CW - 54, y: H - BOT + 3, w: 50, h: BOT - 6 }]]);
+const badges = () => (CW < 170 ? [] : [['gridbtn', 'Grid ' + (SNAPS[cfg.snap][0] === 'Auto' ? gridName() : SNAPS[cfg.snap][0]), { x: CW - 150, y: H - BOT + 3, w: 92, h: BOT - 6 }], ['zoombtn', (view.ppt / 0.06).toFixed(2) + 'x', { x: CW - 54, y: H - BOT + 3, w: 50, h: BOT - 6 }], ...(CW < 330 ? [] : [['fith', 'H', { x: CW - 198, y: H - BOT + 3, w: 19, h: BOT - 6 }], ['fitw', 'W', { x: CW - 177, y: H - BOT + 3, w: 19, h: BOT - 6 }]])]);
 let pressed = null;                                           // which corner / badge button is under the finger (drawn highlighted)
 const nX = () => 1 + Math.max(0, state.returns.length - 2);
 const xInfo = (i) => { const j = i - state.tracks.length; return j === 0 ? { master: true, strip: MASTER, name: 'Master', color: state.master.color || '#4cd964', obj: state.master } : { master: false, k: j + 1, strip: RET0 + j + 1, name: state.returns[j + 1].name, color: state.returns[j + 1].color || '#35d0e0', obj: state.returns[j + 1] }; };
@@ -337,6 +342,10 @@ function draw() {
     xl.push({ y, h, t: `${src} track aktif → ${x.name}` });
   }
   const gy1 = Math.min(LB, rowY(nn));                                                   // grid only over the rows, not over the "+" row and the empty space below
+  { const barPx = BAR * view.ppt; let kb = 1; while (barPx * kb < 34) kb *= 2;                    // the same step as the ruler's bar numbers
+    ctx.fillStyle = currentTone() === 'light' ? 'rgba(0,0,0,.045)' : 'rgba(0,0,0,.10)';
+    for (let b = Math.floor(Math.max(0, P.barAt(view.x0)) / kb) * kb; tx(P.barStart(b)) < CW; b += kb) { if ((b / kb) & 1) { const x0 = tx(P.barStart(b)), x1 = tx(P.barStart(b + kb)); ctx.fillRect(x0, RULER, x1 - x0, gy1 - RULER); } } }
+  ctx.globalAlpha = clamp(0.25 + 1.5 * (prefs.gridInt == null ? 0.5 : prefs.gridInt), 0.1, 1);
   // grid: beats faint, bars stronger (drawn per bar, so 7/8 and signature changes stay right)
   const tEnd = view.x0 + CW / view.ppt + g;
   eachGrid(view.x0 - g, tEnd, g, (t, j) => {
@@ -347,7 +356,7 @@ function draw() {
     ctx.fillStyle = r % P.MM.bt[j] === 0 ? C('#4a4a50') : C('#3a3a3f');   // beat lines clearly visible, sub-beats fainter
     ctx.fillRect(x, RULER, 1, gy1 - RULER);
   });
-  ctx.fillStyle = C('#74747c');
+  ctx.globalAlpha = 1; ctx.fillStyle = C('#74747c');
   for (let b = Math.max(0, P.barAt(view.x0)); tx(P.barStart(b)) < CW; b++) { const x = Math.round(tx(P.barStart(b))); if (x >= 0) ctx.fillRect(x, RULER, 1, gy1 - RULER); }
   if (P.state.sigs.length) { ctx.fillStyle = 'rgba(255,167,34,.3)'; for (const c of P.state.sigs) { const x = Math.round(tx(P.barStart(c.bar))); if (x >= 0 && x <= CW) ctx.fillRect(x, RULER, 1, gy1 - RULER); } }
   for (const m of state.markers) { const x = Math.round(tx(m.t)); if (x < 0 || x > CW) continue; ctx.fillStyle = C('#0e0e10'); ctx.fillRect(x, RULER, 1, gy1 - RULER); }   // Live: a dark line down from every locator
@@ -413,7 +422,14 @@ function drawDragAids() {
 let loopA = 0;                                                   // drawn brightness of the loop brace (eases to 1 when the loop is on)
 const PUon = () => state.punch.on && state.punch.end > state.punch.start;
 function drawRuler(g) {
-  ctx.fillStyle = C('#202022'); ctx.fillRect(0, 0, CW, MROW);                              // locator strip
+  // Overview (Live): the whole Arrangement in a thin strip, every clip a line in its colour, the shown part outlined; drag = scroll / zoom
+  { const span = ovSpan(), n = Math.max(1, state.tracks.length), lh = Math.max(1, Math.min(2, (OV - 3) / n));
+    ctx.fillStyle = C('#161617'); ctx.fillRect(0, 0, CW, OV);
+    state.tracks.forEach((t, i) => { const y = 1 + (i / n) * (OV - 3); for (const c of t.clips) { ctx.fillStyle = c.color || t.color || '#888'; ctx.fillRect(c.start / span * CW, y, Math.max(1, c.len / span * CW), lh); } });
+    const a = view.x0 / span * CW, b = Math.min(CW, (view.x0 + CW / view.ppt) / span * CW);
+    ctx.fillStyle = 'rgba(255,255,255,.10)'; ctx.fillRect(a, 0, b - a, OV - 1); ctx.strokeStyle = T('--text'); ctx.lineWidth = 1; ctx.strokeRect(Math.round(a) + 0.5, 0.5, Math.max(3, Math.round(b - a) - 1), OV - 2);
+    ctx.fillStyle = C('#08080a'); ctx.fillRect(0, OV - 1, CW, 1); }
+  ctx.fillStyle = C('#202022'); ctx.fillRect(0, OV, CW, MROW - OV);                         // locator strip
   ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(0, MROW, CW, RULER - MROW);                   // beat time ruler
   ctx.fillStyle = C('#08080a'); ctx.fillRect(0, MROW - 1, CW, 1); ctx.fillRect(0, RULER - 2, CW, 2);
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, CW, RULER); ctx.clip();
@@ -450,8 +466,8 @@ function drawRuler(g) {
     if (x > CW + 4) break;
     const nx = k2 + 1 < ml.length ? Math.round(tx(ml[k2 + 1].t)) : CW + 200, w = Math.min(nx - x - 3, ctx.measureText(m.name).width + 16);
     if (x + Math.max(8, w) < 0) continue;
-    ctx.fillStyle = C('#3a3a3e'); ctx.strokeStyle = C('#d6d6da'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 0.5, 0.5); ctx.lineTo(x + 9, MROW / 2); ctx.lineTo(x + 0.5, MROW - 1); ctx.closePath(); ctx.fill(); ctx.stroke();   // Live: outlined flag
-    if (w > 18) { ctx.save(); ctx.beginPath(); ctx.rect(x + 1, 0, w, MROW); ctx.clip(); ctx.fillStyle = C('#d6d6da'); ctx.fillText(m.name, x + 12, MROW / 2); ctx.restore(); }
+    ctx.fillStyle = C('#3a3a3e'); ctx.strokeStyle = C('#d6d6da'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 0.5, OV + 0.5); ctx.lineTo(x + 9, (OV + MROW) / 2); ctx.lineTo(x + 0.5, MROW - 1); ctx.closePath(); ctx.fill(); ctx.stroke();   // Live: outlined flag
+    if (w > 18) { ctx.save(); ctx.beginPath(); ctx.rect(x + 1, OV, w, MROW - OV); ctx.clip(); ctx.fillStyle = C('#d6d6da'); ctx.fillText(m.name, x + 12, (OV + MROW) / 2); ctx.restore(); }
   }
   ctx.textBaseline = 'top';
   ctx.restore();
@@ -472,7 +488,7 @@ function drawTimeRuler() {
   }
   ctx.restore();
   ctx.font = FONT(600, 10); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-  const bg = badges(); if (bg.length) { ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(bg[0][2].x - 8, y + 1, CW - bg[0][2].x + 8, BOT - 1); ctx.fillStyle = C('#141415'); ctx.fillRect(bg[0][2].x - 8, y + 1, 1, BOT - 1); }
+  const bg = badges(), bx0 = bg.reduce((m, q) => Math.min(m, q[2].x), CW); if (bg.length) { ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(bx0 - 8, y + 1, CW - bx0 + 8, BOT - 1); ctx.fillStyle = C('#141415'); ctx.fillRect(bx0 - 8, y + 1, 1, BOT - 1); }
   for (const [type, lbl, r] of bg) {                         // Live-style fields: flat, 1 px border, lighter while pressed
     ctx.fillStyle = pressed === type ? C('#55555b') : C('#3a3a3e'); ctx.fillRect(r.x, r.y, r.w, r.h);
     ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
@@ -540,6 +556,8 @@ function drawHead(tick) {
     // only left and right of the playhead, inside the ruler (owner: no light on the bars it has passed or has yet to reach, none in the grid)
     octx.save(); octx.beginPath(); octx.rect(0, 0, CW, RULER); octx.clip(); octx.fillStyle = gr; octx.fillRect(x - R, 0, R * 2, RULER); octx.restore(); }
   if (px >= 0) { octx.fillStyle = 'rgba(0,0,0,.35)'; octx.fillRect(x + 1.5, RULER, 1, LANE_B() - RULER); octx.fillStyle = C('#ffa722'); octx.fillRect(x, RULER, 1.5, LANE_B() - RULER); }
+  if (!state.playing && px >= 0) { const on = calmTL() || Math.floor(performance.now() / 530) % 2 === 0, i = state.sel.track;   // Live's flashing blue insert marker on the selected track
+    if (on) { const y0 = i >= 0 && i < state.tracks.length ? rowY(i) : RULER, h0 = i >= 0 && i < state.tracks.length ? rh(i) - 2 : LANE_B() - RULER; octx.save(); octx.beginPath(); octx.rect(0, RULER, CW, LANE_B() - RULER); octx.clip(); octx.fillStyle = '#2aa7ff'; octx.fillRect(x - 0.25, y0, 2, h0); octx.restore(); } }
   octx.save(); octx.shadowColor = washRgba(hc, 0.9); octx.shadowBlur = 4 + lv * 4; octx.fillStyle = C('#ffa722'); octx.beginPath(); octx.moveTo(x - 5.5, MROW); octx.lineTo(x + 6.5, MROW); octx.lineTo(x + 0.75, MROW + 8); octx.closePath(); octx.fill(); octx.restore();   // the playhead flag glows
   octx.restore();
 }
@@ -666,7 +684,9 @@ function drawHeads() {
   ctx.fillStyle = C('#08080a'); ctx.fillRect(hx - 1, 0, 2, H);                                // line between clip area and headers
   // top corner: Snap switch (tap: snap, follow, select / fold options)
   ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(hx + 1, 0, HEAD - 1, RULER); ctx.fillStyle = C('#141415'); ctx.fillRect(hx, RULER - 1, HEAD, 1);
-  drawSwitch(snapRect(), 'Snap ' + SNAPS[cfg.snap][0], cfg.snap !== SNAPS.length - 1, pressed === 'corner');
+  { const q = cornerRects(), tri = (r, dir) => { const cx = r.x + r.w / 2, cy = r.y + r.h / 2; ctx.fillStyle = C('#d4d4d8'); ctx.beginPath(); ctx.moveTo(cx - 4 * dir, cy); ctx.lineTo(cx + 3 * dir, cy - 4.5); ctx.lineTo(cx + 3 * dir, cy + 4.5); ctx.closePath(); ctx.fill(); };
+    drawBtn(q.set, 'Set', false, null, pressed !== 'locset'); for (const [r, ty, dir] of [[q.prev, 'locprev', 1], [q.next, 'locnext', -1]]) { ctx.fillStyle = pressed === ty ? C('#55555b') : C('#3a3a3e'); ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1); tri(r, dir); } }
+  drawSwitch(snapRect(), HEAD > 200 ? 'Snap ' + SNAPS[cfg.snap][0] : SNAPS[cfg.snap][0], cfg.snap !== SNAPS.length - 1, pressed === 'corner');
   // bottom corner: Follow switch (the arrangement scrolls with the playhead)
   ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(hx + 1, H - BOT, HEAD - 1, BOT); ctx.fillStyle = C('#141415'); ctx.fillRect(hx, H - BOT, HEAD, 1);
   drawSwitch(followRect(), 'Follow', cfg.follow, pressed === 'follow');
@@ -743,6 +763,7 @@ function glideClip(c) { if (!prefs.reduceMotion && !gl.has(c.id)) gl.set(c.id, {
 
 let lastHeadPx = -1e9, headDirty = true;
 const FOLLOW_AT = 0.38;                       // playhead stays at this fraction of the width while the arrangement scrolls under it
+let lastBlink = 0;
 export function frame() {
   if (!W) return;
   const now = performance.now(), dt = clamp((now - (mo.last || now)) / 1000, 0.001, 0.05); mo.last = now;
@@ -773,6 +794,7 @@ export function frame() {
   const px = Math.round(tx(tick) * dpr);
   smoothMeters();
   const mk = state.playing || lastMeterKey ? meterKey() : 0;
+  const bl = state.playing ? 0 : Math.floor(now / 530) % 2; if (bl !== lastBlink) { lastBlink = bl; headDirty = true; }
   if (headDirty || px !== lastHeadPx || mk !== lastMeterKey) { lastHeadPx = px; lastMeterKey = mk; headDirty = false; drawHead(tick); }
 }
 
@@ -786,7 +808,8 @@ function edgeScroll(x) {
 // ------------------------------------------------------------------ hit testing + actions
 function hit(x, y) {
   if (y < RULER) {
-    if (x >= CW) return { type: 'corner' };
+    if (x >= CW) { const q = cornerRects(); return inRect(q.set, x, y, 2) ? { type: 'locset' } : inRect(q.prev, x, y, 1) ? { type: 'locprev' } : inRect(q.next, x, y, 1) ? { type: 'locnext' } : { type: 'corner' }; }
+    if (y < OV + 1) return { type: 'ov', tick: x / CW * ovSpan() };
     if (y < MROW + 2) { let best = null, bd = 18; for (const m of state.markers) { const d = Math.abs(x - tx(m.t)); if (d < bd) { bd = d; best = m; } } return best ? { type: 'marker', m: best } : { type: 'mrow', tick: xt(x) }; }
     if (PUon() && y > RULER - 11) {
       const dl = Math.abs(x - tx(state.punch.start)), dr = Math.abs(x - tx(state.punch.end));
@@ -1252,6 +1275,12 @@ function setup() {
       touchedAt = performance.now();
       switch (t.type) {
         case 'corner': return toggleSnap();
+        case 'locset': { const m = P.addMarker(Math.round(state.playing ? P.currentTick() : snapT(P.currentTick()))); toast('Locator \u201c' + m.name + '\u201d ditambahkan.', 1400); return invalidate(); }
+        case 'locprev': P.jumpMarker(-1); return invalidate();
+        case 'locnext': P.jumpMarker(1); return invalidate();
+        case 'ov': glideTo(Math.max(0, t.tick - CW / (2 * view.ppt)), view.ppt); return;                 // Overview: tap = show that part
+        case 'fitw': { const e = songEnd(); if (e) fitTo(0, e); return; }                              // Live's Optimize Width (W)
+        case 'fith': { const avail = LANE_B() - RULER - ADD_H - nX() * XROW_H, used = contentH() - ADD_H - nX() * XROW_H; if (used > 0) { for (const tr of state.tracks) animRow(tr); view.rowH = clamp(view.rowH * avail / used, 30, ROW_MAX); view.y0 = 0; clampView(); invalidate(); } return; }   // Optimize Height (H)
         case 'cornerMenu': return menu([...SNAPS.map((s, k) => ({ label: s[0], check: cfg.snap === k, fn: () => { cfg.snap = k; invalidate(); } })), { sep: true }, { label: 'Ikuti playhead', check: cfg.follow, fn: () => { cfg.follow = !cfg.follow; } }, { label: 'Pilih semua klip', fn: () => selAll() }, { label: 'Batal pilihan', dim: !msel.size, fn: () => clearSel() }, { sep: true }, { label: 'Lipat semua track', fn: () => foldAll(true) }, { label: 'Buka semua track', fn: () => foldAll(false) }], canvasOrigin().left + Math.max(0, CW - 20), canvasOrigin().top + RULER);
         case 'gridbtn': { const o = canvasOrigin(); return menu(SNAPS.map((s, k) => ({ label: s[0], check: cfg.snap === k, fn: () => { cfg.snap = k; invalidate(); } })), o.left + CW - 150, o.top + H - BOT); }
         case 'zoombtn': return zoomMenu();
@@ -1290,6 +1319,7 @@ function setup() {
       }
     },
     dtap(x, y, t) {
+      if (t.type === 'ov') { const e = songEnd(); if (e) fitTo(0, e); return; }                           // Live: double-click the Overview = the whole Arrangement
       if (t.type === 'headw') return setHeadW(0);                                                // double-tap the edge: back to the automatic width
       if (t.type === 'rowh') { const tr = state.tracks[t.i]; if (tr && tr.hx) { animRow(tr); delete tr.hx; invalidate(); } return; }   // double-tap the grip: back to the normal height
       clearTimeout(menuWait); menuWait = 0;
@@ -1329,6 +1359,7 @@ function setup() {
       if (t.type === 'loop' || t.type === 'loopL' || t.type === 'loopR') { drag = { k: t.type, s0: state.loop.start, e0: state.loop.end, t0: t.tick }; return true; }
       if (t.type === 'head' && (t.btn === 3 || t.btn === 4)) { const rc = hdr(t.i)[t.btn === 3 ? 'vol' : 'pan']; if (rc) { const tr = state.tracks[t.i]; drag = { k: t.btn === 3 ? 'hvol' : 'hpan', i: t.i, rc, x0, y0, u0: t.btn === 3 ? Math.sqrt(clamp(tr.vol / VMAX, 0, 1)) : (clamp(tr.pan, -1, 1) + 1) / 2, fine: false }; return true; } }
       if (t.type === 'head' && (t.btn === 8 || t.btn === 9)) { const rc = hdr(t.i)[t.btn === 8 ? 'sa' : 'sb']; if (rc) { const tr = state.tracks[t.i]; drag = { k: 'hsend', s: t.btn - 8, i: t.i, rc, x0, y0, u0: (tr.send && tr.send[t.btn - 8]) || 0 }; return true; } }
+      if (t.type === 'ov') { stopMotion(); drag = { k: 'ov', p0: view.ppt }; return true; }               // Overview: sideways = scroll, up / down = zoom
       if (t.type === 'ruler') { drag = { k: 'rpend', a: snapT(t.tick), tick0: t.tick, p0: view.ppt }; return true; }   // direction decides: Live zoom (vertical) or time selection (horizontal)
       if (t.type === 'clip' && msel.has(t.c.id)) {                // group move / group resize of every picked clip
         checkpoint(); P.selectClip(t.i, t.c.id);
@@ -1368,6 +1399,7 @@ function setup() {
       if (drag.k === 'marker') { P.editMarker(drag.id, { t: Math.max(0, snapT(tick)) }); invalidate(); return; }
       if (drag.k === 'punchL') { P.setPunch({ start: Math.min(snapT(tick), state.punch.end - BEAT) }); invalidate(); return; }
       if (drag.k === 'punchR') { P.setPunch({ end: Math.max(snapT(tick), state.punch.start + BEAT) }); invalidate(); return; }
+      if (drag.k === 'ov') { const span = ovSpan(); view.ppt = clamp(drag.p0 * Math.exp(dy * 0.011), PMIN, PMAX); view.x0 = Math.max(0, clamp(x, 0, CW) / CW * span - CW / (2 * view.ppt)); clampView(); invalidate(); return; }
       if (drag.k === 'rpend') {
         if (Math.abs(dy) > Math.abs(dx) * 1.15) { drag.k = 'rzoom'; stopMotion(); } else { drag.k = 'sel'; sel = { a: drag.a, b: drag.a }; }
       }
@@ -1512,7 +1544,7 @@ function setup() {
   ov.addEventListener('pointerdown', (e) => {
     const r = ov.getBoundingClientRect(); canvas._last = hit(e.clientX - r.left, e.clientY - r.top);
     down.add(e.pointerId); touching = true; touchedAt = performance.now(); stopMotion();   // a touch stops any glide or fling right where it is
-    const ty = canvas._last.type; if (ty === 'corner' || ty === 'gridbtn' || ty === 'zoombtn' || ty === 'follow') { pressed = ty; invalidate(); }
+    const ty = canvas._last.type; if (ty === 'corner' || ty === 'gridbtn' || ty === 'zoombtn' || ty === 'follow' || ty === 'locset' || ty === 'locprev' || ty === 'locnext' || ty === 'fith' || ty === 'fitw') { pressed = ty; invalidate(); }
   }, true);
   const release = (e) => { down.delete(e.pointerId); if (!down.size) touching = false; if (pressed) { pressed = null; invalidate(); } };
   ov.addEventListener('pointerup', release, true); ov.addEventListener('pointercancel', release, true);

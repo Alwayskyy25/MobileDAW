@@ -6,7 +6,7 @@ import { prefs, savePrefs } from './prefs.js';
 import { initLayout } from './layout.js';
 import { initFloat } from './floatwin.js';
 import { initEdgeGuard } from './edgeguard.js';
-import { applyTheme, C } from './theme.js';
+import { applyTheme, setThemeAdjust, C } from './theme.js';
 import { enableMidi } from './midi.js';
 import { openSettings, toggleFullscreen, initAutoFullscreen, initUiPrefs } from './settingsui.js';
 import { initLog, log } from './log.js';
@@ -485,6 +485,7 @@ function keys() {
 function boot() {
   initLog(prefs.logLevel);
   initNative(toast);                                   // Android app (Capacitor): back button, html.native-app; nothing in the browser
+  if (prefs.themeAdj) setThemeAdjust(prefs.themeAdj);
   applyTheme(prefs.theme);
   initEdgeGuard(); initTouchHit();   // taps on empty panel surface next to a small button reach it (44 px touch areas)
   initLayout();
