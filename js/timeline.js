@@ -30,7 +30,11 @@ const FOLD_H = 24, MIN_ROW = 52, ADD_H = 44, XROW_H = 26;                // fold
 export const view = { x0: 0, ppt: 0.06, y0: 0, rowH: 60 };   // 60: the three header rows (buttons, volume + pan, sends + output) fit with their borders
 let CW = 0;                                                    // width of the clip area = canvas width - HEAD
 const sn = (n, f) => ({ 0: n, get 1() { return f(); } });   // snap values are read live: BAR / BEAT change with the time signature
-const SNAPS = [sn('Auto', () => -1), sn('Bar', () => BAR), sn('1 Beat', () => BEAT), sn('1/2 Beat', () => BEAT / 2), sn('1/4 Beat', () => BEAT / 4), sn('Triplet', () => BEAT / 3), sn('Off', () => 0)];
+const SNAPS = [sn('Auto', () => -1), sn('Bar', () => BAR), sn('1 Beat', () => BEAT), sn('1/2 Beat', () => BEAT / 2), sn('1/4 Beat', () => BEAT / 4), sn('Triplet', () => BEAT / 3), sn('Off', () => 0),
+  sn('8 Bars', () => 8 * BAR), sn('4 Bars', () => 4 * BAR), sn('2 Bars', () => 2 * BAR), sn('1/2', () => 2 * BEAT), sn('1/32', () => BEAT / 8)];   // appended: saved prefs keep their index (6 = Off)
+const SNAP_OFF = 6;
+// Live's grid menu (refs/live12/119): adaptive widths (px between grid lines) and the fixed grids from 8 Bars to 1/32, widest first
+const ADAPT = [['Widest', 104], ['Wide', 52], ['Medium', 26], ['Narrow', 13], ['Narrowest', 7]], FIXED = [[7, '8 Bars'], [8, '4 Bars'], [9, '2 Bars'], [1, '1 Bar'], [10, '1/2'], [2, '1/4'], [3, '1/8'], [4, '1/16'], [11, '1/32']];
 const cfg = { snap: prefs.snap, follow: prefs.follow };
 export function applyTimelinePrefs() { cfg.snap = prefs.snap; cfg.follow = prefs.follow; invalidate(); }
 let marq = null, clipM = null, selbar = null, selW = 0;   // marq = rubber-band rectangle in world coordinates (tick, content-y) so it survives scrolling
@@ -44,9 +48,9 @@ let canvas, ctx, W = 0, H = 0, dpr = 1, dirty = true, hooks = {}, sel = null, to
 
 export const invalidate = () => { dirty = true; };
 export function snapTicks() {
-  const m = SNAPS[cfg.snap][1];
-  if (m >= 0) return m;
-  for (const t of [120, 240, 480, 960, 1920, 3840, 7680, 15360]) if (t * view.ppt >= 26) return t;
+  const m = SNAPS[cfg.snap][1], tri = prefs.tripGrid && cfg.snap !== 5 ? 2 / 3 : 1;   // Triplet Grid: every grid 2/3 as wide
+  if (m >= 0) return Math.round(m * tri);
+  const px = prefs.adaptPx || 26; for (const t of [60, 120, 240, 480, 960, 1920, 3840, 7680, 15360]) if (t * tri * view.ppt >= px) return Math.round(t * tri);
   return 15360;
 }
 // grid ticks in [a, b) aligned to the start of each signature segment (with a single signature this is the plain grid)
@@ -218,6 +222,11 @@ function ink(hex) {                     // text on a colour: dark on light colou
 
 const contentInk = (hex) => (ink(hex).startsWith('rgba(14') ? 'rgba(10,10,12,.86)' : 'rgba(250,250,252,.88)');   // Live: black content on light clip colours, white on dark ones
 function drawClip(t, c, y, hh) {
+  if (t.fold && t.kind !== 'auto') {                                         // Live: a folded track shows its clips as a thin band in their colour
+    const g0 = gl.get(c.id), x = tx(g0 ? g0.s : c.start), w = (g0 ? g0.l : c.len) * view.ppt; if (x > CW || x + w < 0) return;
+    const by = Math.round(y + hh / 2 - 3); ctx.fillStyle = c.muted ? '#8a8a8f' : tone(t.color); ctx.fillRect(x, by, w, 6);
+    if (state.sel.clip === c.id || msel.has(c.id)) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 0.5, by - 0.5, Math.max(1, Math.round(w) - 1), 7); }
+    return; }
   { const tc = tone(t.color); if (tc !== t.color) t = { __proto__: t, color: tc }; }   // Color Intensity / Hue of the theme reach the clip colours
   const g = gl.get(c.id), cs = g ? g.s : c.start, cl = g ? g.l : c.len;
   const x = tx(cs), w = cl * view.ppt;
@@ -659,7 +668,7 @@ function drawHeads() {
     ctx.fillStyle = ik; ctx.font = FONT(on ? 700 : 600, 11); ctx.textBaseline = 'middle';
     const nameR = !fullLook && r.mute ? r.mute.x - 4 : hx + nw - 6;
     ctx.fillText(cut2((P.isFrozen(i) ? '\u2744 ' : '') + t.name, nameR - hx - 28), hx + 24, y + r.th / 2 + 0.5);   // \u2744 = frozen; one line + ellipsis, never split mid-word
-    if (r.mute) drawBtn(r.mute, auto ? 'On' : String(i + 1), !t.mute, T('--mute'));
+    if (r.mute) drawBtn(r.mute, auto ? 'On' : String(i + 1), !t.mute, T('--lv-or') || T('--mute'));   // Live 12's track activator: orange with the track number
     if (r.solo) drawBtn(r.solo, 'S', t.solo, T('--solo'));
     if (r.arm) drawBtn(r.arm, 'arm', !!t.arm, T('--rec'));
     if (r.aut) drawBtn(r.aut, 'aut', lanes.has(t.id), T('--accent'));
@@ -671,7 +680,7 @@ function drawHeads() {
     }
     if (r.vol) drawSlider(r.vol, Math.sqrt(clamp(t.vol / VMAX, 0, 1)), dbTxt(t.vol) + ' dB', false);
     if (r.pan) drawSlider(r.pan, (clamp(t.pan, -1, 1) + 1) / 2, panTxt(t.pan), true);
-    for (const [k, rc] of [[0, r.sa], [1, r.sb]]) if (rc) { const v = (t.send && t.send[k]) || 0; drawSlider(rc, v, 'AB'[k] + ' ' + Math.round(v * 100) + '%', false); }
+    for (const [k, rc] of [[0, r.sa], [1, r.sb]]) if (rc) { const v = (t.send && t.send[k]) || 0; drawSlider(rc, v, 'AB'[k] + ' ' + dbTxt(v), false); }   // Live: sends in dB, -inf at zero
     if (r.hm) {                                                                            // folded row: horizontal meter well (two thin lanes, L over R)
       ctx.fillStyle = C('#161617'); ctx.fillRect(r.hm.x, r.hm.y, r.hm.w, r.hm.h);
       const lh = Math.max(1.5, (r.hm.h - 3) / 2); ctx.fillStyle = C('#101011'); ctx.fillRect(r.hm.x + 2, r.hm.y + 1, r.hm.w - 4, lh); ctx.fillRect(r.hm.x + 2, r.hm.y + 2 + lh, r.hm.w - 4, lh);
@@ -688,7 +697,7 @@ function drawHeads() {
   { const q = cornerRects(); if (q.auto.w) drawBtn(q.auto, 'aut', autoMode(), T('--accent'));
     if (q.lock.w) { const r = q.lock, on = lockEnv(); drawBtn(r, '', on, T('--accent')); const cx = r.x + r.w / 2, cy = r.y + r.h / 2 + 1; ctx.strokeStyle = on ? '#15151a' : C('#b4b4ba'); ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = 1.4;   // Live's Lock Envelopes: a padlock
       ctx.fillRect(cx - 4, cy - 1, 8, 6); ctx.beginPath(); ctx.arc(cx, cy - 2, 2.8, Math.PI, on ? 0 : -0.35 * Math.PI); ctx.stroke(); } }
-  drawSwitch(snapRect(), HEAD > 260 ? 'Snap ' + SNAPS[cfg.snap][0] : SNAPS[cfg.snap][0], cfg.snap !== SNAPS.length - 1, pressed === 'corner');
+  drawSwitch(snapRect(), HEAD > 260 ? 'Snap ' + SNAPS[cfg.snap][0] : SNAPS[cfg.snap][0], cfg.snap !== SNAP_OFF, pressed === 'corner');
   // bottom corner: Follow switch (the arrangement scrolls with the playhead)
   ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(hx + 1, H - BOT, HEAD - 1, BOT); ctx.fillStyle = C('#141415'); ctx.fillRect(hx, H - BOT, HEAD, 1);
   drawSwitch(followRect(), 'Follow', cfg.follow, pressed === 'follow');
@@ -1264,8 +1273,20 @@ export function sigDialog(bar) {
 // ------------------------------------------------------------------ gestures
 let drag = null;
 const CLIP_EDITS = new Set(['move', 'resize', 'resizeL', 'stretch', 'gmove', 'gresize', 'fadeIn', 'fadeOut']);   // drags that took a checkpoint
+// the arrangement's grid menu as Live's (Snap to Grid, Adaptive Grid widths, Fixed Grid, Narrow / Widen, Triplet Grid, zoom to fit)
+function fitHeight() { const avail = LANE_B() - RULER - ADD_H - nX() * XROW_H, used = contentH() - ADD_H - nX() * XROW_H; if (used > 0) { for (const tr of state.tracks) animRow(tr); view.rowH = clamp(view.rowH * avail / used, 30, ROW_MAX); view.y0 = 0; clampView(); invalidate(); } }
+function gridMenu() {
+  const set = (k) => { cfg.snap = k; invalidate(); }, fi = FIXED.findIndex(([k]) => k === cfg.snap);
+  const step = (d) => { const i = fi >= 0 ? fi : FIXED.findIndex(([k]) => SNAPS[k][1] <= (snapTicks() || BAR)); const j = clamp((i < 0 ? 3 : i) + d, 0, FIXED.length - 1); set(FIXED[j][0]); };
+  return [{ label: 'Snap to Grid', check: cfg.snap !== SNAP_OFF, fn: () => toggleSnap() }, { sep: true },
+    { label: 'ADAPTIVE GRID', dim: true }, ...ADAPT.map(([n, px]) => ({ label: n, check: cfg.snap === 0 && (prefs.adaptPx || 26) === px, fn: () => { prefs.adaptPx = px; set(0); } })), { sep: true },
+    { label: 'FIXED GRID', dim: true }, ...FIXED.map(([k, n]) => ({ label: n, check: cfg.snap === k, fn: () => set(k) })), { sep: true },
+    { label: 'Narrow Grid', fn: () => step(1) }, { label: 'Widen Grid', fn: () => step(-1) }, { label: 'Triplet Grid', check: !!prefs.tripGrid, fn: () => { prefs.tripGrid = !prefs.tripGrid; savePrefs(); invalidate(); } }, { sep: true },
+    { label: 'Zoom to Fit', fn: () => { const e = songEnd(); if (e) fitTo(0, e); } }, { label: 'Fit Content to View Width (W)', fn: () => { const e = songEnd(); if (e) fitTo(0, e); } },
+    { label: 'Fit Content to View Height (H)', fn: () => fitHeight() }];
+}
 function toggleSnap() {                                   // FL Studio Mobile: tap the Snap switch = on / off (the last grid comes back), long-press = options
-  const OFF = SNAPS.length - 1;
+  const OFF = SNAP_OFF;
   if (cfg.snap !== OFF) { cfg.lastSnap = cfg.snap; cfg.snap = OFF; } else cfg.snap = cfg.lastSnap != null && cfg.lastSnap !== OFF ? cfg.lastSnap : 0;
   haptic(8); toast('Snap ' + (cfg.snap === OFF ? 'mati' : SNAPS[cfg.snap][0]) + '.', 900); invalidate();
 }
@@ -1283,9 +1304,9 @@ function setup() {
         case 'locnext': P.jumpMarker(1); return invalidate();
         case 'wzoom': { const L = [1, 1.5, 2, 3, 4], k = L.indexOf(prefs.waveZoom || 1); prefs.waveZoom = L[(k + 1) % L.length]; savePrefs(); return invalidate(); }   // Waveform Vertical Zoom: display only
         case 'fitw': { const e = songEnd(); if (e) fitTo(0, e); return; }                              // Live's Optimize Width (W)
-        case 'fith': { const avail = LANE_B() - RULER - ADD_H - nX() * XROW_H, used = contentH() - ADD_H - nX() * XROW_H; if (used > 0) { for (const tr of state.tracks) animRow(tr); view.rowH = clamp(view.rowH * avail / used, 30, ROW_MAX); view.y0 = 0; clampView(); invalidate(); } return; }   // Optimize Height (H)
+        case 'fith': return fitHeight();   // Optimize Height (H)
         case 'cornerMenu': return menu([...SNAPS.map((s, k) => ({ label: s[0], check: cfg.snap === k, fn: () => { cfg.snap = k; invalidate(); } })), { sep: true }, { label: 'Ikuti playhead', check: cfg.follow, fn: () => { cfg.follow = !cfg.follow; } }, { label: 'Pilih semua klip', fn: () => selAll() }, { label: 'Batal pilihan', dim: !msel.size, fn: () => clearSel() }, { sep: true }, { label: 'Lipat semua track', fn: () => foldAll(true) }, { label: 'Buka semua track', fn: () => foldAll(false) }], canvasOrigin().left + Math.max(0, CW - 20), canvasOrigin().top + RULER);
-        case 'gridbtn': { const o = canvasOrigin(); return menu(SNAPS.map((s, k) => ({ label: s[0], check: cfg.snap === k, fn: () => { cfg.snap = k; invalidate(); } })), o.left + CW - 150, o.top + H - BOT); }
+        case 'gridbtn': { const o = canvasOrigin(); return menu(gridMenu(), o.left + CW - 150, o.top + H - BOT); }
         case 'zoombtn': return zoomMenu();
         case 'marker': return markerMenu(t.m, x, y);
         case 'mrow': return markerRowMenu(t.tick, x, y);

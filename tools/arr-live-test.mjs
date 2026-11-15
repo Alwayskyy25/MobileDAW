@@ -78,6 +78,13 @@ ok(t9.bg === t0.bg && t9.acc === t0.acc, 'reset: the theme is back exactly');
     await ev(async () => { const Th = await import('./js/theme.js'); Th.setThemeAdjust({ tone: 0, brightness: 0, contrast: 0, intensity: 0, hue: 0 }); const p = await import('./js/prefs.js'); p.prefs.themeAdj = null; }); await page.keyboard.press('Escape'); await page.mouse.click(4, 4); await page.waitForTimeout(300); }
   else console.log('     (settings dialog not opened from the test)'); }
 for (const th of ['dark', 'light', 'midlight', 'live', 'lightlc', 'medc']) { await ev(async (th) => { const Th = await import('./js/theme.js'); Th.applyTheme(th); }, th); await page.waitForTimeout(350); await page.screenshot({ path: path.join(out, 'arr-' + th + '.png') }); }
+// Live's grid menu (Grid field, bottom right): Snap to Grid, Adaptive / Fixed Grid, Triplet Grid; a fixed 2 Bars grid shows in the field
+{ const g = await geo(), K3 = bx.width / g.w; await page.mouse.click(bx.x + (g.cw - 150 + 46) * K3, bx.y + (g.h - 9) * K3); await page.waitForTimeout(450);
+  const items = await ev(() => [...document.querySelectorAll('.menu .mi')].map((x) => x.textContent)); await page.screenshot({ path: path.join(out, 'grid-menu.png') });
+  await ev(() => { const it = [...document.querySelectorAll('.menu .mi')].find((x) => x.textContent === '2 Bars'); if (it) it.click(); }); await page.waitForTimeout(400);
+  const st = await ev(async () => (await import('./js/timeline.js')).snapTicks()), bar = await ev(async () => (await import('./js/project.js')).BAR);
+  ok(['Snap to Grid', 'ADAPTIVE GRID', 'Widest', 'FIXED GRID', '8 Bars', '1/32', 'Narrow Grid', 'Widen Grid', 'Triplet Grid', 'Zoom to Fit'].every((x) => items.includes(x)) && st === 2 * bar, `grid menu as Live's (${items.length} entries); Fixed 2 Bars -> snap ${st / bar} bars`);
+}
 // Lock Envelopes: off (Live's default) a dragged clip takes its track's automation along; on, the automation stays at the song position
 { const setup = () => ev(async () => { const P = await import('./js/project.js'), T = await import('./js/timeline.js'), D = await import('./js/defs.js');
     P.newProject(false); P.addTrack('midi'); const c = P.addClip(0, 0, 4 * P.BAR); c.notes.push({ t: 0, d: 480, p: 60, v: 0.8 }); P.clipChanged(0);
