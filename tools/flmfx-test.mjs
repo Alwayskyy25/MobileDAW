@@ -141,6 +141,8 @@ ok(dryR > 0.01, `the test signal plays (${dryR.toFixed(3)} rms)`);
     const n = Math.round(0.45 * SR), L = new Float32Array(n), R = new Float32Array(n); w.render(L, R, n); return L; };
   const zc = (x, a, b) => { let n = 0, f = -1, l = -1; for (let i = Math.round(a) + 1; i < Math.round(b); i++) if (x[i - 1] < 0 && x[i] >= 0) { const t = i - 1 + x[i - 1] / (x[i - 1] - x[i]); if (f < 0) f = t; else n++; l = t; } return n > 0 ? n * SR / (l - f) : 0; };
   const got = []; for (let k = 0; k < 4; k++) got.push(zc(await play(48 + k), SR * 0.02, SR * 0.3));
+  { const { slicerDetect } = await import('../js/slicerdetect.js'), st = slicerDetect(loop, loop, 0.25);   // the display's port finds the same four slices the engine plays
+    ok(st.length === 4 && st.every((f, k) => Math.abs(f - k * len) < SR * 0.01), `Slicer display detection (js/slicerdetect.js): ${st.length} slices at ${st.map((f) => (f / SR).toFixed(3)).join(' / ')} s`); }
   ok(got.every((x, k) => Math.abs(x / seg[k] - 1) < 0.01), `Slicer: keys 48..51 play the loop's four slices (${got.map((x) => x.toFixed(0)).join(' / ')} Hz)`);
   const up = zc(await play(49, ['instParam 0 1 0.75']), SR * 0.02, SR * 0.3);
   ok(Math.abs(up / (330 * 2) - 1) < 0.01, `Slicer Pitch +12 (FLM law trunc(48 v - 24)): slice 2 plays ${up.toFixed(0)} Hz`);

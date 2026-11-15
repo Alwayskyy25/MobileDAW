@@ -10,6 +10,7 @@ import { menuItem } from './fxlaw.js';
 import { FLM_LAYOUT, flmName, flmShort, flmSwitch } from './flmlayout.js';
 import { FLM_LIVE, OSC3_LIVE } from './flmlive.js';
 import { FLM_GRAPH } from './flmviz.js';
+import { slicesOf } from './slicerdetect.js';
 import { OP_ALGOS } from './engine/operator.js';
 import { POLI_TGT, POLI_GRID, POLI_MIDI } from './engine/poli.js';
 import { MELD_B, MELD_G, MELD_N, MO, MELD_TGT, MELD_SRC, MELD_OSC } from './engine/meld.js';
@@ -1944,6 +1945,11 @@ VI[35] = (k) => {
     if (!sm) { label(g, 'Belum ada loop', w / 2, hh / 2 + 4, '#bbb', 11, 'center'); return; }
     const pk = sm.peaks || [], n = pk.length, mid = hh / 2; g.fillStyle = DISPC.bl;
     for (let x = 0; x < w; x += 2) { const a = pk[Math.min(n - 1, Math.floor(x / w * n))] || 0; g.fillRect(x, mid - a * (mid - 6), 1.5, Math.max(1, a * (mid - 6) * 2)); }
+    // the slices the engine plays (the same detection, js/slicerdetect.js): a line at each start, the key it plays on (first key: param 8, 0 = C3)
+    const st = slicesOf(sm.pyr, k.get(7)), fr = sm.pyr && sm.pyr.l ? sm.pyr.l.length : 0;
+    if (st && fr) { const n = st.length, fk = Math.min(Math.round(k.get(8)) > 0 ? Math.round(k.get(8)) : 48, 128 - Math.max(1, n)), NN = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      st.forEach((f, q) => { const x = Math.round(f / fr * w) + 0.5; g.fillStyle = DISPC.or; g.fillRect(x - 0.5, 14, 1, hh - 14); if (w / Math.max(1, n) > 22 || q === 0) label(g, NN[(fk + q) % 12] + (Math.floor((fk + q) / 12) - 2), x + 2, hh - 4, DISPC.or, 8); });
+      label(g, n + ' slice', w - 6, 12, DISPC.ink, 9, 'right'); }
     label(g, nm(), 6, 12, DISPC.ink, 9); };
   const S = FLM_LIVE.i35, el = flmLive(k, { ...S, L: [[() => h('button', { class: 'lv-btn lk-t', onclick: () => BR.openBrowser('file', { track: i, zone: 0 }) }, 'Loop…'), ...S.L[0]]], D: { ...S.D, graph } });
   let last = null; k.every(500, () => { const n = nm(); if (n !== last) { last = n; k.redraw(); } });

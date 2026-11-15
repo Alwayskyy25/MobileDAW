@@ -78,6 +78,20 @@ ok(t9.bg === t0.bg && t9.acc === t0.acc, 'reset: the theme is back exactly');
     await ev(async () => { const Th = await import('./js/theme.js'); Th.setThemeAdjust({ tone: 0, brightness: 0, contrast: 0, intensity: 0, hue: 0 }); const p = await import('./js/prefs.js'); p.prefs.themeAdj = null; }); await page.keyboard.press('Escape'); await page.mouse.click(4, 4); await page.waitForTimeout(300); }
   else console.log('     (settings dialog not opened from the test)'); }
 for (const th of ['dark', 'light', 'midlight', 'live', 'lightlc', 'medc']) { await ev(async (th) => { const Th = await import('./js/theme.js'); Th.applyTheme(th); }, th); await page.waitForTimeout(350); await page.screenshot({ path: path.join(out, 'arr-' + th + '.png') }); }
+// Lock Envelopes: off (Live's default) a dragged clip takes its track's automation along; on, the automation stays at the song position
+{ const setup = () => ev(async () => { const P = await import('./js/project.js'), T = await import('./js/timeline.js'), D = await import('./js/defs.js');
+    P.newProject(false); P.addTrack('midi'); const c = P.addClip(0, 0, 4 * P.BAR); c.notes.push({ t: 0, d: 480, p: 60, v: 0.8 }); P.clipChanged(0);
+    const lane = P.addAutoTrack({ kind: 5, strip: P.stripOf(0), param: 4, def: D.INSTRUMENTS[P.state.tracks[0].inst.type].params[4] }, 'Cutoff');
+    const ai = P.state.tracks.indexOf(lane); lane.clips = [{ id: 777001, start: 0, len: 12 * P.BAR, name: '', pts: [{ t: 0, v: 0.2 }, { t: 2 * P.BAR, v: 0.9 }, { t: 4 * P.BAR - 1, v: 0.2 }, { t: 12 * P.BAR - 1, v: 0.2 }] }];
+    T.view.x0 = 0; T.view.ppt = (document.querySelector('#arr canvas').getBoundingClientRect().width - T.headWidth()) / (14 * P.BAR); P.selectTrack(0); P.emit('all'); return { ai }; });
+  const peakAt = () => ev(async () => { const P = await import('./js/project.js'); const lane = P.state.tracks.find((t) => t.kind === 'auto'); const abs = []; for (const c of lane.clips) for (const p of c.pts) abs.push([c.start + p.t, p.v]); abs.sort((a, b) => a[0] - b[0]); const top = abs.reduce((m, p) => (p[1] > m[1] ? p : m), [0, -1]); return { bar: top[0] / P.BAR, start: P.state.tracks[0].clips[0].start / P.BAR }; });
+  const dragClip = async () => { const q = await ev(async () => { const T = await import('./js/timeline.js'), P = await import('./js/project.js'); const p = T.probe(1 * P.BAR, 0), r = document.querySelector('#arr canvas').getBoundingClientRect(); return { x: p.x, y: p.top + 6, x2: T.probe(5 * P.BAR, 0).x, k: r.width / document.querySelector('#arr canvas').clientWidth }; });
+    const K2 = bx.width / (await geo()).w; await page.mouse.move(bx.x + q.x * K2, bx.y + q.y * K2); await page.mouse.down(); await page.waitForTimeout(80); await page.mouse.move(bx.x + q.x2 * K2, bx.y + q.y * K2, { steps: 8 }); await page.mouse.up(); await page.waitForTimeout(400); };
+  await ev(async () => { const p = await import('./js/prefs.js'); p.prefs.lockEnv = false; }); await setup(); await page.waitForTimeout(400); const a0 = await peakAt(); await dragClip(); const a1 = await peakAt();
+  await page.screenshot({ path: path.join(out, 'lock-envelopes-off.png') });
+  await ev(async () => { const p = await import('./js/prefs.js'); p.prefs.lockEnv = true; }); await setup(); await page.waitForTimeout(400); await dragClip(); const b1 = await peakAt();
+  await ev(async () => { const p = await import('./js/prefs.js'); p.prefs.lockEnv = false; });
+  ok(a1.start === 4 && a1.bar === a0.bar + 4 && b1.start === 4 && b1.bar === a0.bar, `Lock Envelopes off: clip bar ${a0.start} -> ${a1.start}, its automation peak bar ${a0.bar} -> ${a1.bar}; on: the peak stays at bar ${b1.bar}`); }
 ok(!errs.length, 'no page errors' + (errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''));
 await b.close(); server.close();
 console.log(bad ? `\narr-live-test: ${bad} FAILED` : '\narr-live-test: all passed'); process.exit(bad ? 1 : 0);

@@ -1766,3 +1766,8 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .thm-adj .thm-av { font-weight: var(--fw-sb); } .thm-adj .thm-av.on { color: var(--lv-or, var(--accent)); }
 .thm-adj { grid-template-columns: 128px 1fr 76px; min-height: 26px; }
 .thm-adjs > .b { justify-self: start; height: var(--ctl-s); padding: 0 var(--sp-6); border-radius: 4px; }
+/* every instrument's / device's tab strip in the title bar in Live Sampler's look (rounded top, the open tab lighter with an orange top line),
+   the same as the FLM synths' tabs: Drift, Meld, Wavetable, Simpler, Poli, Analog ... */
+.card > h4 > .lv-tabs.lk-htabs { gap: 2px; }
+.card > h4 > .lv-tabs.lk-htabs .lv-tab { border: 0; border-radius: 4px 4px 0 0; background: rgba(0, 0, 0, .16); color: var(--lv-ink); text-transform: none; padding: 0 8px; }
+.card > h4 > .lv-tabs.lk-htabs .lv-tab.on { background: var(--lv-body); color: var(--lv-ink); box-shadow: inset 0 2px 0 var(--lv-or, var(--accent)); }

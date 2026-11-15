@@ -24,7 +24,7 @@ const { state, PPQ, SWATCHES } = P;
 // headers on the RIGHT: a title bar in the track colour, the mixer buttons under it, volume / pan sliders when the row is tall enough
 // and a level meter along the right edge of every header.
 let HEAD = 140;                                                 // header width: prefs.headW (drag the header's left edge), else chosen from the canvas width
-const OV = 0, RULER = 34, MROW = 12;   // OV: height of a strip above the locator strip (none: the owner removed the Overview); MROW = bottom of the locator strip
+const OV = 0, RULER = 38, MROW = 12, LT = 21;   // Live 12 order: the beat-time ruler (bar numbers) on top [0, LT), the scrub area with the locators and the loop brace under it [LT, RULER)
 const BOT = 19, HANDLE = 18, TH = 20, METW = 9;   // top ruler (locators + beats) / bottom time ruler / header title bar / meter strip
 const FOLD_H = 24, MIN_ROW = 52, ADD_H = 44, XROW_H = 26;                // folded row (title bar only) / smallest open row (title + buttons) / "+" row / Master + FX rows (thin, as Live's return / main rows)
 export const view = { x0: 0, ppt: 0.06, y0: 0, rowH: 60 };   // 60: the three header rows (buttons, volume + pan, sends + output) fit with their borders
@@ -74,7 +74,7 @@ const LANE_B = () => H - BOT;                                  // bottom edge of
 // rows have individual heights: a folded track is FOLD_H tall, the others view.rowH (gliding while a fold animates)
 // below the tracks: the Master row and one row per effect track (Return A/B stay in the mixer), then the "+" row
 // top corner over the headers (Live: Set Locator, Previous / Next Locator, then our Snap switch)
-const cornerRects = () => { const y = 8, h = RULER - 16, x = CW + 6, bw = 24, sw = 30; const ax = x + sw + 2 * bw + 8, aw = HEAD > 190 ? 26 : 0; return { set: { x, y, w: sw, h }, prev: { x: x + sw + 3, y, w: bw, h }, next: { x: x + sw + 3 + bw + 1, y, w: bw, h }, auto: { x: ax, y, w: aw, h }, snap: { x: ax + (aw ? aw + 4 : 0), y, w: Math.max(40, HEAD - 6 - (ax - CW) - (aw ? aw + 4 : 0)), h } }; };
+const cornerRects = () => { const y = 8, h = RULER - 16, x = CW + 6, bw = 24, sw = 30; const ax = x + sw + 2 * bw + 8, aw = HEAD > 190 ? 26 : 0, lw = HEAD > 230 ? 22 : 0, lx = ax + (aw ? aw + 1 : 0), sx = lx + (lw ? lw + 4 : aw ? 3 : 0); return { set: { x, y, w: sw, h }, prev: { x: x + sw + 3, y, w: bw, h }, next: { x: x + sw + 3 + bw + 1, y, w: bw, h }, auto: { x: ax, y, w: aw, h }, lock: { x: lx, y, w: lw, h }, snap: { x: sx, y, w: Math.max(40, CW + HEAD - 6 - sx), h } }; };
 const snapRect = () => cornerRects().snap;
 const songEnd = () => state.tracks.reduce((m, t) => t.clips.reduce((a, c) => Math.max(a, c.start + c.len), m), 0);
 
@@ -100,7 +100,8 @@ export function setHeadW(w) { const [lo, hi] = headLim(); prefs[full() ? 'headW'
 export function setHeadFull(on) { prefs.headFull = !!on; savePrefs(); applyHead(); clampView(); invalidate(); }
 export const headIsFull = () => full();
 const WZ = () => prefs.waveZoom || 1;                          // Live's Waveform Vertical Zoom
-const autoMode = () => prefs.autoMode !== false;              // Live's Automation Mode: off hides the automation lanes
+const autoMode = () => prefs.autoMode !== false;
+const lockEnv = () => prefs.lockEnv === true;                 // Live's Lock Envelopes (off by default: automation moves with the clips)              // Live's Automation Mode: off hides the automation lanes
 const rowTarget = (t) => (t.kind === 'auto' && !autoMode() ? 0 : t.fold ? FOLD_H : t.hx ? Math.round(clamp(view.rowH * t.hx, MIN_ROW, ROW_MAX)) : view.rowH) + subN(t) * SUBH();
 // Sub-tracks (project.js subsOf, FL Studio Mobile): rows under the track's own row, SUBH high each, with clips of their own that play through
 // the track's instrument and mixer channel. A folded track hides them (their clips then lie in the thin row). rhMain = the track's own row.
@@ -271,7 +272,7 @@ function drawClip(t, c, y, hh) {
       }
     }
   } else if (c.notes && bh > 6) {
-    const [lo, hi] = noteBox(c), span = hi - lo + 1, nh = Math.max(1.5, Math.min(bh / span, 6));
+    const [lo, hi] = noteBox(c), span = hi - lo + 1, nh = Math.max(2, Math.min(bh / span * 0.8, 7));   // Live: solid note bars, about 4/5 of a pitch row
     ctx.fillStyle = INK;
     for (const g of P.loopSegs(c)) {                            // looped MIDI: the notes are drawn again in every repeat (no empty bars)
       const gx = x + g.o * view.ppt;
@@ -425,11 +426,11 @@ function drawDragAids() {
 let loopA = 0;                                                   // drawn brightness of the loop brace (eases to 1 when the loop is on)
 const PUon = () => state.punch.on && state.punch.end > state.punch.start;
 function drawRuler(g) {
-  ctx.fillStyle = C('#202022'); ctx.fillRect(0, OV, CW, MROW - OV);                         // locator strip
-  ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(0, MROW, CW, RULER - MROW);                   // beat time ruler
-  ctx.fillStyle = C('#08080a'); ctx.fillRect(0, MROW - 1, CW, 1); ctx.fillRect(0, RULER - 2, CW, 2);
+  ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(0, 0, CW, LT);                                 // beat-time ruler
+  ctx.fillStyle = C('#232325'); ctx.fillRect(0, LT, CW, RULER - LT);                       // scrub area: locators, loop brace
+  ctx.fillStyle = C('#08080a'); ctx.fillRect(0, LT - 1, CW, 1); ctx.fillRect(0, RULER - 2, CW, 2);
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, CW, RULER); ctx.clip();
-  if (sel) { ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(tx(sel.a), MROW, tx(sel.b) - tx(sel.a), RULER - MROW - 1); }
+  if (sel) { ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(tx(sel.a), 0, tx(sel.b) - tx(sel.a), LT - 1); }
   // loop brace along the bottom of the beat ruler: grey when the loop is off, lit when it is on (Live's Arrangement Loop)
   const LP = state.loop;
   if (LP && LP.end > LP.start) {
@@ -446,13 +447,13 @@ function drawRuler(g) {
   const chg = new Map(P.state.sigs.map((c) => [c.bar, c]));
   const RI = currentTone() === 'light' ? '0,0,0' : '255,255,255';
   ctx.fillStyle = `rgba(${RI},.22)`;
-  eachGrid(view.x0 - g, view.x0 + CW / view.ppt + g, g, (t, j) => { const r = (t - P.MM.T[j]) % P.MM.bl[j]; if (r) ctx.fillRect(Math.round(tx(t)), r % P.MM.bt[j] ? RULER - 4 : RULER - 7, 1, r % P.MM.bt[j] ? 3 : 6); });   // Live: beat ticks taller than subdivisions
+  eachGrid(view.x0 - g, view.x0 + CW / view.ppt + g, g, (t, j) => { const r = (t - P.MM.T[j]) % P.MM.bl[j]; if (r) ctx.fillRect(Math.round(tx(t)), r % P.MM.bt[j] ? LT - 4 : LT - 7, 1, r % P.MM.bt[j] ? 3 : 6); });   // Live: beat ticks taller than subdivisions
   for (let b = Math.floor(Math.max(0, P.barAt(view.x0)) / k) * k; tx(P.barStart(b)) < CW; b++) {
     const c = chg.get(b), x = Math.round(tx(P.barStart(b)));
-    if (b % k && !c) { ctx.fillStyle = `rgba(${RI},.34)`; ctx.fillRect(x, RULER - 10, 1, 9); continue; }   // unlabelled bars: a longer tick
-    ctx.fillStyle = c ? C('#ffa722') : `rgba(${RI},.5)`; ctx.fillRect(x, MROW, 1, RULER - MROW - 1);
-    const lab = String(b + 1); ctx.fillStyle = c ? C('#ffa722') : T('--text'); ctx.fillText(lab, x + 3, MROW + 3);
-    if (c) { ctx.font = FONT(700, 9); ctx.fillText(c.n + '/' + c.d, x + 8 + ctx.measureText(lab).width, MROW + 4); ctx.font = FONT(500, 10); }
+    if (b % k && !c) { ctx.fillStyle = `rgba(${RI},.34)`; ctx.fillRect(x, LT - 10, 1, 9); continue; }   // unlabelled bars: a longer tick
+    ctx.fillStyle = c ? C('#ffa722') : `rgba(${RI},.5)`; ctx.fillRect(x, LT - 12, 1, 11);   // Live: a short line up from the ruler's bottom edge, the number right of it
+    const lab = String(b + 1); ctx.fillStyle = c ? C('#ffa722') : T('--text'); ctx.fillText(lab, x + 3, 4);
+    if (c) { ctx.font = FONT(700, 9); ctx.fillText(c.n + '/' + c.d, x + 8 + ctx.measureText(lab).width, 5); ctx.font = FONT(500, 10); }
   }
   if (PUon()) { ctx.fillStyle = C('#ff3636'); ctx.fillRect(tx(state.punch.start), RULER - 3, tx(state.punch.end) - tx(state.punch.start), 2); ctx.fillRect(tx(state.punch.start) - 1, RULER - 11, 4, 9); ctx.fillRect(tx(state.punch.end) - 3, RULER - 11, 4, 9); }
   // locators (markers): a flag with its name on the locator strip
@@ -463,8 +464,8 @@ function drawRuler(g) {
     if (x > CW + 4) break;
     const nx = k2 + 1 < ml.length ? Math.round(tx(ml[k2 + 1].t)) : CW + 200, w = Math.min(nx - x - 3, ctx.measureText(m.name).width + 16);
     if (x + Math.max(8, w) < 0) continue;
-    ctx.fillStyle = C('#3a3a3e'); ctx.strokeStyle = C('#d6d6da'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 0.5, OV + 0.5); ctx.lineTo(x + 9, (OV + MROW) / 2); ctx.lineTo(x + 0.5, MROW - 1); ctx.closePath(); ctx.fill(); ctx.stroke();   // Live: outlined flag
-    if (w > 18) { ctx.save(); ctx.beginPath(); ctx.rect(x + 1, OV, w, MROW - OV); ctx.clip(); ctx.fillStyle = C('#d6d6da'); ctx.fillText(m.name, x + 12, (OV + MROW) / 2); ctx.restore(); }
+    ctx.fillStyle = C('#3a3a3e'); ctx.strokeStyle = C('#d6d6da'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 0.5, LT + 1.5); ctx.lineTo(x + 9, LT + 6.5); ctx.lineTo(x + 0.5, LT + 11.5); ctx.closePath(); ctx.fill(); ctx.stroke();   // Live: outlined flag
+    if (w > 18) { ctx.save(); ctx.beginPath(); ctx.rect(x + 1, LT, w, 13); ctx.clip(); ctx.fillStyle = C('#d6d6da'); ctx.fillText(m.name, x + 12, LT + 7); ctx.restore(); }
   }
   ctx.textBaseline = 'top';
   ctx.restore();
@@ -555,7 +556,7 @@ function drawHead(tick) {
   if (px >= 0) { octx.fillStyle = 'rgba(0,0,0,.35)'; octx.fillRect(x + 1.5, RULER, 1, LANE_B() - RULER); octx.fillStyle = C('#ffa722'); octx.fillRect(x, RULER, 1.5, LANE_B() - RULER); }
   if (!state.playing && px >= 0) { const on = calmTL() || Math.floor(performance.now() / 530) % 2 === 0, i = state.sel.track;   // Live's flashing blue insert marker on the selected track
     if (on) { const y0 = i >= 0 && i < state.tracks.length ? rowY(i) : RULER, h0 = i >= 0 && i < state.tracks.length ? rh(i) - 2 : LANE_B() - RULER; octx.save(); octx.beginPath(); octx.rect(0, RULER, CW, LANE_B() - RULER); octx.clip(); octx.fillStyle = '#2aa7ff'; octx.fillRect(x - 0.25, y0, 2, h0); octx.restore(); } }
-  octx.save(); octx.shadowColor = washRgba(hc, 0.9); octx.shadowBlur = 4 + lv * 4; octx.fillStyle = C('#ffa722'); octx.beginPath(); octx.moveTo(x - 5.5, MROW); octx.lineTo(x + 6.5, MROW); octx.lineTo(x + 0.75, MROW + 8); octx.closePath(); octx.fill(); octx.restore();   // the playhead flag glows
+  octx.save(); octx.shadowColor = washRgba(hc, 0.9); octx.shadowBlur = 4 + lv * 4; octx.fillStyle = C('#ffa722'); octx.beginPath(); octx.moveTo(x - 5.5, LT); octx.lineTo(x + 6.5, LT); octx.lineTo(x + 0.75, LT + 8); octx.closePath(); octx.fill(); octx.restore();   // the playhead flag glows
   octx.restore();
 }
 
@@ -684,7 +685,9 @@ function drawHeads() {
   ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(hx + 1, 0, HEAD - 1, RULER); ctx.fillStyle = C('#141415'); ctx.fillRect(hx, RULER - 1, HEAD, 1);
   { const q = cornerRects(), tri = (r, dir) => { const cx = r.x + r.w / 2, cy = r.y + r.h / 2; ctx.fillStyle = C('#d4d4d8'); ctx.beginPath(); ctx.moveTo(cx - 4 * dir, cy); ctx.lineTo(cx + 3 * dir, cy - 4.5); ctx.lineTo(cx + 3 * dir, cy + 4.5); ctx.closePath(); ctx.fill(); };
     drawBtn(q.set, 'Set', false, null, pressed !== 'locset'); for (const [r, ty, dir] of [[q.prev, 'locprev', 1], [q.next, 'locnext', -1]]) { ctx.fillStyle = pressed === ty ? C('#55555b') : C('#3a3a3e'); ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1); tri(r, dir); } }
-  { const q = cornerRects(); if (q.auto.w) drawBtn(q.auto, 'aut', autoMode(), T('--accent')); }
+  { const q = cornerRects(); if (q.auto.w) drawBtn(q.auto, 'aut', autoMode(), T('--accent'));
+    if (q.lock.w) { const r = q.lock, on = lockEnv(); drawBtn(r, '', on, T('--accent')); const cx = r.x + r.w / 2, cy = r.y + r.h / 2 + 1; ctx.strokeStyle = on ? '#15151a' : C('#b4b4ba'); ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = 1.4;   // Live's Lock Envelopes: a padlock
+      ctx.fillRect(cx - 4, cy - 1, 8, 6); ctx.beginPath(); ctx.arc(cx, cy - 2, 2.8, Math.PI, on ? 0 : -0.35 * Math.PI); ctx.stroke(); } }
   drawSwitch(snapRect(), HEAD > 260 ? 'Snap ' + SNAPS[cfg.snap][0] : SNAPS[cfg.snap][0], cfg.snap !== SNAPS.length - 1, pressed === 'corner');
   // bottom corner: Follow switch (the arrangement scrolls with the playhead)
   ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(hx + 1, H - BOT, HEAD - 1, BOT); ctx.fillStyle = C('#141415'); ctx.fillRect(hx, H - BOT, HEAD, 1);
@@ -807,14 +810,14 @@ function edgeScroll(x) {
 // ------------------------------------------------------------------ hit testing + actions
 function hit(x, y) {
   if (y < RULER) {
-    if (x >= CW) { const q = cornerRects(); return inRect(q.set, x, y, 2) ? { type: 'locset' } : inRect(q.prev, x, y, 1) ? { type: 'locprev' } : inRect(q.next, x, y, 1) ? { type: 'locnext' } : q.auto.w && inRect(q.auto, x, y, 1) ? { type: 'automode' } : { type: 'corner' }; }
-    if (y < MROW + 2) { let best = null, bd = 18; for (const m of state.markers) { const d = Math.abs(x - tx(m.t)); if (d < bd) { bd = d; best = m; } } return best ? { type: 'marker', m: best } : { type: 'mrow', tick: xt(x) }; }
+    if (x >= CW) { const q = cornerRects(); return inRect(q.set, x, y, 2) ? { type: 'locset' } : inRect(q.prev, x, y, 1) ? { type: 'locprev' } : inRect(q.next, x, y, 1) ? { type: 'locnext' } : q.auto.w && inRect(q.auto, x, y, 1) ? { type: 'automode' } : q.lock.w && inRect(q.lock, x, y, 1) ? { type: 'lockenv' } : { type: 'corner' }; }
+    if (y >= LT - 1 && y < RULER - 10) { let best = null, bd = 18; for (const m of state.markers) { const d = Math.abs(x - tx(m.t)); if (d < bd) { bd = d; best = m; } } return best ? { type: 'marker', m: best } : { type: 'mrow', tick: xt(x) }; }
     if (PUon() && y > RULER - 11) {
       const dl = Math.abs(x - tx(state.punch.start)), dr = Math.abs(x - tx(state.punch.end));
       if (Math.min(dl, dr) < 14) return { type: dl <= dr ? 'punchL' : 'punchR' };
     }
     const LP = state.loop;                                        // loop brace along the bottom of the beat ruler: ends = start / end, middle = move, tap = on / off
-    if (y > RULER - 15 && LP.end > LP.start) {
+    if (y >= RULER - 10 && LP.end > LP.start) {
       const a = tx(LP.start), b = tx(LP.end), ez = Math.min(14, Math.max(6, (b - a) / 3));
       if (x > a - 10 && x < b + 10) return Math.abs(x - a) < ez ? { type: 'loopL', tick: xt(x) } : Math.abs(x - b) < ez ? { type: 'loopR', tick: xt(x) } : { type: 'loop', tick: xt(x) };
     }
@@ -1274,6 +1277,7 @@ function setup() {
       switch (t.type) {
         case 'corner': return toggleSnap();
         case 'locset': { const m = P.addMarker(Math.round(state.playing ? P.currentTick() : snapT(P.currentTick()))); toast('Locator \u201c' + m.name + '\u201d ditambahkan.', 1400); return invalidate(); }
+        case 'lockenv': prefs.lockEnv = !lockEnv(); savePrefs(); toast(lockEnv() ? 'Lock Envelopes nyala: otomasi tetap di posisi lagu saat klip dipindah.' : 'Lock Envelopes mati: otomasi ikut pindah bersama klip.', 1800); return invalidate();
         case 'automode': prefs.autoMode = !autoMode(); savePrefs(); for (const tr of state.tracks) if (tr.kind === 'auto') animRow(tr); clampView(); toast('Automation Mode ' + (autoMode() ? 'nyala' : 'mati: lane otomasi disembunyikan') + '.', 1300); return invalidate();
         case 'locprev': P.jumpMarker(-1); return invalidate();
         case 'locnext': P.jumpMarker(1); return invalidate();
@@ -1485,6 +1489,11 @@ function setup() {
         toast('Dibatalkan.', 900); updateBar(); invalidate(); return;
       }
       if (cancel && drag && (drag.k === 'sel' || drag.k === 'marq')) { sel = null; marq = null; drag = null; updateBar(); invalidate(); return; }
+      // Lock Envelopes off (Live's default): the automation of a moved clip's track goes with it (same track only; a clip moved to another track leaves it)
+      if (!cancel && drag && !lockEnv()) {
+        if (drag.k === 'move' && drag.i === drag.i0 && drag.c.start !== drag.start) P.moveEnvelopes(P.stripOf(drag.i), drag.start, drag.c.len, drag.c.start - drag.start);
+        if (drag.k === 'gmove') for (const it of drag.items) if (it.cur === it.i && it.c.start !== it.start) P.moveEnvelopes(P.stripOf(it.i), it.start, it.c.len, it.c.start - it.start);
+      }
       if (drag && drag.k === 'sel') { if (sel && sel.b - sel.a < BEAT / 4) sel = null; else selMenu(); }
       if (drag && drag.k === 'marq') {
         const m = marq; marq = null; drag = null;
@@ -1541,7 +1550,7 @@ function setup() {
   ov.addEventListener('pointerdown', (e) => {
     const r = ov.getBoundingClientRect(); canvas._last = hit(e.clientX - r.left, e.clientY - r.top);
     down.add(e.pointerId); touching = true; touchedAt = performance.now(); stopMotion();   // a touch stops any glide or fling right where it is
-    const ty = canvas._last.type; if (ty === 'corner' || ty === 'gridbtn' || ty === 'zoombtn' || ty === 'follow' || ty === 'locset' || ty === 'locprev' || ty === 'locnext' || ty === 'fith' || ty === 'fitw' || ty === 'wzoom') { pressed = ty; invalidate(); }
+    const ty = canvas._last.type; if (ty === 'corner' || ty === 'gridbtn' || ty === 'zoombtn' || ty === 'follow' || ty === 'locset' || ty === 'locprev' || ty === 'locnext' || ty === 'fith' || ty === 'fitw' || ty === 'wzoom' || ty === 'lockenv' || ty === 'automode') { pressed = ty; invalidate(); }
   }, true);
   const release = (e) => { down.delete(e.pointerId); if (!down.size) touching = false; if (pressed) { pressed = null; invalidate(); } };
   ov.addEventListener('pointerup', release, true); ov.addEventListener('pointercancel', release, true);

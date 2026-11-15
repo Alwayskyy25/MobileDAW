@@ -1704,6 +1704,36 @@ export function retargetAutoTrack(i, target, label) {
   syncAutomation(); emit('tracks');
   return true;
 }
+// Live's Lock Envelopes off (the default): moving clips takes the track's automation in their time span with them. The breakpoints of every
+// automation lane of the strip inside [s0, s0 + len) move by delta and replace what the lane had at the destination; the edges get points with
+// the old values, so the curve outside both spans stays as it was. Returns the number of lanes changed.
+export function moveEnvelopes(strip, s0, len, delta) {
+  if (!delta || !(len > 0)) return 0;
+  const s1 = s0 + len, d0 = s0 + delta, d1 = s1 + delta, inR = (t, a, b) => t >= a && t < b; let n = 0;
+  for (const t of state.tracks) {
+    if (t.kind !== 'auto' || !t.target || t.target.strip !== strip || !t.clips.length) continue;
+    const clips = [...t.clips].filter((c) => !c.muted && c.pts && c.pts.length).sort((a, b) => a.start - b.start); if (!clips.length) continue;
+    const at = (T) => { let c = clips.find((q) => T >= q.start && T < q.start + q.len); if (!c) c = clips.filter((q) => q.start <= T).pop() || clips[0]; return autoValueAt(c, Math.max(0, Math.min(c.len, T - c.start))); };
+    const covered = clips.some((c) => c.start < s1 && c.start + c.len > s0); if (!covered) continue;
+    const abs = []; for (const c of clips) for (const p of c.pts) abs.push({ ...p, t: c.start + p.t });
+    const moved = [{ t: d0, v: at(s0) }, ...abs.filter((p) => inR(p.t, s0, s1)).map((p) => ({ ...p, t: p.t + delta })), { t: d1 - 1, v: at(s1 - 1) }];
+    const keep = abs.filter((p) => !inR(p.t, s0, s1) && !inR(p.t, d0, d1));
+    for (const E of [s0 - 1, s1, d0 - 1, d1]) if (E >= 0 && !inR(E, d0, d1)) keep.push({ t: E, v: at(E) });
+    const all = [...keep, ...moved].filter((p) => p.t >= 0).sort((a, b) => a.t - b.t), out = [];
+    for (const p of all) { if (out.length && out[out.length - 1].t === p.t) out[out.length - 1] = p; else out.push(p); }
+    for (const c of clips) c.pts = [];
+    for (const p of out) {                                          // each point into the clip that holds it, or the nearest clip (stretched to hold it)
+      let c = clips.find((q) => p.t >= q.start && p.t <= q.start + q.len);
+      if (!c) { c = clips.reduce((b, q) => (Math.min(Math.abs(p.t - q.start), Math.abs(p.t - q.start - q.len)) < Math.min(Math.abs(p.t - b.start), Math.abs(p.t - b.start - b.len)) ? q : b), clips[0]);
+        if (p.t < c.start) { const sh = c.start - p.t; for (const q of c.pts) q.t += sh; c.len += sh; c.start = p.t; } else c.len = Math.max(c.len, p.t - c.start + 1); }
+      c.pts.push({ ...p, t: p.t - c.start });
+    }
+    for (const c of clips) { c.pts.sort((a, b) => a.t - b.t); if (!c.pts.length) c.pts.push({ t: 0, v: at(c.start) }); }
+    n++;
+  }
+  if (n) { syncAutomation(); emit('tracks'); }
+  return n;
+}
 export function syncAutomation() {
   const flat = [];
   syncTempoMap();
