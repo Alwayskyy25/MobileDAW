@@ -69,6 +69,15 @@ function adjust(map) {
 let ACT = THEMES.dark;                                    // the applied theme: the chosen one with the adjustments
 export function setThemeAdjust(a) { for (const k of Object.keys(ADJ)) if (a && typeof a[k] === 'number' && isFinite(a[k])) ADJ[k] = k === 'hue' ? Math.max(-180, Math.min(180, a[k])) : Math.max(-1, Math.min(1, a[k])); applyTheme(current); }
 export const themeAdjust = () => ({ ...ADJ });
+// a clip / track colour under the Color Intensity and Color Hue adjustments (Live shifts the clip colours with them); unchanged without them
+const toneCache = new Map();
+export function tone(hex) {
+  if (!ADJ.intensity && !ADJ.hue) return hex;
+  let r = toneCache.get(hex); if (r) return r;
+  const m = /^#([0-9a-f]{6})$/i.exec(String(hex)); if (!m) return hex;
+  const R = parseInt(m[1].slice(0, 2), 16), G = parseInt(m[1].slice(2, 4), 16), B = parseInt(m[1].slice(4, 6), 16), [hh, sat, l] = hsl(R, G, B), c = unhsl(hh + ADJ.hue, Math.max(0, Math.min(1, sat * (1 + 0.9 * ADJ.intensity))), l);
+  r = '#' + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join(''); toneCache.set(hex, r); return r;
+}
 export const currentTone = () => THEME_TONE[current] || 'dark';
 let current = 'dark';
 const cache = new Map();
@@ -107,7 +116,7 @@ export const T = (token) => ACT[token];     // theme token for canvas code, e.g.
 export const currentTheme = () => current;
 export function applyTheme(name) {
   if (!THEMES[name]) name = 'dark';
-  current = name; ACT = adjust(THEMES[name]); cache.clear(); buildRamp();
+  current = name; ACT = adjust(THEMES[name]); cache.clear(); toneCache.clear(); buildRamp();
   const root = document.documentElement;
   for (const [k, v] of Object.entries(ACT)) root.style.setProperty(k, v);
   const tone = THEME_TONE[name] || name;              // derived themes reuse the CSS rules of their base

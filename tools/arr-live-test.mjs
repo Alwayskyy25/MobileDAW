@@ -41,12 +41,28 @@ await page.screenshot({ path: path.join(out, 'arr-fit.png') });
 { const q = await ev(() => { const r = (id) => { const e = document.querySelector(id), b = e.getBoundingClientRect(), c = getComputedStyle(e); return { w: Math.round(b.width), h: Math.round(b.height), rad: c.borderTopLeftRadius, svg: !!e.querySelector('svg') }; }; return ['#btn-browser', '#btn-rew', '#btn-play', '#btn-rec', '#btn-metro', '#btn-menu'].map(r); });
   ok(q.every((x) => x.svg && x.h === q[0].h && x.rad !== '0px') && q.slice(1, 5).every((x) => x.w === q[1].w), `control bar: six icon buttons, one height (${q[0].h} px), rounded (${q[0].rad}), transport buttons one width (${q[1].w} px)`);
   await page.locator('#top').screenshot({ path: path.join(out, 'controlbar.png') }); }
+// lit states of the transport: Play green while playing, Record red while armed, the metronome orange
+{ await ev(() => { document.querySelector('#btn-metro').click(); document.querySelector('#btn-play').click(); }); await page.waitForTimeout(500);
+  const on = await ev(() => ['#btn-play', '#btn-metro'].map((id) => { const e = document.querySelector(id); return { on: e.classList.contains('on'), bg: getComputedStyle(e).backgroundColor }; }));
+  await page.locator('#top').screenshot({ path: path.join(out, 'controlbar-on.png') });
+  await ev(() => { document.querySelector('#btn-play').click(); document.querySelector('#btn-metro').click(); }); await page.waitForTimeout(300);
+  ok(on[0].on && on[1].on && on[0].bg !== on[1].bg, `Play lit (${on[0].bg}) and metronome lit (${on[1].bg}) while playing`); }
+// Automation Mode: off hides the automation lanes, on brings them back; Waveform Vertical Zoom steps through its levels
+{ const lanes = () => ev(async () => { const T = await import('./js/timeline.js'), P = await import('./js/project.js'); const i = P.state.tracks.findIndex((t) => t.kind === 'auto'); return i < 0 ? null : T.probe(0, i + 1).top - T.probe(0, i).top; });
+  await ev(async () => { const P = await import('./js/project.js'); P.addAutoTrack({ kind: 6, strip: 'master', param: 0, def: P.TEMPO_DEF }, 'Tempo'); P.emit('all'); });
+  await page.waitForTimeout(400); const h0 = await lanes();
+  if (h0 == null) console.log('     (no automation lane could be made from the test: Automation Mode checked by its switch only)');
+  const g = await geo(); await tap(g.cw + 6 + 30 + 2 * 24 + 8 + 13, 17); await page.waitForTimeout(700); const h1 = await lanes(), off = await ev(async () => (await import('./js/prefs.js')).prefs.autoMode);
+  await tap(g.cw + 6 + 30 + 2 * 24 + 8 + 13, 17); await page.waitForTimeout(700); const h2 = await lanes(), on2 = await ev(async () => (await import('./js/prefs.js')).prefs.autoMode);
+  ok(off === false && on2 === true && (h0 == null || (h0 > 10 && h1 < 2 && h2 > 10)), `Automation Mode switch: off -> on (${off} -> ${on2})` + (h0 != null ? `, lane height ${Math.round(h0)} -> ${Math.round(h1)} -> ${Math.round(h2)} px` : ''));
+  const z0 = await ev(async () => (await import('./js/prefs.js')).prefs.waveZoom || 1); await tap(g.cw - 242 + 19, g.h - 9); const z1 = await ev(async () => (await import('./js/prefs.js')).prefs.waveZoom || 1);
+  ok(z1 > z0, `Waveform Vertical Zoom: ${z0}x -> ${z1}x`); await ev(async () => { const p = await import('./js/prefs.js'); p.prefs.waveZoom = 1; }); }
 // theme adjustments on top of a theme: brightness lifts the greys, tone tints them, hue turns the accent; reset restores the theme exactly
 const tok = () => ev(() => { const s = getComputedStyle(document.documentElement); return { bg: s.getPropertyValue('--bg').trim(), acc: s.getPropertyValue('--accent').trim() }; });
 const t0 = await tok();
 for (const [name, adj, file] of [['brightness +50 %', { brightness: 0.5 }, 'theme-bright'], ['tone warm', { brightness: 0, tone: 1 }, 'theme-warm'], ['tone cool + hue', { tone: -1, hue: 150, intensity: -0.3 }, 'theme-cool-hue'], ['contrast', { tone: 0, hue: 0, intensity: 0, contrast: 0.8 }, 'theme-contrast']]) {
   await ev(async (a) => { const Th = await import('./js/theme.js'); Th.setThemeAdjust(a); }, adj); await page.waitForTimeout(350); await page.screenshot({ path: path.join(out, file + '.png') });
-  const t = await tok(); console.log('     ' + name + ': --bg ' + t0.bg + ' -> ' + t.bg + ', --accent ' + t0.acc + ' -> ' + t.acc); if (name.startsWith('brightness')) ok(parseInt(t.bg.slice(1, 3), 16) > parseInt(t0.bg.slice(1, 3), 16) + 15, 'brightness lifts the background'); if (name.startsWith('tone warm')) ok(parseInt(t.bg.slice(1, 3), 16) > parseInt(t.bg.slice(5, 7), 16), 'warm tone: more red than blue in the greys'); if (name.includes('hue')) ok(t.acc !== t0.acc, 'hue turns the accent colour');
+  const t = await tok(); console.log('     ' + name + ': --bg ' + t0.bg + ' -> ' + t.bg + ', --accent ' + t0.acc + ' -> ' + t.acc); if (name.startsWith('brightness')) ok(parseInt(t.bg.slice(1, 3), 16) > parseInt(t0.bg.slice(1, 3), 16) + 15, 'brightness lifts the background'); if (name.startsWith('tone warm')) ok(parseInt(t.bg.slice(1, 3), 16) > parseInt(t.bg.slice(5, 7), 16), 'warm tone: more red than blue in the greys'); if (name.includes('hue')) ok(t.acc !== t0.acc, 'hue turns the accent colour'); if (name.includes('hue')) { const c = await ev(async () => (await import('./js/theme.js')).tone('#ff3fd2')); ok(c !== '#ff3fd2', 'hue also turns the clip colours (#ff3fd2 -> ' + c + ')'); }
 }
 await ev(async () => { const Th = await import('./js/theme.js'); Th.setThemeAdjust({ tone: 0, brightness: 0, contrast: 0, intensity: 0, hue: 0 }); }); const t9 = await tok();
 ok(t9.bg === t0.bg && t9.acc === t0.acc, 'reset: the theme is back exactly');

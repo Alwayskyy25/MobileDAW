@@ -51,7 +51,7 @@ function range(p, a, b) {                                       // min / max ove
 
 // o = { x0, x1 (pixel range to draw), s0 (sample index at pixel x0), spp (samples per pixel), mid, amp (pixels for amplitude 1) }
 export function wavePath(p, o) {
-  const path = new Path2D(), n = p.l.length, { x0, x1, mid, amp, s0, spp } = o;
+  const path = new Path2D(), n = p.l.length, { x0, x1, mid, amp, s0, spp } = o, G = o.gain || 1;   // gain: Live's Waveform Vertical Zoom (display only, clipped at the lane)
   if (!(spp > 0) || !n) return path;
   const idx = (px) => s0 + (px - x0) * spp;
   let a = x0, b = x1;
@@ -63,7 +63,7 @@ export function wavePath(p, o) {
     const cnt = b - a, top = new Float32Array(cnt), bot = new Float32Array(cnt);
     for (let i = 0; i < cnt; i++) {
       range(p, idx(a + i), idx(a + i + 1));
-      let yt = mid - Math.min(1, MX) * amp, yb = mid - Math.max(-1, MN) * amp;
+      let yt = mid - Math.min(1, MX * G) * amp, yb = mid - Math.max(-1, MN * G) * amp;
       if (yb - yt < 1) { const m = (yt + yb) / 2; yt = m - 0.5; yb = m + 0.5; }
       top[i] = yt; bot[i] = yb;
     }
@@ -78,7 +78,7 @@ export function wavePath(p, o) {
       return v0 + (v1 - v0) * f;
     };
     path.moveTo(a, mid);
-    for (let px = a; px <= b; px++) path.lineTo(px, mid - Math.max(-1, Math.min(1, at(idx(px)))) * amp);
+    for (let px = a; px <= b; px++) path.lineTo(px, mid - Math.max(-1, Math.min(1, at(idx(px)) * G)) * amp);
     path.lineTo(b, mid); path.closePath();
   }
   return path;
@@ -94,7 +94,7 @@ export function peaksPath(pk, o) {
     if (u1 < 0) continue; if (u0 >= n) break;
     const b0 = Math.max(0, Math.floor(u0)), b1 = Math.min(n - 1, Math.max(b0, Math.floor(u1)));
     let m = 0; for (let b = b0; b <= b1; b++) if (pk[b] > m) m = pk[b];
-    xs.push(px + 0.5); top.push(Math.max(0.5, m * amp));
+    xs.push(px + 0.5); top.push(Math.max(0.5, Math.min(1, m * (o.gain || 1)) * amp));
   }
   if (!xs.length) return path;
   path.moveTo(xs[0], mid - top[0]);

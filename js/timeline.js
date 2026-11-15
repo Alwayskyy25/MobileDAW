@@ -2,7 +2,7 @@
 // Gestures follow FL Studio Mobile (tap clip = controls, double-tap = editor, long-tap = menus,
 // right-edge handle = resize, ruler drag = time selection) on an Ableton-style layout.
 import { densify } from './autocurve.js';
-import { C, T, currentTone } from './theme.js';
+import { C, T, currentTone, tone } from './theme.js';
 import { attachGestures, gestureTiming, haptic } from './gesture.js';
 import { menu, ask, modal, toast, clamp } from './ui.js';
 import { checkpoint, revertLast } from './history.js';
@@ -74,12 +74,12 @@ const LANE_B = () => H - BOT;                                  // bottom edge of
 // rows have individual heights: a folded track is FOLD_H tall, the others view.rowH (gliding while a fold animates)
 // below the tracks: the Master row and one row per effect track (Return A/B stay in the mixer), then the "+" row
 // top corner over the headers (Live: Set Locator, Previous / Next Locator, then our Snap switch)
-const cornerRects = () => { const y = 8, h = RULER - 16, x = CW + 6, bw = 24, sw = 30; return { set: { x, y, w: sw, h }, prev: { x: x + sw + 3, y, w: bw, h }, next: { x: x + sw + 3 + bw + 1, y, w: bw, h }, snap: { x: x + sw + 2 * bw + 9, y, w: Math.max(40, HEAD - 12 - (sw + 2 * bw + 9)), h } }; };
+const cornerRects = () => { const y = 8, h = RULER - 16, x = CW + 6, bw = 24, sw = 30; const ax = x + sw + 2 * bw + 8, aw = HEAD > 190 ? 26 : 0; return { set: { x, y, w: sw, h }, prev: { x: x + sw + 3, y, w: bw, h }, next: { x: x + sw + 3 + bw + 1, y, w: bw, h }, auto: { x: ax, y, w: aw, h }, snap: { x: ax + (aw ? aw + 4 : 0), y, w: Math.max(40, HEAD - 6 - (ax - CW) - (aw ? aw + 4 : 0)), h } }; };
 const snapRect = () => cornerRects().snap;
 const songEnd = () => state.tracks.reduce((m, t) => t.clips.reduce((a, c) => Math.max(a, c.start + c.len), m), 0);
 
 const followRect = () => ({ x: CW + 6, y: H - BOT + 3, w: HEAD - 12, h: BOT - 6 });
-const badges = () => (CW < 170 ? [] : [['gridbtn', 'Grid ' + (SNAPS[cfg.snap][0] === 'Auto' ? gridName() : SNAPS[cfg.snap][0]), { x: CW - 150, y: H - BOT + 3, w: 92, h: BOT - 6 }], ['zoombtn', (view.ppt / 0.06).toFixed(2) + 'x', { x: CW - 54, y: H - BOT + 3, w: 50, h: BOT - 6 }], ...(CW < 330 ? [] : [['fith', 'H', { x: CW - 198, y: H - BOT + 3, w: 19, h: BOT - 6 }], ['fitw', 'W', { x: CW - 177, y: H - BOT + 3, w: 19, h: BOT - 6 }]])]);
+const badges = () => (CW < 170 ? [] : [['gridbtn', 'Grid ' + (SNAPS[cfg.snap][0] === 'Auto' ? gridName() : SNAPS[cfg.snap][0]), { x: CW - 150, y: H - BOT + 3, w: 92, h: BOT - 6 }], ['zoombtn', (view.ppt / 0.06).toFixed(2) + 'x', { x: CW - 54, y: H - BOT + 3, w: 50, h: BOT - 6 }], ...(CW < 420 ? [] : [['wzoom', '\u2248' + (prefs.waveZoom || 1) + 'x', { x: CW - 242, y: H - BOT + 3, w: 38, h: BOT - 6 }]]), ...(CW < 330 ? [] : [['fith', 'H', { x: CW - 198, y: H - BOT + 3, w: 19, h: BOT - 6 }], ['fitw', 'W', { x: CW - 177, y: H - BOT + 3, w: 19, h: BOT - 6 }]])]);
 let pressed = null;                                           // which corner / badge button is under the finger (drawn highlighted)
 const nX = () => 1 + Math.max(0, state.returns.length - 2);
 const xInfo = (i) => { const j = i - state.tracks.length; return j === 0 ? { master: true, strip: MASTER, name: 'Master', color: state.master.color || '#4cd964', obj: state.master } : { master: false, k: j + 1, strip: RET0 + j + 1, name: state.returns[j + 1].name, color: state.returns[j + 1].color || '#35d0e0', obj: state.returns[j + 1] }; };
@@ -99,7 +99,9 @@ export const subLayout = (i) => (state.tracks[i] ? P.subsOf(state.tracks[i]).map
 export function setHeadW(w) { const [lo, hi] = headLim(); prefs[full() ? 'headW' : 'headWc'] = w > 0 ? Math.round(clamp(w, lo, hi)) : 0; savePrefs(); applyHead(); clampView(); invalidate(); }
 export function setHeadFull(on) { prefs.headFull = !!on; savePrefs(); applyHead(); clampView(); invalidate(); }
 export const headIsFull = () => full();
-const rowTarget = (t) => (t.fold ? FOLD_H : t.hx ? Math.round(clamp(view.rowH * t.hx, MIN_ROW, ROW_MAX)) : view.rowH) + subN(t) * SUBH();
+const WZ = () => prefs.waveZoom || 1;                          // Live's Waveform Vertical Zoom
+const autoMode = () => prefs.autoMode !== false;              // Live's Automation Mode: off hides the automation lanes
+const rowTarget = (t) => (t.kind === 'auto' && !autoMode() ? 0 : t.fold ? FOLD_H : t.hx ? Math.round(clamp(view.rowH * t.hx, MIN_ROW, ROW_MAX)) : view.rowH) + subN(t) * SUBH();
 // Sub-tracks (project.js subsOf, FL Studio Mobile): rows under the track's own row, SUBH high each, with clips of their own that play through
 // the track's instrument and mixer channel. A folded track hides them (their clips then lie in the thin row). rhMain = the track's own row.
 const subN = (t) => (t && !t.fold && t.kind !== 'auto' ? P.subsOf(t).length : 0);
@@ -215,6 +217,7 @@ function ink(hex) {                     // text on a colour: dark on light colou
 
 const contentInk = (hex) => (ink(hex).startsWith('rgba(14') ? 'rgba(10,10,12,.86)' : 'rgba(250,250,252,.88)');   // Live: black content on light clip colours, white on dark ones
 function drawClip(t, c, y, hh) {
+  { const tc = tone(t.color); if (tc !== t.color) t = { __proto__: t, color: tc }; }   // Color Intensity / Hue of the theme reach the clip colours
   const g = gl.get(c.id), cs = g ? g.s : c.start, cl = g ? g.l : c.len;
   const x = tx(cs), w = cl * view.ppt;
   if (x > CW || x + w < 0) return;
@@ -261,11 +264,11 @@ function drawClip(t, c, y, hh) {
         const N = es.pyr.l.length, two = bh >= 34 ? stereoPyr(es.pyr) : null;
         if (two) {                                                      // stereo, row tall enough: left channel in the upper half, right in the lower (as Live)
           const hh = bh / 2; ctx.save(); ctx.globalAlpha = 0.55; for (let k = 0; k < 2; k++) ctx.fillRect(px0, Math.round(by + hh * k + hh / 2), px1 - px0, 1); ctx.restore();   // centre line of each lane
-          for (let k = 0; k < 2; k++) ctx.fill(wavePath(two[k], { x0: px0, x1: px1, s0: sec0 / es.duration * N, spp: spp0 * N, mid: by + hh * k + hh / 2, amp: hh * 0.5 * 0.94 }));
-        } else { ctx.save(); ctx.globalAlpha = 0.55; ctx.fillRect(px0, Math.round(by + bh / 2), px1 - px0, 1); ctx.restore(); ctx.fill(wavePath(es.pyr, { x0: px0, x1: px1, s0: sec0 / es.duration * N, spp: spp0 * N, mid: by + bh / 2, amp: bh * 0.5 * 0.96 })); }
+          for (let k = 0; k < 2; k++) ctx.fill(wavePath(two[k], { x0: px0, x1: px1, s0: sec0 / es.duration * N, spp: spp0 * N, mid: by + hh * k + hh / 2, amp: hh * 0.5 * 0.94, gain: WZ() }));
+        } else { ctx.save(); ctx.globalAlpha = 0.55; ctx.fillRect(px0, Math.round(by + bh / 2), px1 - px0, 1); ctx.restore(); ctx.fill(wavePath(es.pyr, { x0: px0, x1: px1, s0: sec0 / es.duration * N, spp: spp0 * N, mid: by + bh / 2, amp: bh * 0.5 * 0.96, gain: WZ() })); }
       } else if (es.peaks) {
         const N = es.peaks.length;
-        ctx.fill(peaksPath(es.peaks, { x0: px0, x1: px1, s0: sec0 / es.duration * N, spp: spp0 * N, mid: by + bh / 2, amp: bh * 0.5 * 0.96 }));
+        ctx.fill(peaksPath(es.peaks, { x0: px0, x1: px1, s0: sec0 / es.duration * N, spp: spp0 * N, mid: by + bh / 2, amp: bh * 0.5 * 0.96, gain: WZ() }));
       }
     }
   } else if (c.notes && bh > 6) {
@@ -327,7 +330,7 @@ function draw() {
   ctx.save(); ctx.beginPath(); ctx.rect(0, RULER, CW, LB - RULER); ctx.clip();
   // lanes: one flat grey per track, the selected track a step lighter (as Live highlights the selected track's lane)
   for (let i = Math.max(0, rowAt(RULER)); i <= Math.min(n - 1, rowAt(LB)); i++) {
-    const y = rowY(i), h = rh(i);
+    const y = rowY(i), h = rh(i); if (h < 2) continue;   // a hidden automation lane (Automation Mode off)
     ctx.fillStyle = state.sel.track === i ? C('#333337') : C('#2a2a2c'); ctx.fillRect(0, y, CW, h);
     const sn = subN(state.tracks[i]);
     if (sn) { const mh = rhMain(i), sh = SUBH(), L = P.subsOf(state.tracks[i]); for (let k = 0; k < sn; k++) { const sy = y + mh + k * sh; ctx.fillStyle = C('#262628'); ctx.fillRect(0, sy, CW, sh); if (L[k].mute) { ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(0, sy, CW, sh); } ctx.fillStyle = C('#1a1a1c'); ctx.fillRect(0, sy - 1, CW, 1); } }   // sub-track rows: a shade darker, a thin line above each
@@ -382,7 +385,7 @@ function draw() {
   ctx.restore();
   // clips
   const first = Math.max(0, rowAt(RULER)), last = Math.min(n - 1, rowAt(LB));
-  for (let i = first; i <= last; i++) for (const c of state.tracks[i].clips) { const b = laneBox(i, c); drawClip(state.tracks[i], c, b.y, b.h); }   // a clip of a sub-track sits in its row
+  for (let i = first; i <= last; i++) for (const c of state.tracks[i].clips) { const b = laneBox(i, c); if (b.h < 2) continue; drawClip(state.tracks[i], c, b.y, b.h); }   // a clip of a sub-track sits in its row
   if (sel) { const a = Math.max(0, tx(sel.a)), b = Math.min(CW, tx(sel.b)); ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fillRect(a, RULER, Math.max(0, b - a), gy1 - RULER); ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(Math.round(a), RULER, 1, gy1 - RULER); ctx.fillRect(Math.round(b), RULER, 1, gy1 - RULER); }   // Live: the selection is a white wash with bright edges
   if (marq) {
     const ax = tx(marq.t0), bx = tx(marq.t1), ay = RULER - view.y0 + marq.y0, by = RULER - view.y0 + marq.y1;
@@ -643,7 +646,8 @@ function drawHeads() {
       ctx.fillStyle = C('#141415'); ctx.fillRect(hx, y + h - 1, HEAD, 1);
       continue;
     }
-    const t = state.tracks[i], on = state.sel.track === i, r = hdr(i), auto = t.kind === 'auto';
+    let t = state.tracks[i]; if (rh(i) < 2) continue; { const tc = tone(t.color); if (tc !== t.color) t = { __proto__: t, color: tc }; }
+    const on = state.sel.track === i, r = hdr(i), auto = t.kind === 'auto';
     const nw = r.nw, ik = ink(t.color), fullLook = full();
     ctx.fillStyle = on ? C('#3a3a3e') : C('#2c2c2f'); ctx.fillRect(hx, y, HEAD, h - 1);                    // selected track: the mixer column a step lighter
     ctx.fillStyle = t.color; ctx.fillRect(hx, y, nw, h - 1);                                              // the whole name block in the track colour, as in Live
@@ -679,7 +683,8 @@ function drawHeads() {
   ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(hx + 1, 0, HEAD - 1, RULER); ctx.fillStyle = C('#141415'); ctx.fillRect(hx, RULER - 1, HEAD, 1);
   { const q = cornerRects(), tri = (r, dir) => { const cx = r.x + r.w / 2, cy = r.y + r.h / 2; ctx.fillStyle = C('#d4d4d8'); ctx.beginPath(); ctx.moveTo(cx - 4 * dir, cy); ctx.lineTo(cx + 3 * dir, cy - 4.5); ctx.lineTo(cx + 3 * dir, cy + 4.5); ctx.closePath(); ctx.fill(); };
     drawBtn(q.set, 'Set', false, null, pressed !== 'locset'); for (const [r, ty, dir] of [[q.prev, 'locprev', 1], [q.next, 'locnext', -1]]) { ctx.fillStyle = pressed === ty ? C('#55555b') : C('#3a3a3e'); ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1); tri(r, dir); } }
-  drawSwitch(snapRect(), HEAD > 200 ? 'Snap ' + SNAPS[cfg.snap][0] : SNAPS[cfg.snap][0], cfg.snap !== SNAPS.length - 1, pressed === 'corner');
+  { const q = cornerRects(); if (q.auto.w) drawBtn(q.auto, 'aut', autoMode(), T('--accent')); }
+  drawSwitch(snapRect(), HEAD > 260 ? 'Snap ' + SNAPS[cfg.snap][0] : SNAPS[cfg.snap][0], cfg.snap !== SNAPS.length - 1, pressed === 'corner');
   // bottom corner: Follow switch (the arrangement scrolls with the playhead)
   ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(hx + 1, H - BOT, HEAD - 1, BOT); ctx.fillStyle = C('#141415'); ctx.fillRect(hx, H - BOT, HEAD, 1);
   drawSwitch(followRect(), 'Follow', cfg.follow, pressed === 'follow');
@@ -801,7 +806,7 @@ function edgeScroll(x) {
 // ------------------------------------------------------------------ hit testing + actions
 function hit(x, y) {
   if (y < RULER) {
-    if (x >= CW) { const q = cornerRects(); return inRect(q.set, x, y, 2) ? { type: 'locset' } : inRect(q.prev, x, y, 1) ? { type: 'locprev' } : inRect(q.next, x, y, 1) ? { type: 'locnext' } : { type: 'corner' }; }
+    if (x >= CW) { const q = cornerRects(); return inRect(q.set, x, y, 2) ? { type: 'locset' } : inRect(q.prev, x, y, 1) ? { type: 'locprev' } : inRect(q.next, x, y, 1) ? { type: 'locnext' } : q.auto.w && inRect(q.auto, x, y, 1) ? { type: 'automode' } : { type: 'corner' }; }
     if (y < MROW + 2) { let best = null, bd = 18; for (const m of state.markers) { const d = Math.abs(x - tx(m.t)); if (d < bd) { bd = d; best = m; } } return best ? { type: 'marker', m: best } : { type: 'mrow', tick: xt(x) }; }
     if (PUon() && y > RULER - 11) {
       const dl = Math.abs(x - tx(state.punch.start)), dr = Math.abs(x - tx(state.punch.end));
@@ -1268,8 +1273,10 @@ function setup() {
       switch (t.type) {
         case 'corner': return toggleSnap();
         case 'locset': { const m = P.addMarker(Math.round(state.playing ? P.currentTick() : snapT(P.currentTick()))); toast('Locator \u201c' + m.name + '\u201d ditambahkan.', 1400); return invalidate(); }
+        case 'automode': prefs.autoMode = !autoMode(); savePrefs(); for (const tr of state.tracks) if (tr.kind === 'auto') animRow(tr); clampView(); toast('Automation Mode ' + (autoMode() ? 'nyala' : 'mati: lane otomasi disembunyikan') + '.', 1300); return invalidate();
         case 'locprev': P.jumpMarker(-1); return invalidate();
         case 'locnext': P.jumpMarker(1); return invalidate();
+        case 'wzoom': { const L = [1, 1.5, 2, 3, 4], k = L.indexOf(prefs.waveZoom || 1); prefs.waveZoom = L[(k + 1) % L.length]; savePrefs(); return invalidate(); }   // Waveform Vertical Zoom: display only
         case 'fitw': { const e = songEnd(); if (e) fitTo(0, e); return; }                              // Live's Optimize Width (W)
         case 'fith': { const avail = LANE_B() - RULER - ADD_H - nX() * XROW_H, used = contentH() - ADD_H - nX() * XROW_H; if (used > 0) { for (const tr of state.tracks) animRow(tr); view.rowH = clamp(view.rowH * avail / used, 30, ROW_MAX); view.y0 = 0; clampView(); invalidate(); } return; }   // Optimize Height (H)
         case 'cornerMenu': return menu([...SNAPS.map((s, k) => ({ label: s[0], check: cfg.snap === k, fn: () => { cfg.snap = k; invalidate(); } })), { sep: true }, { label: 'Ikuti playhead', check: cfg.follow, fn: () => { cfg.follow = !cfg.follow; } }, { label: 'Pilih semua klip', fn: () => selAll() }, { label: 'Batal pilihan', dim: !msel.size, fn: () => clearSel() }, { sep: true }, { label: 'Lipat semua track', fn: () => foldAll(true) }, { label: 'Buka semua track', fn: () => foldAll(false) }], canvasOrigin().left + Math.max(0, CW - 20), canvasOrigin().top + RULER);
@@ -1533,7 +1540,7 @@ function setup() {
   ov.addEventListener('pointerdown', (e) => {
     const r = ov.getBoundingClientRect(); canvas._last = hit(e.clientX - r.left, e.clientY - r.top);
     down.add(e.pointerId); touching = true; touchedAt = performance.now(); stopMotion();   // a touch stops any glide or fling right where it is
-    const ty = canvas._last.type; if (ty === 'corner' || ty === 'gridbtn' || ty === 'zoombtn' || ty === 'follow' || ty === 'locset' || ty === 'locprev' || ty === 'locnext' || ty === 'fith' || ty === 'fitw') { pressed = ty; invalidate(); }
+    const ty = canvas._last.type; if (ty === 'corner' || ty === 'gridbtn' || ty === 'zoombtn' || ty === 'follow' || ty === 'locset' || ty === 'locprev' || ty === 'locnext' || ty === 'fith' || ty === 'fitw' || ty === 'wzoom') { pressed = ty; invalidate(); }
   }, true);
   const release = (e) => { down.delete(e.pointerId); if (!down.size) touching = false; if (pressed) { pressed = null; invalidate(); } };
   ov.addEventListener('pointerup', release, true); ov.addEventListener('pointercancel', release, true);

@@ -1742,3 +1742,15 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 #top #btn-browser.on { background: var(--lv-or, var(--accent)); color: #1a1100; }
 [data-w="s"] #top .tport .b, [data-w="xs"] #top .tport .b { width: 36px; min-width: 36px; }
 #top .tport, #top .grp.hist { gap: 2px; border: 0; border-radius: 0; overflow: visible; background: transparent; } #top .tport .b + .b, #top .grp.hist .b + .b { border-left: 0; }
+/* control bar fields in the same flat look: tempo, performance, view switch */
+#top-l #rd-bpm { border: 0; border-radius: 4px; box-shadow: none; background: var(--lv-well, var(--well)); }
+#top .perf { border: 0; border-radius: 4px; background: var(--lv-well, var(--well)); } #top .perf .fpsbox { border-right: 1px solid var(--lv-body, var(--panel)); }
+#top .perf #cpu, #top .cpubox #cpu { border: 0; border-radius: 0; background: transparent; }
+#top .seg { border: 0; border-radius: 4px; gap: 2px; background: transparent; overflow: visible; }
+#top .seg .b { height: var(--cb-h); border-radius: 4px; background: var(--lv-ctl); color: var(--lv-ink); }
+#top .seg .b.on { background: var(--lv-or, var(--accent)); color: #1a1100; }
+/* SoundFont: the preset list scrolls inside the card; it never makes the card taller */
+.card > .lk.lk-row.fl-live.lk-sf { flex: 1 1 0; min-height: 0; align-items: stretch; }
+.fl-live.lk-sf .lk-sfc, .fl-live.lk-sf .lk-sfdk { min-height: 0 !important; }
+.fl-live.lk-sf .lk-sfdk { display: flex; flex-direction: column; flex: 1 1 0; }
+.fl-live.lk-sf .lk-sflist { flex: 1 1 0; height: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }

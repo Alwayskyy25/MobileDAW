@@ -55,6 +55,31 @@ for (const [k, ty, name] of [[0, 30, 'directwave'], [1, 31, 'gms'], [2, 32, 'min
   const m = await ev(() => { const e = document.querySelector('.menu'); if (!e) return null; const r = e.getBoundingClientRect(); return { n: e.querySelectorAll('.mi').length, top: r.top, bottom: r.bottom, H: innerHeight }; });
   ok(m && m.n >= 20 && m.top >= 0 && m.bottom <= m.H, `quick swap: ${m && m.n} instruments listed, menu inside the screen (${m && Math.round(m.top)}..${m && Math.round(m.bottom)} of ${m && m.H})`);
   await ev(() => { for (const b of document.querySelectorAll('.scrim')) b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); }); await page.waitForTimeout(300); }
+await page.mouse.click(4, 4); await page.waitForTimeout(350);   // close whatever menu a test above left open
+// displays of the redesigned tabs still take the finger: MiniSynth's filter ring (cutoff) and filter envelope (a handle)
+{ await ev(async () => { const P = await import('./js/project.js'); P.selectTrack(P.state.tracks.findIndex((t) => t.inst && t.inst.type === 32)); }); await page.waitForTimeout(500);
+  const par = () => ev(async () => { const P = await import('./js/project.js'), { INSTRUMENTS } = await import('./js/defs.js'); const t = P.state.tracks.find((x) => x.inst && x.inst.type === 32); return INSTRUMENTS[32].params.map((d, j) => (t.inst.params[j] != null ? t.inst.params[j] : d.def)); });
+  const dragOn = async (tab, fx, fy, dx, dy) => { await ev((tab) => [...document.querySelectorAll('.lk-flmtabs .lv-tab')].find((x) => x.textContent === tab).click(), tab); await page.waitForTimeout(350);
+    const cv = await page.$('.card.flm-card .flm-dbox canvas'); await cv.scrollIntoViewIfNeeded(); await page.waitForTimeout(200); const bx = await cv.boundingBox(), v0 = await par(); if (process.env.DBG) console.log(tab, JSON.stringify(bx), JSON.stringify(await ev(([x, y]) => { const e = document.elementFromPoint(x, y); return { w: innerWidth, at: e && (e.tagName + '.' + e.className + '#' + e.id), par: e && e.parentElement && e.parentElement.className }; }, [bx.x + bx.width * fx, bx.y + bx.height * fy])));
+    await page.mouse.move(bx.x + bx.width * fx, bx.y + bx.height * fy); await page.mouse.down(); await page.mouse.move(bx.x + bx.width * fx + dx, bx.y + bx.height * fy + dy, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(200);
+    const v1 = await par(); return v0.map((v, j) => (Math.abs(v - v1[j]) > 1e-6 ? j : -1)).filter((j) => j >= 0); };
+  const f = await dragOn('FILTER', 0.6, 0.4, -80, 30), e = await dragOn('FLT EG', 0.5, 0.2, 50, 40);
+  ok(f.includes(4) && e.some((j) => j >= 8 && j <= 11), `MiniSynth displays follow a drag: filter moved params ${f.join(',')} (4 = Cutoff), envelope moved ${e.join(',')} (8..11 = A D S R)`); }
+// title bar menus: the instrument's "⋯" menu and the quick swap button of an effect card
+{ await ev(() => document.querySelector('.card.flm-card > h4 .dv-more').click()); await page.waitForTimeout(450);
+  const m1 = await ev(() => [...document.querySelectorAll('.menu .mi')].map((x) => x.textContent));
+  await ev(() => { for (const b of document.querySelectorAll('.scrim')) b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); }); await page.waitForTimeout(300);
+  await ev(async () => { const P = await import('./js/project.js'); const i = P.state.tracks.findIndex((t) => t.inst && t.inst.type === 32); P.addDevice(i, 109); P.emit('all'); }); await page.waitForTimeout(500);
+  const before = await ev(async () => { const P = await import('./js/project.js'); return P.state.tracks.find((t) => t.inst && t.inst.type === 32).devices[0].type; });
+  await ev(() => document.querySelector('.card.lkcard:not(.flm-card) > h4 .dv-swap').click()); await page.waitForTimeout(450);
+  const n2 = await ev(() => { const it = [...document.querySelectorAll('.menu .mi')].filter((x) => !x.classList.contains('hd') && !x.classList.contains('sep') && x.textContent === 'Compressor'); if (it[0]) it[0].click(); return document.querySelectorAll('.menu .mi').length; }); await page.waitForTimeout(500);
+  const after = await ev(async () => { const P = await import('./js/project.js'); return P.state.tracks.find((t) => t.inst && t.inst.type === 32).devices[0].type; });
+  ok(m1.some((x) => /Ganti instrumen/.test(x)) && m1.some((x) => /mengambang/.test(x)) && n2 > 30 && after !== before, `instrument menu: ${m1.join(' | ')}; effect quick swap: ${n2} entries, Filter (${before}) -> Compressor (${after})`); }
+// SoundFont with a loaded file: the 136 presets scroll inside the card, the card keeps the height of the rack
+{ await ev(async () => { const P = await import('./js/project.js'); P.addTrack('midi'); const i = P.state.tracks.length - 1; P.setInstrument(i, 6); P.state.tracks[i].inst.sf = { path: 'x/TimGM6mb.sf2', presets: Array.from({ length: 136 }, (_, q) => 'Preset ' + (q + 1)), preset: 33 }; P.selectTrack(i); P.emit('all'); }); await page.waitForTimeout(600);
+  const q = await ev(() => { const l = document.querySelector('.lk-sflist'), c = l.closest('.card'), sc = c.parentElement; return { card: Math.round(c.getBoundingClientRect().height), rack: Math.round(sc.getBoundingClientRect().height), list: Math.round(l.getBoundingClientRect().height), scroll: l.scrollHeight }; });
+  ok(q.card <= q.rack + 1 && q.scroll > q.list * 3, `SoundFont: card ${q.card} px in a ${q.rack} px rack, the list (${q.list} px) scrolls its ${q.scroll} px of presets`);
+  const el = await page.$('.card:has(.lk-sflist)'); if (el) await el.screenshot({ path: path.join(out, 'soundfont.png') }); }
 // a knob turned on the panel reaches the project (and the engine)
 const moved = await ev(async () => { const P = await import('./js/project.js'); const i = P.state.tracks.findIndex((t) => t.inst && t.inst.type === 32); P.selectTrack(i); P.setInstParam(i, 4, 37); return P.state.tracks[i].inst.params[4]; });
 ok(moved === 37, 'MiniSynth Cutoff set through the project API: ' + moved);
