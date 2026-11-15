@@ -225,9 +225,7 @@ function drawClip(t, c, y, hh) {
   const isSel = state.sel.clip === c.id || msel.has(c.id);
   const tall = hh >= 40, hd = tall ? 14 : 0, y0 = y + 1, h0 = hh - 2;   // folded / short rows: no title strip, only colour + content
   const col = c.muted ? '#8a8a8f' : t.color;                               // deactivated clip: the same neutral grey in every theme (clip colours are not themed)
-  { const sy0 = Math.max(RULER, y0 + 1), sy1 = Math.min(LANE_B(), y0 + h0 + 2);   // depth: a soft shadow below / right of the clip (two dark bands, no blur cost)
-    if (sy1 > sy0) { ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(xs + 2, sy0 + 1, Math.max(0, xe - xs), sy1 - sy0); ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(xs + 3, sy0 + 2, Math.max(0, xe - xs), sy1 - sy0); }
-    if (isSel && !c.muted) { ctx.save(); ctx.shadowColor = washRgba(t.color, 0.85); ctx.shadowBlur = 12; ctx.fillStyle = washRgba(t.color, 0.6); ctx.fillRect(xs, Math.max(RULER, y0), Math.max(0, xe - xs), Math.max(0, Math.min(LANE_B(), y0 + h0) - Math.max(RULER, y0))); ctx.restore(); } }   // selected: a glow in its colour
+  // Live's clips are flat: no drop shadow, no glow (the selection shows as a lighter body and a light edge, drawn below)
   ctx.save();
   const cy0 = Math.max(RULER, y0), cy1 = Math.min(LANE_B(), y0 + h0);              // clipped to the clip itself and the lane area: notes never spill while it glides
   ctx.beginPath(); ctx.rect(xs, cy0, Math.max(0, xe - xs), Math.max(0, cy1 - cy0)); ctx.clip();
@@ -238,6 +236,7 @@ function drawClip(t, c, y, hh) {
   ctx.fillStyle = body; ctx.fillRect(x, y0, w, h0);
   if (tall) { ctx.fillStyle = isSel ? tint(col, 0.18) : col; ctx.fillRect(x, y0, w, hd); ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(x, y0 + hd, w, 1); }
   ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 0.5, y0 + 0.5, Math.max(0, Math.round(w) - 1), h0 - 1);
+  if (isSel && !c.muted) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.strokeRect(Math.round(x) + 1.5, y0 + 1.5, Math.max(0, Math.round(w) - 3), h0 - 3); }   // selected: a light inner edge
   if (tall && w > 18) {
     ctx.fillStyle = ink(col); ctx.font = FONT(600, 10); ctx.textBaseline = 'middle';
     ctx.fillText(c.name || (c.sample ? c.sample.name : t.name), xs + 5, y0 + hd / 2 + 0.5, Math.max(0, xe - xs - 10));
@@ -345,22 +344,23 @@ function draw() {
     xl.push({ y, h, t: `${src} track aktif → ${x.name}` });
   }
   const gy1 = Math.min(LB, rowY(nn));                                                   // grid only over the rows, not over the "+" row and the empty space below
-  { const barPx = BAR * view.ppt; let kb = 1; while (barPx * kb < 34) kb *= 2;                    // the same step as the ruler's bar numbers
-    ctx.fillStyle = currentTone() === 'light' ? 'rgba(0,0,0,.045)' : 'rgba(0,0,0,.10)';
-    for (let b = Math.floor(Math.max(0, P.barAt(view.x0)) / kb) * kb; tx(P.barStart(b)) < CW; b += kb) { if ((b / kb) & 1) { const x0 = tx(P.barStart(b)), x1 = tx(P.barStart(b + kb)); ctx.fillRect(x0, RULER, x1 - x0, gy1 - RULER); } } }
-  ctx.globalAlpha = clamp(0.25 + 1.5 * (prefs.gridInt == null ? 0.5 : prefs.gridInt), 0.1, 1);
-  // grid: beats faint, bars stronger (drawn per bar, so 7/8 and signature changes stay right)
-  const tEnd = view.x0 + CW / view.ppt + g;
+  // grid (Live 12): flat lines in the theme's ink at four strengths - every labelled bar (the ruler's step) > bar > beat > subdivision - so a
+  // zoomed-out arrangement is not striped with bright bar lines; every other labelled group a shade darker. Grid Line Intensity scales them.
+  const barPx = BAR * view.ppt; let kb = 1; while (barPx * kb < 34) kb *= 2;                     // the same step as the ruler's bar numbers
+  const light = currentTone() === 'light', INK = light ? '0,0,0' : '255,255,255', GI = 0.4 + 1.2 * (prefs.gridInt == null ? 0.5 : prefs.gridInt), line = (a) => `rgba(${INK},${Math.min(0.6, a * GI).toFixed(3)})`;
+  ctx.fillStyle = light ? 'rgba(0,0,0,.04)' : 'rgba(0,0,0,.12)';
+  for (let b = Math.floor(Math.max(0, P.barAt(view.x0)) / kb) * kb; tx(P.barStart(b)) < CW; b += kb) { if ((b / kb) & 1) { const x0 = tx(P.barStart(b)), x1 = tx(P.barStart(b + kb)); ctx.fillRect(x0, RULER, x1 - x0, gy1 - RULER); } }
+  const tEnd = view.x0 + CW / view.ppt + g, sub = line(light ? 0.05 : 0.035), beat = line(light ? 0.09 : 0.065);
   eachGrid(view.x0 - g, tEnd, g, (t, j) => {
     const x = Math.round(tx(t));
     if (x < 0 || x > CW) return;
     const r = t - P.MM.T[j];
     if (r % P.MM.bl[j] === 0) return;
-    ctx.fillStyle = r % P.MM.bt[j] === 0 ? C('#4a4a50') : C('#3a3a3f');   // beat lines clearly visible, sub-beats fainter
+    ctx.fillStyle = r % P.MM.bt[j] === 0 ? beat : sub;
     ctx.fillRect(x, RULER, 1, gy1 - RULER);
   });
-  ctx.globalAlpha = 1; ctx.fillStyle = C('#74747c');
-  for (let b = Math.max(0, P.barAt(view.x0)); tx(P.barStart(b)) < CW; b++) { const x = Math.round(tx(P.barStart(b))); if (x >= 0) ctx.fillRect(x, RULER, 1, gy1 - RULER); }
+  const barL = line(light ? 0.14 : 0.10), grpL = line(light ? 0.24 : 0.19);
+  for (let b = Math.max(0, P.barAt(view.x0)); tx(P.barStart(b)) < CW; b++) { const x = Math.round(tx(P.barStart(b))); if (x >= 0) { ctx.fillStyle = b % kb ? barL : grpL; ctx.fillRect(x, RULER, 1, gy1 - RULER); } }
   if (P.state.sigs.length) { ctx.fillStyle = 'rgba(255,167,34,.3)'; for (const c of P.state.sigs) { const x = Math.round(tx(P.barStart(c.bar))); if (x >= 0 && x <= CW) ctx.fillRect(x, RULER, 1, gy1 - RULER); } }
   for (const m of state.markers) { const x = Math.round(tx(m.t)); if (x < 0 || x > CW) continue; ctx.fillStyle = C('#0e0e10'); ctx.fillRect(x, RULER, 1, gy1 - RULER); }   // Live: a dark line down from every locator
   const PU = state.punch;
@@ -444,13 +444,14 @@ function drawRuler(g) {
   ctx.font = FONT(500, 10); ctx.textBaseline = 'top';
   const barPx = BAR * view.ppt; let k = 1; while (barPx * k < 34) k *= 2;
   const chg = new Map(P.state.sigs.map((c) => [c.bar, c]));
-  ctx.fillStyle = C('#4a4a50');
-  eachGrid(view.x0 - g, view.x0 + CW / view.ppt + g, g, (t, j) => { const r = (t - P.MM.T[j]) % P.MM.bl[j]; if (r) ctx.fillRect(Math.round(tx(t)), r % P.MM.bt[j] ? RULER - 4 : RULER - 6, 1, r % P.MM.bt[j] ? 3 : 5); });
+  const RI = currentTone() === 'light' ? '0,0,0' : '255,255,255';
+  ctx.fillStyle = `rgba(${RI},.22)`;
+  eachGrid(view.x0 - g, view.x0 + CW / view.ppt + g, g, (t, j) => { const r = (t - P.MM.T[j]) % P.MM.bl[j]; if (r) ctx.fillRect(Math.round(tx(t)), r % P.MM.bt[j] ? RULER - 4 : RULER - 7, 1, r % P.MM.bt[j] ? 3 : 6); });   // Live: beat ticks taller than subdivisions
   for (let b = Math.floor(Math.max(0, P.barAt(view.x0)) / k) * k; tx(P.barStart(b)) < CW; b++) {
     const c = chg.get(b), x = Math.round(tx(P.barStart(b)));
-    if (b % k && !c) { ctx.fillStyle = C('#4a4a50'); ctx.fillRect(x, RULER - 8, 1, 7); continue; }   // unlabelled bars: a longer tick
-    ctx.fillStyle = c ? C('#ffa722') : C('#6a6a70'); ctx.fillRect(x, MROW, 1, RULER - MROW - 1);
-    const lab = String(b + 1); ctx.fillStyle = c ? C('#ffa722') : C('#b4b4ba'); ctx.fillText(lab, x + 4, MROW + 3);
+    if (b % k && !c) { ctx.fillStyle = `rgba(${RI},.34)`; ctx.fillRect(x, RULER - 10, 1, 9); continue; }   // unlabelled bars: a longer tick
+    ctx.fillStyle = c ? C('#ffa722') : `rgba(${RI},.5)`; ctx.fillRect(x, MROW, 1, RULER - MROW - 1);
+    const lab = String(b + 1); ctx.fillStyle = c ? C('#ffa722') : T('--text'); ctx.fillText(lab, x + 3, MROW + 3);
     if (c) { ctx.font = FONT(700, 9); ctx.fillText(c.n + '/' + c.d, x + 8 + ctx.measureText(lab).width, MROW + 4); ctx.font = FONT(500, 10); }
   }
   if (PUon()) { ctx.fillStyle = C('#ff3636'); ctx.fillRect(tx(state.punch.start), RULER - 3, tx(state.punch.end) - tx(state.punch.start), 2); ctx.fillRect(tx(state.punch.start) - 1, RULER - 11, 4, 9); ctx.fillRect(tx(state.punch.end) - 3, RULER - 11, 4, 9); }

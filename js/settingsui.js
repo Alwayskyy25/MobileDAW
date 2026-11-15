@@ -300,8 +300,8 @@ export function openSettings() {
   }));
   // Live 12's theme adjustments: Tone, Brightness, Contrast, Color Intensity, Color Hue, Grid Line Intensity - on top of the chosen theme
   const adjRow = (label, key, min, max, step, fmt) => { const cur = () => (key === 'gridInt' ? (prefs.gridInt == null ? 0.5 : prefs.gridInt) : themeAdjust()[key]);
-    const val = h('span', { class: 'thm-av' }), sl = h('input', { type: 'range', min, max, step, value: cur(), 'aria-label': label });
-    const show = () => { val.textContent = fmt(+sl.value); sl.style.setProperty('--p', ((+sl.value - min) / (max - min) * 100) + '%'); };
+    const bip = min < 0, val = h('span', { class: 'thm-av' }), sl = h('input', { type: 'range', class: 'sl thm-sl' + (bip ? ' bip' : ''), min, max, step, value: cur(), 'aria-label': label });
+    const show = () => { const p = (+sl.value - min) / (max - min) * 100, z = bip ? 50 : 0; val.textContent = fmt(+sl.value); sl.style.setProperty('--p', p + '%'); sl.style.setProperty('--a', Math.min(p, z) + '%'); sl.style.setProperty('--b', Math.max(p, z) + '%'); val.classList.toggle('on', Math.abs(+sl.value - (key === 'gridInt' ? 0.5 : 0)) > 1e-6); };   // bipolar: filled from the centre, as Live's
     const put = () => { if (key === 'gridInt') { prefs.gridInt = +sl.value; window.dispatchEvent(new Event('themechange')); } else { prefs.themeAdj = { ...themeAdjust(), [key]: +sl.value }; setThemeAdjust(prefs.themeAdj); } show(); };
     sl.addEventListener('input', put); sl.addEventListener('change', savePrefs); sl.addEventListener('dblclick', () => { sl.value = key === 'gridInt' ? 0.5 : 0; put(); savePrefs(); }); show();
     return h('label', { class: 'thm-adj' }, h('span', { class: 'thm-al' }, label), sl, val); };

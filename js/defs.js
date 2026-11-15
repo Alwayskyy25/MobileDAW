@@ -736,7 +736,9 @@ for (const [id, m] of Object.entries(FLMFX)) {
 }
 // "merged": an FLM module whose function a MobileDAW effect already covers (EQ, compressor, reverb, chorus, ...) is not offered a second time;
 // an imported project keeps running it on FLM's DSP under its own name. Offered in the pickers: the FLM modules MobileDAW has no counterpart for.
-const FLM_PICK = [104, 116, 118, 143, 141, 125, 145, 140, 144];   // Multi FX, Trance Delay, Tape Delay, Wow & Flutter, Waveshaper, Pitcher, Pitcher 2, Comb Filter, Spreader
+// every FL Studio Mobile effect on its own DSP (the owner wants them all in the FX lists), in FLM's menu groups: EQ / filter, dynamics, delay /
+// modulation, reverb / space, distortion / shaping, pitch, utility
+const FLM_PICK = [103, 107, 130, 109, 140, 108, 136, 128, 105, 127, 129, 110, 120, 116, 118, 143, 111, 113, 114, 146, 132, 112, 135, 134, 115, 144, 106, 141, 104, 125, 145, 142];
 const FLM_NOTE_PICK = [151, 147, 148, 149, 150];                  // note effects: Arpeggiator, Note Echo, Transpose, Randomizer, Scale
 export const FX_GROUPS = [['loop', 'Delay & Loop', [19, 17, 6, 18, 43, 45, 46, 52]], ['drive', 'Drive & Color', [33, 34, 29, 37, 26, 27, 35, 36, 9, 3, 28]], ['dyn', 'Dynamics', [4, 23, 24, 5, 38, 10]],
   ['eq', 'EQ & Filters', [1, 25, 31, 2]], ['mod', 'Pitch & Modulation', [22, 20, 21, 42]], ['rev', 'Reverb & Resonance', [40, 44, 39, 7, 47, 41]], ['modu', 'Modulators', [50, 48, 49]], ['util', 'Utilities', [51, 0, 32, 30, 16, 14, 15]],

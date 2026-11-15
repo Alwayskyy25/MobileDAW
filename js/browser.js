@@ -202,7 +202,7 @@ function tabFx() {
   out.push(h('div', { class: 'hint' }, 'Ketuk = tambah ke track terpilih. Seret ke track atau Master di arrangement. \u25B6 = dengar dulu.'));
   for (const [g, label, ks] of FX_GROUPS) {
     out.push(head(label, g));
-    for (const k of ks) if (DEVICES[k]) out.push(withAud(row(DEVICES[k].name, () => tapFx(k), '', '', null, dFx(k)), fxAud([{ type: k }])));
+    for (const k of ks) if (DEVICES[k]) out.push(withAud(row(DEVICES[k].name, () => tapFx(k), DEVICES[k].flm != null ? 'FLM DSP' : '', '', null, dFx(k)), fxAud([{ type: k }])));   // FLM modules carry a tag: several share a Live device's name
   }
   return out;
 }

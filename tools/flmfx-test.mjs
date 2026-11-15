@@ -149,9 +149,9 @@ ok(dryR > 0.01, `the test signal plays (${dryR.toFixed(3)} rms)`);
 // JS fallback engine: no FLM modules, but their place in the chain is kept
 { const d = makeDevice(FLMFX_BASE + 32, SR), L = Float32Array.from([0.5, -0.25]), R = Float32Array.from([0.1, 0.2]);
   d.setParam(3, 0.9); d.process(L, R, 2); ok(L[0] === 0.5 && R[1] === Math.fround(0.2) && makeDevice(299, SR) === null, 'JS fallback: an FLM module is a pass-through placeholder (later devices keep their index)'); }
-// pickers: the merged ones are not offered twice
-{ const g = FX_GROUPS.find((x) => x[0] === 'flm'), names = g[2].map((t) => DEVICES[t].name);
-  ok(names.includes('Pitcher 2') && names.includes('Comb Filter') && names.includes('Multi FX') && !names.includes('Reverb') && !names.includes('Compressor'), 'browser offers the FLM modules MobileDAW has no counterpart for: ' + names.join(', ')); }
+// pickers: every FLM audio effect on its own DSP is offered (owner's request), each once; the note effects have their own group
+{ const g = FX_GROUPS.find((x) => x[0] === 'flm'), all = Object.keys(DEVICES).map(Number).filter((t) => DEVICES[t].flm != null && !DEVICES[t].noteFx), names = g[2].map((t) => DEVICES[t].name);
+  ok(all.every((t) => g[2].includes(t)) && new Set(g[2]).size === g[2].length && g[2].length === all.length, `browser offers all ${g[2].length} FLM audio effects: ` + names.join(', ')); }
 // import
 ok(FLM_TYPES[25].name === 'Pitcher' && FLM_TYPES[41].name === 'Waveshaper' && FLM_TYPES[11].name === 'Chorus' && FLM_TYPES[44].name === 'Spreader', 'FLM type ids named as Honeydew does (25 Pitcher, 41 Waveshaper, 11 Chorus, 44 Spreader)');
 { const p = FLMFX[32].p.map((x) => x.d); p[3] = 0.42; p[7] = 0.9;

@@ -65,15 +65,25 @@ await page.mouse.click(4, 4); await page.waitForTimeout(350);   // close whateve
     const v1 = await par(); return v0.map((v, j) => (Math.abs(v - v1[j]) > 1e-6 ? j : -1)).filter((j) => j >= 0); };
   const f = await dragOn('FILTER', 0.6, 0.4, -80, 30), e = await dragOn('FLT EG', 0.5, 0.2, 50, 40);
   ok(f.includes(4) && e.some((j) => j >= 8 && j <= 11), `MiniSynth displays follow a drag: filter moved params ${f.join(',')} (4 = Cutoff), envelope moved ${e.join(',')} (8..11 = A D S R)`); }
+// the same on the other three FLM synths: their filter display moves Cutoff (DirectWave 12, GMS 0, SuperSaw 18)
+for (const [ty, name, tabName, cut] of [[30, 'DirectWave', 'FILTER', 12], [31, 'GMS', 'FILTER', 0], [33, 'SuperSaw', 'FILTER', 18]]) {
+  await ev(async (ty) => { const P = await import('./js/project.js'); P.selectTrack(P.state.tracks.findIndex((t) => t.inst && t.inst.type === ty)); }, ty); await page.waitForTimeout(500);
+  const par = () => ev(async (ty) => { const P = await import('./js/project.js'), { INSTRUMENTS } = await import('./js/defs.js'); const t = P.state.tracks.find((x) => x.inst && x.inst.type === ty); return INSTRUMENTS[ty].params.map((d, j) => (t.inst.params[j] != null ? t.inst.params[j] : d.def)); }, ty);
+  await ev((tab) => [...document.querySelectorAll('.lk-flmtabs .lv-tab')].find((x) => x.textContent === tab).click(), tabName); await page.waitForTimeout(350);
+  const cv = await page.$('.card.flm-card .flm-dbox canvas'); await cv.scrollIntoViewIfNeeded(); await page.waitForTimeout(200); const bx = await cv.boundingBox(), v0 = await par();
+  await page.mouse.move(bx.x + bx.width * 0.6, bx.y + bx.height * 0.4); await page.mouse.down(); await page.mouse.move(bx.x + bx.width * 0.6 - 80, bx.y + bx.height * 0.4 + 30, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(200);
+  const v1 = await par(); ok(v1[cut] < v0[cut], `${name} filter display: dragging left lowers Cutoff (${v0[cut]} -> ${Math.round(v1[cut] * 10) / 10})`); }
 // title bar menus: the instrument's "⋯" menu and the quick swap button of an effect card
-{ await ev(() => document.querySelector('.card.flm-card > h4 .dv-more').click()); await page.waitForTimeout(450);
+{ await ev(async () => { const P = await import('./js/project.js'); P.selectTrack(P.state.tracks.findIndex((t) => t.inst && t.inst.type === 32)); }); await page.waitForTimeout(500);
+  await ev(() => document.querySelector('.card.flm-card > h4 .dv-more').click()); await page.waitForTimeout(450);
   const m1 = await ev(() => [...document.querySelectorAll('.menu .mi')].map((x) => x.textContent));
   await ev(() => { for (const b of document.querySelectorAll('.scrim')) b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); }); await page.waitForTimeout(300);
   await ev(async () => { const P = await import('./js/project.js'); const i = P.state.tracks.findIndex((t) => t.inst && t.inst.type === 32); P.addDevice(i, 109); P.emit('all'); }); await page.waitForTimeout(500);
   const before = await ev(async () => { const P = await import('./js/project.js'); return P.state.tracks.find((t) => t.inst && t.inst.type === 32).devices[0].type; });
   await ev(() => document.querySelector('.card.lkcard:not(.flm-card) > h4 .dv-swap').click()); await page.waitForTimeout(450);
-  const n2 = await ev(() => { const it = [...document.querySelectorAll('.menu .mi')].filter((x) => !x.classList.contains('hd') && !x.classList.contains('sep') && x.textContent === 'Compressor'); if (it[0]) it[0].click(); return document.querySelectorAll('.menu .mi').length; }); await page.waitForTimeout(500);
+  const n2 = await ev(() => { const it = [...document.querySelectorAll('.menu .mi')].filter((x) => !x.classList.contains('hd') && !x.classList.contains('sep') && x.textContent === 'Compressor'); const flm = [...document.querySelectorAll('.menu .mi')].filter((x) => / \(FLM\)$/.test(x.textContent)).length; window.__flmN = flm; if (it[0]) it[0].click(); return document.querySelectorAll('.menu .mi').length; }); await page.waitForTimeout(500);
   const after = await ev(async () => { const P = await import('./js/project.js'); return P.state.tracks.find((t) => t.inst && t.inst.type === 32).devices[0].type; });
+  const flmN = await ev(() => window.__flmN); ok(flmN === 32, `FX list: all ${flmN} FL Studio Mobile effects on their DSP are offered (tagged FLM)`);
   ok(m1.some((x) => /Ganti instrumen/.test(x)) && m1.some((x) => /mengambang/.test(x)) && n2 > 30 && after !== before, `instrument menu: ${m1.join(' | ')}; effect quick swap: ${n2} entries, Filter (${before}) -> Compressor (${after})`); }
 // SoundFont with a loaded file: the 136 presets scroll inside the card, the card keeps the height of the rack
 { await ev(async () => { const P = await import('./js/project.js'); P.addTrack('midi'); const i = P.state.tracks.length - 1; P.setInstrument(i, 6); P.state.tracks[i].inst.sf = { path: 'x/TimGM6mb.sf2', presets: Array.from({ length: 136 }, (_, q) => 'Preset ' + (q + 1)), preset: 33 }; P.selectTrack(i); P.emit('all'); }); await page.waitForTimeout(600);

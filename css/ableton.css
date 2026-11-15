@@ -1743,8 +1743,8 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 [data-w="s"] #top .tport .b, [data-w="xs"] #top .tport .b { width: 36px; min-width: 36px; }
 #top .tport, #top .grp.hist { gap: 2px; border: 0; border-radius: 0; overflow: visible; background: transparent; } #top .tport .b + .b, #top .grp.hist .b + .b { border-left: 0; }
 /* control bar fields in the same flat look: tempo, performance, view switch */
-#top-l #rd-bpm { border: 0; border-radius: 4px; box-shadow: none; background: var(--lv-well, var(--well)); }
-#top .perf { border: 0; border-radius: 4px; background: var(--lv-well, var(--well)); } #top .perf .fpsbox { border-right: 1px solid var(--lv-body, var(--panel)); }
+#top-l #rd-bpm { border: 0; border-radius: 4px; box-shadow: none; background: var(--well); }
+#top .perf { border: 0; border-radius: 4px; background: var(--well); color: var(--text); } #top .perf .fpsbox { border-right: 1px solid var(--lv-body, var(--panel)); }
 #top .perf #cpu, #top .cpubox #cpu { border: 0; border-radius: 0; background: transparent; }
 #top .seg { border: 0; border-radius: 4px; gap: 2px; background: transparent; overflow: visible; }
 #top .seg .b { height: var(--cb-h); border-radius: 4px; background: var(--lv-ctl); color: var(--lv-ink); }
@@ -1754,3 +1754,15 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .fl-live.lk-sf .lk-sfc, .fl-live.lk-sf .lk-sfdk { min-height: 0 !important; }
 .fl-live.lk-sf .lk-sfdk { display: flex; flex-direction: column; flex: 1 1 0; }
 .fl-live.lk-sf .lk-sflist { flex: 1 1 0; height: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+/* theme adjustment sliders: Live's thin track, the fill from the zero point (centre for bipolar values), a slim handle; the value lights when changed */
+.thm-adj .sl.thm-sl { height: 26px; }
+.thm-adj .sl.thm-sl::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; box-shadow: none;
+  background: linear-gradient(to right, var(--well, #111) 0 var(--a, 0%), var(--accent) var(--a, 0%) var(--b, 50%), var(--well, #111) var(--b, 50%) 100%); }
+.thm-adj .sl.thm-sl.bip::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--well, #111) 0 var(--a, 50%), var(--accent) var(--a, 50%) var(--b, 50%), var(--well, #111) var(--b, 50%) 100%),
+  linear-gradient(var(--dim), var(--dim)) 50% 50% / 1px 10px no-repeat; }
+.thm-adj .sl.thm-sl::-webkit-slider-thumb { width: 8px; height: 18px; margin-top: -7px; border-radius: 2px; box-shadow: 0 1px 2px rgba(0, 0, 0, .5); }
+.thm-adj .sl.thm-sl::-moz-range-progress { background: transparent; }
+.thm-adj .sl.thm-sl::-moz-range-track { height: 4px; background: linear-gradient(to right, var(--well, #111) 0 var(--a, 0%), var(--accent) var(--a, 0%) var(--b, 50%), var(--well, #111) var(--b, 50%) 100%); }
+.thm-adj .thm-av { font-weight: var(--fw-sb); } .thm-adj .thm-av.on { color: var(--lv-or, var(--accent)); }
+.thm-adj { grid-template-columns: 128px 1fr 76px; min-height: 26px; }
+.thm-adjs > .b { justify-self: start; height: var(--ctl-s); padding: 0 var(--sp-6); border-radius: 4px; }

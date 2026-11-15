@@ -66,6 +66,17 @@ for (const [name, adj, file] of [['brightness +50 %', { brightness: 0.5 }, 'them
 }
 await ev(async () => { const Th = await import('./js/theme.js'); Th.setThemeAdjust({ tone: 0, brightness: 0, contrast: 0, intensity: 0, hue: 0 }); }); const t9 = await tok();
 ok(t9.bg === t0.bg && t9.acc === t0.acc, 'reset: the theme is back exactly');
+// Settings -> Tampilan: the theme sliders (bipolar ones filled from the centre); moving Brightness changes the theme at once
+{ await ev(async () => { const S = await import('./js/settingsui.js'); S.openSettings(); }); await page.waitForTimeout(700);
+  await ev(() => { const t = [...document.querySelectorAll('[data-t]')].find((x) => /Tampilan/.test(x.dataset.t) || x.textContent.trim() === 'Tampilan'); if (t) t.click(); }); await page.waitForTimeout(400);
+  const has = await ev(() => document.querySelectorAll('.thm-adj input').length);
+  if (has) {
+    const sl = page.locator('.thm-adj input').nth(1); await sl.scrollIntoViewIfNeeded(); const b0 = await tok(), sb = await sl.boundingBox();
+    await page.mouse.click(sb.x + sb.width * 0.8, sb.y + sb.height / 2); await page.waitForTimeout(300); const b1 = await tok();
+    await page.locator('.thm-adjs').screenshot({ path: path.join(out, 'theme-sliders.png') });
+    ok(b1.bg !== b0.bg, `Settings Brightness slider: tapping right of centre lifts --bg (${b0.bg} -> ${b1.bg})`);
+    await ev(async () => { const Th = await import('./js/theme.js'); Th.setThemeAdjust({ tone: 0, brightness: 0, contrast: 0, intensity: 0, hue: 0 }); const p = await import('./js/prefs.js'); p.prefs.themeAdj = null; }); await page.keyboard.press('Escape'); await page.mouse.click(4, 4); await page.waitForTimeout(300); }
+  else console.log('     (settings dialog not opened from the test)'); }
 for (const th of ['dark', 'light', 'midlight', 'live', 'lightlc', 'medc']) { await ev(async (th) => { const Th = await import('./js/theme.js'); Th.applyTheme(th); }, th); await page.waitForTimeout(350); await page.screenshot({ path: path.join(out, 'arr-' + th + '.png') }); }
 ok(!errs.length, 'no page errors' + (errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''));
 await b.close(); server.close();

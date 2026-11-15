@@ -346,7 +346,7 @@ function sideLayout(el) {
 
 // module menu helpers: effect picker, device clipboard (Copy / Paste module, Copy All / Paste All), rack preset picker
 let devClip = null;
-function fxPick(r, fn) { menu(FX_GROUPS.flatMap(([, label, ks]) => [{ label: label.toUpperCase(), dim: true }, ...ks.filter((k) => DEVICES[k]).map((k) => ({ label: DEVICES[k].name, fn: () => fn(k) }))]), Math.max(8, r.left - 40), Math.max(8, r.top - 120)); }
+function fxPick(r, fn) { menu(FX_GROUPS.flatMap(([, label, ks]) => [{ label: label.toUpperCase(), dim: true }, ...ks.filter((k) => DEVICES[k]).map((k) => ({ label: DEVICES[k].name + (DEVICES[k].flm != null && !DEVICES[k].noteFx ? ' (FLM)' : ''), fn: () => fn(k) }))]), Math.max(8, r.left - 40), Math.max(8, r.top - 120)); }
 const report = (x) => { if (x && x.held && x.held.length) toast(`${x.added} modul ditempel; ${x.held.length} sebagai placeholder (tidak ada di versi ini, data disimpan): ${x.held.join(', ')}.`, 4500); else if (x && x.skipped && x.skipped.length) toast(`${x.added} modul ditempel; ${x.skipped.length} dilewati: ${x.skipped.join(', ')}.`, 4000); else if (x) toast(x.added + ' modul ditempel.', 1200); };
 function pasteDevs(i, at) { if (!devClip) return; report(P.insertDeviceCopies(i, at, devClip)); }
 function presetPick(r, i, mode, at) {
@@ -614,7 +614,7 @@ export function render() {
       { label: 'Copy semua modul', dim: !n, fn: () => { devClip = P.devicesSnapshot(i); toast(n + ' modul disalin.', 1200); } },
       { label: 'Paste semua (ganti rantai)\u2026', dim: !devClip, fn: () => modal('Ganti rantai efek?', `${n} modul di rantai ini diganti dengan ${devClip.length} modul yang disalin. Bisa dibatalkan dengan Urungkan.`, [{ label: 'Batal' }, { label: 'Ganti', go: true, fn: () => { const x = P.replaceChain(i, devClip); report(x); } }]) },
       { label: 'Paste di akhir', dim: !devClip || full, fn: () => pasteDevs(i, n) },
-      ...(full ? [{ label: 'Rantai penuh (16 efek)', dim: true }] : FX_GROUPS.flatMap(([, label, ks]) => [{ label: label.toUpperCase(), dim: true }, ...ks.filter((k) => DEVICES[k]).map((k) => ({ label: DEVICES[k].name, fn: () => P.addDevice(i, k) }))])),
+      ...(full ? [{ label: 'Rantai penuh (16 efek)', dim: true }] : FX_GROUPS.flatMap(([, label, ks]) => [{ label: label.toUpperCase(), dim: true }, ...ks.filter((k) => DEVICES[k]).map((k) => ({ label: DEVICES[k].name + (DEVICES[k].flm != null && !DEVICES[k].noteFx ? ' (FLM)' : ''), fn: () => P.addDevice(i, k) }))])),
     ], Math.max(8, r.left - 40), Math.max(8, r.top - 120));
   } }, h('b', { 'aria-hidden': 'true' }, '+'), h('span', {}, full ? 'Rantai penuh (16 efek)' : 'Ketuk untuk menambah efek'), h('small', {}, 'atau seret efek dari Browser ke sini'));
   put(add, 'add');
