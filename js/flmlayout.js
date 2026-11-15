@@ -1,4 +1,4 @@
-// Card layouts of the FL Studio Mobile modules MobileDAW runs on Honeydew's DSP (devices 100 + FLM id, instruments 34 / 35), drawn the
+// (Fallback only since flmlive.js: every module now has a Live composition.) Card layouts of the FL Studio Mobile modules MobileDAW runs on Honeydew's DSP (devices 100 + FLM id, instruments 34 / 35), drawn the
 // Ableton Live way (fxkit.js flmLayout): the module's display on the left, then titled sections; in a section the menus and switches sit on
 // top and the knobs in a grid of two rows. Indices are FLM's parameter order (js/flmfx.js, defs.js INSTRUMENTS).
 //   s:    [title, [param indices]] per section, in reading order (a param left out stays reachable through automation only if hidden)

@@ -208,3 +208,42 @@ function decay(g, w, hh, sec, pre, level) {
   for (let x = 0; x <= w; x += 2) { const t = x / w * span, d = pre != null ? Math.max(0, t - pre) : t, a = (pre != null && t < pre) ? 0 : Math.pow(10, -3 * d / sec) * clamp(level, 0, 1.25); pts.push([x, hh - 4 - clamp(a, 0, 1.25) / 1.25 * (hh - 16)]); }
   g.fillStyle = DISPC.grid; g.fillRect(0, hh - 4, w, 1); lvPath(g, pts, DISPC.bl, hh - 4, 1.5); txt(g, `${sec.toFixed(1)} s`, w - 4, 11, 'right');
 }
+
+// ---- instruments (Transistor Bass 34, 3x Osc 36): the wave, filter, LFO and envelope pictures of flmlive.js. The Transistor Bass wave and
+// cutoff follow the engine's own formulas (native/engine/hdtb.cpp); the 3x Osc pictures are schematic (shape and proportions, no time axis).
+const wave = (g, w, hh, fn, col = DISPC.bl, n = 2) => { g.fillStyle = DISPC.grid; g.fillRect(0, Math.round(hh / 2), w, 1);
+  const pts = []; for (let x = 0; x <= w; x++) pts.push([x, hh / 2 - clamp(fn((x / w * n) % 1, x), -1, 1) * (hh / 2 - 6)]); lvPath(g, pts, col, null, 1.5); };
+const wrap = (x) => x - Math.floor(x), saw = (t) => 2 * t - 1;
+const tbHz = (p) => { const c = p(2), e = p(4), v = (0.1 + 0.58 * Math.pow(c, 1.5)) * (1 - 0.31 * e * e) - 0.02; return clamp(8.175799 * Math.pow(2, 128 * v / 12), 20, 17640); };
+const pole2 = (r, q, kind) => { const d = Math.sqrt(sq(1 - r * r) + sq(r / q)) || 1e-9; return kind === 'hp' ? r * r / d : kind === 'bp' ? (r / q) / d : kind === 'bs' ? Math.abs(1 - r * r) / d : 1 / d; };
+const db20 = (x) => 20 * Math.log10(Math.max(1e-6, x));
+export const tbPos = (p) => [Math.log(tbHz(p) / F0) / Math.log(F1 / F0), 0.5 - 0.4 * p(3)];
+export const o3fPos = (p) => [0.04 + 0.92 * p(111), 0.5 - 0.4 * p(112)];
+const SH3 = [(t) => Math.sin(TAU * t), (t) => (t < 0.25 ? 4 * t : t < 0.75 ? 2 - 4 * t : 4 * t - 4), (t) => (t < 0.5 ? 1 : -1), saw, (t) => 1 - 2 * Math.pow(t, 0.6), (t, x) => 2 * wrap(Math.sin(x * 12.9898) * 43758.5453) - 1];
+const tens = (u, c) => { const k = 2 * c - 1; return k >= 0 ? Math.pow(u, 1 + 3 * k) : 1 - Math.pow(1 - u, 1 - 3 * k); };
+const EZ = 0.18, ET = 0.1, EB = 0.94, ES = 0.1;   // envelope picture: a time takes up to EZ of the width (sqrt scale), sustain plateau ES
+const envX = (p, e) => { const P = (q) => Math.sqrt(p(q + e)) * EZ, a = P(70) + P(74), d = a + P(82) + P(86), r = d + ES + P(98); return { pre: P(70), a, h: a + P(82), d, s: d + ES, r }; };
+export const env3Pos = (e) => [(p) => [envX(p, e).a, ET], (p) => [envX(p, e).d, ET + (1 - p(94 + e)) * (EB - ET)], (p) => [envX(p, e).r, EB]];
+export const FLM_IGRAPH = {
+  tbWave: (g, w, hh, p) => { const pw = clamp(0.5 + 0.45 * p(11), 0.001, 0.999), m = p(1);
+    wave(g, w, hh, (t) => { const sw = saw(t), pu = sw - saw(wrap(t + pw)); return (pu + (sw - pu) * m) * 0.9; }); txt(g, 'Oscillator', 6, 12); },
+  tbFilter: (g, w, hh, p) => { const fc = tbHz(p), q = 0.6 + 7 * p(3); response(g, w, hh, (f) => db20(pole2(f / fc, q) * pole2(f / fc, 0.6)), 30); txt(g, 'Filter', 6, 12); },
+  osc3: (i) => (g, w, hh, p) => { const sh = Math.min(6, Math.round(p(1 + i) * 6)), inv = p(4 + i) > 0.5 ? -1 : 1, ph = p(7 + i) - 0.5;
+    if (sh === 6) { g.fillStyle = DISPC.grid; g.fillRect(0, Math.round(hh / 2), w, 1); txt(g, 'Custom (belum didukung)', w / 2, hh / 2 - 6, 'center'); }
+    else wave(g, w, hh, (t, x) => inv * SH3[sh](wrap(t + ph + 1), x) * 0.9, i === 0 ? DISPC.or : DISPC.bl); txt(g, 'Osc ' + (i + 1), 6, 12); },
+  lfo3: (t) => (g, w, hh, p) => { const sh = Math.min(2, Math.round(p(37 + t) * 2)), pre = p(42 + t) * 0.3, att = p(47 + t) * 0.4 + 0.001, amt = 2 * (p(52 + t) - 0.5), n = 2 + 10 * p(57 + t);
+    g.fillStyle = DISPC.grid; g.fillRect(0, Math.round(hh / 2), w, 1); const pts = [];
+    for (let x = 0; x <= w; x++) { const u = x / w, f = clamp((u - pre) / att, 0, 1); pts.push([x, hh / 2 - f * amt * SH3[sh](wrap(u * n)) * (hh / 2 - 6)]); }
+    lvPath(g, pts, DISPC.bl, hh / 2, 1.5); txt(g, 'LFO', 6, 12); },
+  env3: (e) => (g, w, hh, p) => { const X = envX(p, e), on = p(62 + e) > 0.5, s = p(94 + e), y = (v) => (EB - v * (EB - ET)) * hh, pts = [[0, y(0)], [X.pre * w, y(0)]];
+    const seg = (x0, x1, v0, v1, c) => { for (let q = 1; q <= 16; q++) { const u = q / 16; pts.push([(x0 + (x1 - x0) * u) * w, y(v0 + (v1 - v0) * tens(u, c))]); } };
+    seg(X.pre, X.a, 0, 1, p(78 + e)); pts.push([X.h * w, y(1)]); seg(X.h, X.d, 1, s, p(90 + e)); pts.push([X.s * w, y(s)]); seg(X.s, X.r, s, 0, p(102 + e)); pts.push([w, y(0)]);
+    g.fillStyle = DISPC.grid; g.fillRect(0, Math.round(y(0)), w, 1); lvPath(g, pts, on ? DISPC.or : DISPC.grid2, on ? y(0) : null, 1.5); txt(g, on ? 'Envelope' : 'Envelope (off)', w - 6, 12, 'right'); },
+  filt3: (g, w, hh, p) => { const ty = Math.min(7, Math.round(p(110) * 7)), c = 0.04 + 0.92 * p(111), q = 0.6 + 8 * p(112), kind = ['lp', 'lp', 'bp', 'hp', 'bs', 'lp', 'lp', 'lp'][ty], two = ty === 5 || ty === 7;
+    g.fillStyle = DISPC.grid; g.fillRect(0, Math.round(hh / 2), w, 1); const pts = [];
+    for (let x = 0; x <= w; x += 2) { const r = Math.pow(2, (x / w - c) * 10), m = pole2(r, q, kind), d = clamp(db20(two ? m * m : m), -30, 30); pts.push([x, hh / 2 - d / 30 * (hh / 2 - 4)]); }
+    lvPath(g, pts, DISPC.bl, hh / 2, 1.5); txt(g, 'Filter', 6, 12); },
+  echo3: (g, w, hh, p) => { const n = Math.round(p(130) * 9), fb = p(131), tm = 0.06 + 0.2 * p(132), pan = p(133) - 0.5; g.fillStyle = DISPC.grid; g.fillRect(0, hh - 5, w, 1);
+    for (let q = 0; q <= Math.max(n, 0); q++) { const a = q === 0 ? 1 : Math.pow(0.45 + 0.5 * fb, q), x = 8 + q * (0.03 + 0.07 * p(132)) * w; if (x > w - 4) break; g.fillStyle = q === 0 ? DISPC.or : (q % 2 ? pan >= 0 : pan < 0) ? DISPC.bl : DISPC.sel; g.fillRect(x, hh - 5 - a * (hh - 22), 3, a * (hh - 22)); }
+    txt(g, 'Echo', 6, 12); },
+};

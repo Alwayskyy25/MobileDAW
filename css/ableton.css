@@ -1657,3 +1657,23 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .fl-live .fl-band { justify-content: space-between; gap: var(--sp-3); }
 .fl-live .fl-piano { flex: 1 1 auto; min-height: 84px; display: flex; }
 .fl-live .fl-grow { flex: 1 1 0; align-self: stretch; min-height: var(--sp-2); }
+
+/* Live's vertical slider (fxkit F), as the mixer / Compressor sliders of Live: a narrow groove with the value filled in, a black triangle
+   handle on its right that points at the level, and the value in a field under it */
+.lk .lk-fader { display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); flex: 1 1 auto; align-self: stretch; min-height: 76px; min-width: 44px; }
+.lk .lk-fader > .lk-lb { white-space: nowrap; }
+.lk .lk-ft { position: relative; flex: 1 1 auto; width: 8px; min-height: 40px; margin: 4px 0; background: var(--lv-trk, #5a5a5e); border: 1px solid var(--lv-edge, #2a2a2c); border-radius: 0; touch-action: none; cursor: ns-resize; }
+.lk .lk-ft::before { content: ''; position: absolute; inset: -4px -18px; }   /* touch room around the narrow groove */
+.lk .lk-ff { position: absolute; left: 0; right: 0; background: var(--lv-arc, #4fc3f0); pointer-events: none; }
+.lk .lk-fh { position: absolute; left: 100%; width: 0; height: 0; margin: 0 0 -5px 1px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-right: 8px solid var(--lv-ink); pointer-events: none; }
+.lk .lk-fh::after { content: ''; position: absolute; right: 0; top: -0.5px; width: 9px; height: 1px; margin-right: 100%; transform: translateX(-100%); background: var(--lv-ink); }
+.lk .lk-fader.bip .lk-ft::after { content: ''; position: absolute; left: -3px; right: -3px; top: 50%; height: 1px; background: var(--lv-dim); pointer-events: none; }
+.lk.lk-row.fl-live > .lk-col:has(> .lk-fader) { align-self: stretch !important; }
+.lk.lk-row.fl-live > .lk-col { min-width: 60px; } .fl-live .knob .k-v { white-space: nowrap; }
+.lk .lk-row.fl-live > .lk-col { align-self: stretch; justify-content: flex-start; align-items: center; gap: var(--sp-2); flex: 0 0 auto; min-width: 60px; }
+.lk .lk-row.fl-live > .lk-col:has(> .fl-dk) { flex: 1 1 auto; align-items: stretch; }
+.fl-live.fl-parts > .lk-sep { margin: 0 var(--sp-1); }
+.fl-live .fl-cap { align-self: flex-start; }
+.card .lk-o3p > .fl-live { flex: 1 1 auto; margin: 0; }
+.card > .lk.lk-row.fl-live { flex: 1 1 auto; }
+.fl-live .fl-dk:not(:has(> .lk-dfill, > .fl-piano)) { justify-content: center; }

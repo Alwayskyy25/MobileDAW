@@ -8,7 +8,7 @@ import { fmtParam, normOf, valOf, MOD_MAP, DEVICES, INSTRUMENTS, FX_GROUPS, IRAC
 import { buildSynth } from './devviz.js';
 import { menuItem } from './fxlaw.js';
 import { FLM_LAYOUT, flmName, flmShort, flmSwitch } from './flmlayout.js';
-import { FLM_LIVE } from './flmlive.js';
+import { FLM_LIVE, OSC3_LIVE } from './flmlive.js';
 import { FLM_GRAPH } from './flmviz.js';
 import { OP_ALGOS } from './engine/operator.js';
 import { POLI_TGT, POLI_GRID, POLI_MIDI } from './engine/poli.js';
@@ -103,6 +103,20 @@ function kit(ctx) {
   const S = (k, o = {}) => { const p = def.params[k], items = p.items || Array.from({ length: Math.round(p.max - p.min) + 1 }, (_, j) => fmtParam(p, p.min + j)); return reg(lvSel(() => items.map((l, j) => ({ label: l, value: j + p.min })), () => Math.round(get(k)), (v) => set(k, v), { w: o.w || 76, cls: 'lk-s ' + (o.cls || ''), show: o.short ? (v) => o.short[Math.round(v - p.min)] : null }), k); };
   const N = (k, o = {}) => reg(lvNum(def.params[k], () => get(k), (v) => set(k, v), fmtParam, { fill: o.fill !== false, w: o.w || 64, onLong: auto(k), label: def.params[k].n, cls: 'lk-n ' + (o.cls || '') }), k);
   const NT = (k, o = {}) => N(k, { ...o, fill: false, cls: 'lk-nt ' + (o.cls || '') });     // value as coloured text inside a dark display (Live: Decay 1.81 s)
+  // F: Live's vertical slider (Compressor Thresh / Out): the title, a dark track that takes the free height of its column, filled from the
+  // bottom (from the centre for a bipolar value) with a handle line, and the value as a number field under it. Drag = relative, full track = full range.
+  const F = (k, o = {}) => {
+    const p = def.params[k], fill = h('i', { class: 'lk-ff' }), hd = h('i', { class: 'lk-fh' }), trk = h('div', { class: 'lk-ft', role: 'slider', 'aria-label': p.n }, fill, hd);
+    const bip = (p.min < 0 && p.max > 0 && !p.curve) || o.bip, z = o.bip ? 0.5 : bip ? normOf(p, 0) : 0;
+    const paint = () => { const n = Math.min(1, Math.max(0, normOf(p, d.params[k]))), a = Math.min(n, z), b = Math.max(n, z); fill.style.bottom = a * 100 + '%'; fill.style.height = (b - a) * 100 + '%'; hd.style.bottom = n * 100 + '%'; };
+    let st = null;
+    trk.addEventListener('pointerdown', (e) => { trk.setPointerCapture(e.pointerId); st = { y: e.clientY, n: normOf(p, d.params[k]), hh: Math.max(40, trk.clientHeight) }; e.preventDefault(); });
+    trk.addEventListener('pointermove', (e) => { if (!st) return; let v = valOf(p, Math.min(1, Math.max(0, st.n + (st.y - e.clientY) / st.hh))); if (p.step) v = Math.round(v / p.step) * p.step; set(k, v); });
+    const end = () => { st = null; }; trk.addEventListener('pointerup', end); trk.addEventListener('pointercancel', end);
+    trk.addEventListener('dblclick', () => set(k, p.def));
+    const num = N(k, { w: o.w || 52, fill: false }), root = h('div', { class: 'lk-fader' + (bip ? ' bip' : '') }, h('span', { class: 'lk-lb' }, lbl(k, o)), trk, num);
+    root.update = paint; draws.push(paint); paint(); return reg(root, k);
+  };
   const dk = (...kids) => h('div', { class: 'lk-dk' }, ...kids.filter(Boolean));                // dark display area holding controls
   const LN = (text, el) => h('div', { class: 'lk-ln' }, h('span', {}, text), el);           // label left, control right (Live rows like "Freq [5.08 kHz]")
   const TL = (text, ...kids) => h('div', { class: 'lk-tl' }, h('span', { class: 'lk-lb' }, text), ...kids);   // title above a control
@@ -124,7 +138,7 @@ function kit(ctx) {
   const swap = (k, on, off) => { const box = h('div', { class: 'lk-swap' }); const fill = () => box.replaceChildren(get(k) > 0.5 ? on() : off()); fill(); draws.push(() => { const want = get(k) > 0.5; if (box._on !== want) { box._on = want; fill(); } }); box._on = get(k) > 0.5; return box; };
   // like swap, for a list parameter: fn(value) builds the content (Spectral Time: Time / Notes / 16th knob by Mode)
   const swapN = (k, fn) => { const box = h('div', { class: 'lk-swap' }); let cur = null; const fill = () => { const v = Math.round(get(k)); if (v !== cur) { cur = v; box.replaceChildren(fn(v)); } }; fill(); draws.push(fill); return box; };
-  return { ctx, d, def, get, set, inDraw, K, swapN, T, CY, CH, S, N, NT, dk, LN, TL, D, DF, sec, row, col, sep, every, out, swap, redraw, reg, auto };
+  return { ctx, d, def, get, set, inDraw, K, F, swapN, T, CY, CH, S, N, NT, dk, LN, TL, D, DF, sec, row, col, sep, every, out, swap, redraw, reg, auto };
 }
 // filter (band) display with a draggable ring: x = freq, y = width (or Q); used by the delays, Beat Repeat, Erosion, Vinyl
 function bandDisp(k, w, hh, kf, kw, o = {}) {
@@ -1814,6 +1828,15 @@ const flmLayout = (k, L) => {
 // number fields like Live's in-display values) | right columns with Dry/Wet at the bottom - built from the same kit parts as the Live 12 panels.
 const liveBand = new Map();   // Equalizer: the selected band per device
 const flmLive = (k, S) => {
+  if (S.parts) {   // several Live sections in one card (instruments): each with its own display, a thin line between them
+    const kids = []; S.parts.forEach((part, q) => { if (!part) return; if (kids.length) kids.push(k.sep()); kids.push(...flmLivePart(k, { names: S.names, ...part })); });
+    const root = k.row(...kids); root.classList.add('fl-live', 'fl-parts'); return root;
+  }
+  const kids = flmLivePart(k, S), root = k.row(...kids);
+  root.classList.add('fl-live'); if (!S.D) root.classList.add('fl-nod');
+  return root;
+};
+const flmLivePart = (k, S) => {
   const ps = k.def.params, cl = (x) => Math.min(1, Math.max(0, x));
   const name = (j, l) => (l != null ? l : S.names && S.names[j] != null ? S.names[j] : flmShort(flmName(ps[j].n).replace(/ ?\((sync|Sync)\)$/, '')));
   const cur = (j) => { const p = ps[j], n = p.items.length; return p.br ? menuItem(p.br, k.get(j)) : Math.round(k.get(j) * (n - 1)); };
@@ -1827,6 +1850,7 @@ const flmLive = (k, S) => {
     if (typeof it === 'function') return it(k);
     if (typeof it === 'number') return dk ? item({ n: it }, dk, bare) : k.K(it, { n: name(it), p: { lawCtx: () => ({ p: k.d.params }) } });
     if (it.h != null) return h('span', { class: 'lk-lb fl-hd' }, it.h || ' ');
+    if (it.f != null) return k.F(it.f, { n: name(it.f, it.l), bip: it.bip });
     if (it.sw != null) return k.swap(it.sw, () => item(it.on, dk, bare), () => item(it.off, dk, bare));
     if (it.n != null) { const f = dk ? k.NT(it.n, { w: 52, cls: 'or' }) : k.N(it.n, { w: 66 }); return bare ? f : lab(name(it.n, it.l), f); }
     if (it.s != null) { const c = sel(it.s, it.w); return bare ? c : lab(name(it.s, it.l), c); }
@@ -1838,7 +1862,7 @@ const flmLive = (k, S) => {
   // ---- the display
   let dk = null;
   if (S.D) {
-    const D = S.D, parts = [], hs = D.handles || [], gr = FLM_GRAPH[k.def.flm], get = (j) => k.get(j);
+    const D = S.D, parts = [], hs = D.handles || [], gr = D.graph || FLM_GRAPH[k.def.flm], get = (j) => k.get(j);
     const at = (hd, w, hh) => { const f = hd.pos ? hd.pos(get) : [hd.x != null ? k.get(hd.x) : 0.5, hd.y != null ? 1 - k.get(hd.y) : 0.5]; return [cl(f[0]) * w, cl(f[1]) * hh]; };
     const band = () => (S.band ? liveBand.get(k.d.id) || 0 : -1);
     if (D.piano) {   // a one-octave keyboard instead of a graph (Scale)
@@ -1847,7 +1871,7 @@ const flmLive = (k, S) => {
         const b = k.T(j, blk ? '' : nm, { cls: 'fkey' + (blk ? ' blk' : '') }); b.title = nm; b.style.setProperty('--x', x); box.append(b); });
       parts.push(h('div', { class: 'fl-piano' }, box));
     } else if (gr) {
-      const draw = (g, w, hh) => { gr(g, w, hh, get); hs.forEach((hd, q) => { const [x, y] = at(hd, w, hh); lvRing(g, x, y, q === band() ? 5 : 3.6);
+      const draw = (g, w, hh) => { gr(g, w, hh, get, k); hs.forEach((hd, q) => { const [x, y] = at(hd, w, hh); lvRing(g, x, y, q === band() ? 5 : 3.6);
         if (hd.n) { g.fillStyle = q === band() ? DISPC.or : DISPC.ink; g.font = '700 9px system-ui,sans-serif'; g.textAlign = 'center'; g.fillText(hd.n, x, y - 8); g.textAlign = 'left'; } }); };
       const tapKeys = D.tap ? (x, y, e) => { const c = e.currentTarget, w = c._w, hh = c._h, kw = (w - 8) / 7, top = 16, h2 = hh - top - 4, jj = Math.floor((x - 4) / kw);
         let note = [0, 2, 4, 5, 7, 9, 11][Math.max(0, Math.min(6, jj))];
@@ -1857,8 +1881,12 @@ const flmLive = (k, S) => {
       const drag = tapKeys ? { onDown: tapKeys } : hs.length ? {
         onDown: (x, y, e) => { const c = e.currentTarget; let best = 0, bd = 1e9; hs.forEach((hd, q) => { const [hx, hy] = at(hd, c._w, c._h), d = Math.hypot(hx - x, hy - y); if (d < bd) { bd = d; best = q; } });
           const hd = hs[best]; if (S.band) { liveBand.set(k.d.id, best); if (S._pick) S._pick(); k.redraw(); }
-          return { hd, vx: hd.x != null ? k.get(hd.x) : 0, vy: hd.y != null ? k.get(hd.y) : 0 }; },
-        onMove: (x, y, dx, dy, st, e) => { const c = e.currentTarget, hd = st.hd; if (hd.x != null) k.set(hd.x, cl(st.vx + dx / c._w * (hd.kx || 1))); if (hd.y != null) k.set(hd.y, cl(st.vy - dy / c._h * (hd.ky || 1))); },
+          const [fx, fy] = at(hd, 1, 1); return { hd, vx: hd.x != null ? k.get(hd.x) : 0, vy: hd.y != null ? k.get(hd.y) : 0, fx, fy }; },
+        // the handle stays under the finger: with a position law (pos) the parameter is solved for the place the finger is at
+        onMove: (x, y, dx, dy, st, e) => { const c = e.currentTarget, hd = st.hd;
+          const solve = (j, ax, want) => { const f = (v) => hd.pos((q) => (q === j ? v : k.get(q)))[ax], inc = f(1) >= f(0); if (Math.abs(f(1) - f(0)) < 1e-6) return null; let a = 0, b = 1; for (let n = 0; n < 22; n++) { const m = (a + b) / 2; if ((f(m) < want) === inc) a = m; else b = m; } return (a + b) / 2; };
+          if (hd.x != null) { const v = hd.pos ? solve(hd.x, 0, cl(st.fx + dx / c._w)) : cl(st.vx + dx / c._w); if (v != null) k.set(hd.x, v); }
+          if (hd.y != null) { const v = hd.pos ? solve(hd.y, 1, cl(st.fy + dy / c._h)) : cl(st.vy - dy / c._h); if (v != null) k.set(hd.y, v); } },
       } : null;
       parts.push(k.DF(D.w || 190, D.h || 64, draw, drag));
     }
@@ -1880,6 +1908,7 @@ const flmLive = (k, S) => {
       if (head) parts.push(h('div', { class: 'lk-dkh' }, head));
       parts.push(h('div', { class: 'lk-row fl-row' }, ...its.map((it) => item(it, true))));
     }
+    if (D.cap) parts.unshift(h('div', { class: 'lk-dkh fl-cap' }, D.cap));
     dk = k.dk(...parts); dk.classList.add('fl-dk');
   }
   // Equalizer: the selected band's Freq / Gain / Q stand left of the display (EQ Eight)
@@ -1889,40 +1918,34 @@ const flmLive = (k, S) => {
     S._pick = fill; fill(); left = [side];
   }
   const mid = dk && S.B ? k.col(dk, h('div', { class: 'lk-row fl-b' }, ...S.B.map((it) => item(it, false)))) : dk;
-  const root = k.row(...left, mid, ...(S.R || []).map(column));
-  root.classList.add('fl-live'); if (!dk) root.classList.add('fl-nod');
-  return root;
+  return [...left, mid, ...(S.R || []).map(column)].filter(Boolean);
 };
 const flmCard = (k) => { const id = k.def.flm != null && !k.def.native ? k.def.flm : 'i' + k.d.type; if (FLM_LIVE[id]) return flmLive(k, { ...FLM_LIVE[id] }); const L = FLM_LAYOUT[id]; return L ? flmLayout(k, L) : flmPanel(k); };
 for (const t of Object.keys(DEVICES)) if (DEVICES[t].view === 'flmfx') V[t] = flmCard;
 VI[34] = flmCard;   // Transistor Bass: the same compact FLM layout (its Distortion is a switch)
-// 3x Osc: FLM's eight pages (Honeydew instruments.rs) as tabs; within a page the controls drop the page's own prefix ("Volume Envelope Attack"
-// -> "Attack"). The tab is remembered per track.
-const OSC3_PAGES = (() => {
-  const r = (a, b) => Array.from({ length: b - a + 1 }, (_, q) => a + q), lfo = (t) => [27, 32, 37, 42, 47, 52, 57].map((x) => x + t), env = (t) => r(0, 11).map((q) => 62 + t + 4 * q);
-  const osc = (i) => [1, 4, 7, 10, 13, 16, 19].map((x) => x + i).concat(i ? [21 + i] : [], i === 2 ? [24] : [], [146 + i]);
-  return [['Osc', [['Osc 1', osc(0)], ['Osc 2', osc(1)], ['Osc 3', osc(2)], ['Global', [25, 26]]]], ['Pan', [['LFO', lfo(0)], ['Pan', [113, 122, 126]]]],
-    ['Vol', [['LFO', lfo(1)], ['Envelope', [...env(0), 114]]]], ['Cut', [['LFO', lfo(2)], ['Envelope', env(1)]]], ['Res', [['LFO', lfo(3)], ['Envelope', env(2)]]],
-    ['Pitch', [['LFO', lfo(4)], ['Envelope', env(3)]]], ['Filter', [['Filter', [110, 111, 112, 115, 116]], ['Tracking', [121, 123, 124, 125, 127, 128]]]],
-    ['Misc', [['Voices', [117, 118, 119, 120, 129]], ['Echo', r(130, 138)], ['Arpeggio', r(139, 145)]]]];
-})();
+// 3x Osc: FLM's eight pages as tabs, each page a Live device (flmlive.js OSC3_LIVE): the oscillators with their waves, the five
+// modulation pages with the LFO and the envelope drawn and dragged, the filter with its ring. The tab is remembered per track.
 const osc3Tab = new Map();
 VI[36] = (k) => {
   const key = k.ctx.d && k.ctx.d.id, page = h('div', { class: 'lk-row lk-o3p' });
-  const short = (n) => n.replace(/^Osc 3 = amplitude modulation$/, 'AM').replace(/^Osc [123] /, '').replace(/^Stereo Phase Randomness$/, 'Ph Rand').replace(/^(Coarse|Fine) Pitch$/, '$1').replace(/^(Pan|Volume|ModX|ModY|Pitch) (LFO|Envelope) /, '').replace(/^Delay /, '').replace(/^Arpeggio /, '').replace(/^Filter /, '').replace(/^Key Tracking /, 'Key ').replace(/^Velocity Tracking /, 'Vel ').replace(/^(Attack|Decay|Release) Tension$/, (_, a) => a[0] + ' Curve').replace(/^Volume Multiplier$/, 'Vol Mult').replace(/^Portamento /, 'Porta ').replace(/^Maximum Polyphony$/, 'Voices').replace(/^Monophonic Mode$/, 'Mono');
-  const names = {}; for (const [, groups] of OSC3_PAGES) for (const [, idx] of groups) for (const j of idx) names[j] = short(k.def.params[j].n);
-  const show = (j) => { osc3Tab.set(key, j); page.replaceChildren(flmLayout(k, { s: OSC3_PAGES[j][1], names })); };
+  const show = (j) => { osc3Tab.set(key, j); page.replaceChildren(flmLive(k, OSC3_LIVE[j][1])); };
   const j0 = osc3Tab.get(key) || 0;
-  const tb = lvTabs(OSC3_PAGES.map(([label]) => ({ label })), j0, show, { cls: 'lk-tabs' });
+  const tb = lvTabs(OSC3_LIVE.map(([label]) => ({ label })), j0, show, { cls: 'lk-tabs' });
   show(j0);
   return k.col(tb, page);
 };
-// Slicer: the loop (zone 0, picked from the browser) above the compact FLM controls
+// Slicer: the loop (zone 0, picked from the browser) is the display, as Simpler's sample
 VI[35] = (k) => {
   const { i } = k.ctx, t = P.state.tracks[i], z = () => (t.inst.zones && t.inst.zones[0]) || {};
-  const name = h('span', { class: 'lk-lb' }), upd = () => { name.textContent = z().sample ? (z().sample.name || String(z().sample.path || '').split('/').pop()) : 'Belum ada loop'; };
-  upd(); k.every(500, upd);
-  return k.col(h('div', { class: 'lk-row lk-flmtop' }, h('button', { class: 'lv-btn', onclick: () => BR.openBrowser('file', { track: i, zone: 0 }) }, 'Loop\u2026'), name), flmCard(k));
+  const nm = () => (z().sample ? (z().sample.name || String(z().sample.path || '').split('/').pop()) : '');
+  const graph = (g, w, hh) => { const sm = z().sample;
+    if (!sm) { label(g, 'Belum ada loop', w / 2, hh / 2 + 4, '#bbb', 11, 'center'); return; }
+    const pk = sm.peaks || [], n = pk.length, mid = hh / 2; g.fillStyle = DISPC.bl;
+    for (let x = 0; x < w; x += 2) { const a = pk[Math.min(n - 1, Math.floor(x / w * n))] || 0; g.fillRect(x, mid - a * (mid - 6), 1.5, Math.max(1, a * (mid - 6) * 2)); }
+    label(g, nm(), 6, 12, DISPC.ink, 9); };
+  const S = FLM_LIVE.i35, el = flmLive(k, { ...S, L: [[() => h('button', { class: 'lv-btn lk-t', onclick: () => BR.openBrowser('file', { track: i, zone: 0 }) }, 'Loop…'), ...S.L[0]]], D: { ...S.D, graph } });
+  let last = null; k.every(500, () => { const n = nm(); if (n !== last) { last = n; k.redraw(); } });
+  return el;
 };
 
 export const KIT = V;
