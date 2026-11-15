@@ -27,7 +27,7 @@ for (const [k, ty, name] of [[0, 30, 'directwave'], [1, 31, 'gms'], [2, 32, 'min
   ok(tabs.length >= 5, `${name}: tabs ${tabs.join(' / ')}`);
   for (let j = 0; j < tabs.length; j++) {
     await ev((j) => document.querySelectorAll('.lk-flmtabs .lv-tab')[j].click(), j); await page.waitForTimeout(250);
-    const n = await ev(() => document.querySelectorAll('.lk-flmpg .lk-k, .lk-flmpg .flm-c, .lk-flmpg .lk-t, .lk-flmpg .lk-n, .lk-flmpg .lk-ch').length);
+    const n = await ev(() => document.querySelectorAll('.lk-flmpg .lk-k, .lk-flmpg .flm-c, .lk-flmpg .lk-t, .lk-flmpg .lk-n, .lk-flmpg .lk-ch, .lk-flmpg .lv-fld, .lk-flmpg .lk-s').length);
     if (n < 2) ok(false, `${name} ${tabs[j]}: ${n} controls`);
     const el = await page.$('.card.flm-card');
     if (process.env.DBG) await page.screenshot({ path: path.join(out, '_full.png') });
