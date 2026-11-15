@@ -8,6 +8,7 @@ import { fmtParam, normOf, valOf, MOD_MAP, DEVICES, INSTRUMENTS, FX_GROUPS, IRAC
 import { buildSynth } from './devviz.js';
 import { menuItem } from './fxlaw.js';
 import { FLM_LAYOUT, flmName, flmShort, flmSwitch } from './flmlayout.js';
+import { FLM_LIVE } from './flmlive.js';
 import { FLM_GRAPH } from './flmviz.js';
 import { OP_ALGOS } from './engine/operator.js';
 import { POLI_TGT, POLI_GRID, POLI_MIDI } from './engine/poli.js';
@@ -1809,7 +1810,90 @@ const flmLayout = (k, L) => {
   sync(); if (when.length) k.every(120, () => { sync(); });
   return root;
 };
-const flmCard = (k) => { const L = FLM_LAYOUT[k.def.flm != null && !k.def.native ? k.def.flm : 'i' + k.d.type]; return L ? flmLayout(k, L) : flmPanel(k); };
+// A Live-device composition of an FLM module (js/flmlive.js): knob columns | dark display (graph with dragged handles, mode buttons, lines of
+// number fields like Live's in-display values) | right columns with Dry/Wet at the bottom - built from the same kit parts as the Live 12 panels.
+const liveBand = new Map();   // Equalizer: the selected band per device
+const flmLive = (k, S) => {
+  const ps = k.def.params, cl = (x) => Math.min(1, Math.max(0, x));
+  const name = (j, l) => (l != null ? l : S.names && S.names[j] != null ? S.names[j] : flmShort(flmName(ps[j].n).replace(/ ?\((sync|Sync)\)$/, '')));
+  const cur = (j) => { const p = ps[j], n = p.items.length; return p.br ? menuItem(p.br, k.get(j)) : Math.round(k.get(j) * (n - 1)); };
+  const put = (j, q) => { const n = ps[j].items.length; k.set(j, n > 1 ? q / (n - 1) : 0); };
+  const sel = (j, w) => { const c = k.reg(lvSel(() => ps[j].items.map((l, q) => ({ label: l, value: q })), () => cur(j), (q) => put(j, q), { w: w || 72, cls: 'lk-s' }), j); c.update && c.update(); return c; };
+  const choice = (j, vert) => { const c = k.reg(lvChoice(ps[j].items.map((l) => ({ label: l })), () => cur(j), (q) => put(j, q), { cls: 'lk-ch ' + (vert ? 'v' : '') }), j); c.update && c.update(); return c; };
+  const lab = (t, el) => (t ? k.TL(t, el) : el);
+  // one item of a column / row; dk = inside the dark display (numbers are orange text fields there, as Live's)
+  const item = (it, dk, bare) => {
+    if (it === '-') return h('div', { class: 'fl-grow' });
+    if (typeof it === 'function') return it(k);
+    if (typeof it === 'number') return dk ? item({ n: it }, dk, bare) : k.K(it, { n: name(it), p: { lawCtx: () => ({ p: k.d.params }) } });
+    if (it.h != null) return h('span', { class: 'lk-lb fl-hd' }, it.h || ' ');
+    if (it.sw != null) return k.swap(it.sw, () => item(it.on, dk, bare), () => item(it.off, dk, bare));
+    if (it.n != null) { const f = dk ? k.NT(it.n, { w: 52, cls: 'or' }) : k.N(it.n, { w: 66 }); return bare ? f : lab(name(it.n, it.l), f); }
+    if (it.s != null) { const c = sel(it.s, it.w); return bare ? c : lab(name(it.s, it.l), c); }
+    if (it.ch != null) { const few = ps[it.ch].items.length <= 4; const c = few ? choice(it.ch, !dk) : sel(it.ch); return bare || few ? c : lab(name(it.ch, it.l), c); }
+    if (it.t != null) { const t = it.key ? ps[it.t].n.replace(/^BYP /i, '') : name(it.t, it.l); return k.T(it.t, t, { w: it.key ? 22 : Math.max(34, 12 + t.length * 7), cls: it.key ? 'fl-key' : '' }); }
+    return null;
+  };
+  const column = (list) => k.col(...list.map((it) => item(it, false)));
+  // ---- the display
+  let dk = null;
+  if (S.D) {
+    const D = S.D, parts = [], hs = D.handles || [], gr = FLM_GRAPH[k.def.flm], get = (j) => k.get(j);
+    const at = (hd, w, hh) => { const f = hd.pos ? hd.pos(get) : [hd.x != null ? k.get(hd.x) : 0.5, hd.y != null ? 1 - k.get(hd.y) : 0.5]; return [cl(f[0]) * w, cl(f[1]) * hh]; };
+    const band = () => (S.band ? liveBand.get(k.d.id) || 0 : -1);
+    if (D.piano) {   // a one-octave keyboard instead of a graph (Scale)
+      const box = h('div', { class: 'fkeys' }), wi = [0, 2, 4, 5, 7, 9, 11];
+      D.piano.forEach((j, q) => { const blk = BLACK.includes(q), x = blk ? wi.indexOf(q - 1) + 1 : wi.indexOf(q), nm = ps[j].n.replace(/^Note /i, '');
+        const b = k.T(j, blk ? '' : nm, { cls: 'fkey' + (blk ? ' blk' : '') }); b.title = nm; b.style.setProperty('--x', x); box.append(b); });
+      parts.push(h('div', { class: 'fl-piano' }, box));
+    } else if (gr) {
+      const draw = (g, w, hh) => { gr(g, w, hh, get); hs.forEach((hd, q) => { const [x, y] = at(hd, w, hh); lvRing(g, x, y, q === band() ? 5 : 3.6);
+        if (hd.n) { g.fillStyle = q === band() ? DISPC.or : DISPC.ink; g.font = '700 9px system-ui,sans-serif'; g.textAlign = 'center'; g.fillText(hd.n, x, y - 8); g.textAlign = 'left'; } }); };
+      const tapKeys = D.tap ? (x, y, e) => { const c = e.currentTarget, w = c._w, hh = c._h, kw = (w - 8) / 7, top = 16, h2 = hh - top - 4, jj = Math.floor((x - 4) / kw);
+        let note = [0, 2, 4, 5, 7, 9, 11][Math.max(0, Math.min(6, jj))];
+        if (y < top + h2 * 0.6) for (const [bk, bj] of [[1, 0], [3, 1], [6, 3], [8, 4], [10, 5]]) { const cx = 4 + (bj + 1) * kw; if (Math.abs(x - cx) <= kw * 0.3) note = bk; }
+        const pi = D.tap(note); k.set(pi, k.get(pi) > 0.5 ? 0 : 1); return false; } : null;
+      // drag a handle like Live: the nearest one follows the finger relatively (x and / or y parameter)
+      const drag = tapKeys ? { onDown: tapKeys } : hs.length ? {
+        onDown: (x, y, e) => { const c = e.currentTarget; let best = 0, bd = 1e9; hs.forEach((hd, q) => { const [hx, hy] = at(hd, c._w, c._h), d = Math.hypot(hx - x, hy - y); if (d < bd) { bd = d; best = q; } });
+          const hd = hs[best]; if (S.band) { liveBand.set(k.d.id, best); if (S._pick) S._pick(); k.redraw(); }
+          return { hd, vx: hd.x != null ? k.get(hd.x) : 0, vy: hd.y != null ? k.get(hd.y) : 0 }; },
+        onMove: (x, y, dx, dy, st, e) => { const c = e.currentTarget, hd = st.hd; if (hd.x != null) k.set(hd.x, cl(st.vx + dx / c._w * (hd.kx || 1))); if (hd.y != null) k.set(hd.y, cl(st.vy - dy / c._h * (hd.ky || 1))); },
+      } : null;
+      parts.push(k.DF(D.w || 190, D.h || 64, draw, drag));
+    }
+    if (D.tabs != null) parts.push(choice(D.tabs, false));
+    if (S.band) {   // EQ Eight's band row: the band buttons, then the selected band's type and channel
+      const row = h('div', { class: 'lk-row fl-band' }), pick = () => { const b = band();
+        row.replaceChildren(k.reg(lvChoice(Array.from({ length: S.band }, (_, q) => ({ label: String(q + 1) })), () => band(), (q) => { liveBand.set(k.d.id, q); S._pick(); k.redraw(); }, { cls: 'lk-ch' }), -1),
+          sel(4 + 4 * b, 84), sel(17 + b, 64)); };
+      S._row = pick; parts.push(row);
+    }
+    const rows = D.rows || [];
+    if (D.table && rows.length) {   // lines of numbers under one header (Multiband Dynamics' display)
+      const n = Math.max(...rows.map((r) => r.length - 1)), tb = h('div', { class: 'fl-tbl', style: `grid-template-columns:auto repeat(${n}, auto)` });
+      tb.append(h('span', {}), ...rows[0].slice(1).map((it) => h('span', { class: 'fl-th' }, name(it.n ?? it.s ?? it.t ?? (it.on && (it.on.s ?? it.on.n)), it.l ?? (it.on && it.on.l)))));
+      for (const r of rows) { tb.append(h('span', { class: 'fl-tr' }, r[0])); for (let q = 1; q <= n; q++) tb.append(r[q] ? item(r[q], true, true) : h('span', {})); }
+      parts.push(tb);
+    } else for (const r of rows) {
+      const head = typeof r[0] === 'string' ? r[0] : null, its = head != null ? r.slice(1) : r;
+      if (head) parts.push(h('div', { class: 'lk-dkh' }, head));
+      parts.push(h('div', { class: 'lk-row fl-row' }, ...its.map((it) => item(it, true))));
+    }
+    dk = k.dk(...parts); dk.classList.add('fl-dk');
+  }
+  // Equalizer: the selected band's Freq / Gain / Q stand left of the display (EQ Eight)
+  let left = (S.L || []).map(column);
+  if (S.band) {
+    const side = k.col(); const fill = () => { const b = liveBand.get(k.d.id) || 0, o = 1 + 4 * b; side.replaceChildren(k.K(o + 1, { n: 'Freq' }), k.K(o, { n: 'Gain' }), k.K(o + 2, { n: 'Q' })); if (S._row) S._row(); };
+    S._pick = fill; fill(); left = [side];
+  }
+  const mid = dk && S.B ? k.col(dk, h('div', { class: 'lk-row fl-b' }, ...S.B.map((it) => item(it, false)))) : dk;
+  const root = k.row(...left, mid, ...(S.R || []).map(column));
+  root.classList.add('fl-live'); if (!dk) root.classList.add('fl-nod');
+  return root;
+};
+const flmCard = (k) => { const id = k.def.flm != null && !k.def.native ? k.def.flm : 'i' + k.d.type; if (FLM_LIVE[id]) return flmLive(k, { ...FLM_LIVE[id] }); const L = FLM_LAYOUT[id]; return L ? flmLayout(k, L) : flmPanel(k); };
 for (const t of Object.keys(DEVICES)) if (DEVICES[t].view === 'flmfx') V[t] = flmCard;
 VI[34] = flmCard;   // Transistor Bass: the same compact FLM layout (its Distortion is a switch)
 // 3x Osc: FLM's eight pages (Honeydew instruments.rs) as tabs; within a page the controls drop the page's own prefix ("Volume Envelope Attack"

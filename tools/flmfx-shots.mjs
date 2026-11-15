@@ -29,6 +29,21 @@ for (const [s, set] of SETS.entries()) {
 }
 const moved = await ev(async () => { const P = await import('./js/project.js'); P.setDeviceParam(0, 0, 1, 0.37); return P.state.tracks[0].devices[0].params[1]; });
 ok(moved === 0.37, 'a module parameter set through the project API: ' + moved);
+// Live interaction: dragging the ring of the Filter's display moves Freq (x) and Reso (y); tapping a key of Pitcher 2's keyboard switches the note
+await ev(async () => { const P = await import('./js/project.js'); while (P.state.tracks[0].devices.length) P.removeDevice(0, 0); P.addDevice(0, 109); P.addDevice(0, 145); P.selectTrack(0); P.emit('all'); });
+await page.waitForTimeout(700);
+{ const cv = (await page.$$('.fl-live canvas'))[0], bx = await cv.boundingBox();
+  const before = await ev(async () => { const P = await import('./js/project.js'); return P.state.tracks[0].devices[0].params.slice(1, 3); });
+  const sx = bx.x + bx.width * 0.6, sy = bx.y + bx.height * 0.5;
+  await page.mouse.move(sx, sy); await page.mouse.down(); await page.mouse.move(sx - bx.width * 0.25, sy - bx.height * 0.3, { steps: 6 }); await page.mouse.up();
+  const after = await ev(async () => { const P = await import('./js/project.js'); return P.state.tracks[0].devices[0].params.slice(1, 3); });
+  ok(after[0] < before[0] - 0.1 && after[1] > before[1] + 0.2, `Filter display: dragging the ring left / up lowers Freq (${before[0].toFixed(2)} -> ${after[0].toFixed(2)}) and raises Reso (${before[1].toFixed(2)} -> ${after[1].toFixed(2)})`);
+  const kb = (await page.$$('.fl-live canvas'))[1]; await kb.scrollIntoViewIfNeeded(); await page.waitForTimeout(300); const kx = await kb.boundingBox();
+  const n0 = await ev(async () => { const P = await import('./js/project.js'); return P.state.tracks[0].devices[1].params[1]; });
+  await page.mouse.click(kx.x + kx.width * 0.07, kx.y + kx.height * 0.9);
+  const n1 = await ev(async () => { const P = await import('./js/project.js'); return P.state.tracks[0].devices[1].params[1]; });
+  ok((n0 > 0.5) !== (n1 > 0.5), `Pitcher 2 keyboard: tapping the C key switches Note C (${n0} -> ${n1})`); }
+await page.screenshot({ path: path.join(out, 'live-filter-pitcher.png') });
 // the Transistor Bass instrument (34) panel
 await ev(async () => { const P = await import('./js/project.js'); while (P.state.tracks[0].devices.length) P.removeDevice(0, 0); P.setInstrument(0, 34); P.selectTrack(0); P.emit('all'); });
 await page.waitForTimeout(700);
