@@ -1,3 +1,4 @@
+import { moistureDef, m2Text } from './moistdefs.js';
 import { factoryPresets } from './presetlib.js';
 import { wtName, WT_COUNT } from './engine/live.js';
 import { FLM_SYNC, GMS_FX, GMS_FX_RATE, GMS_WAVES, MINI_KINDS, SS_LFO_DEST, cutHz, syncBeats, miniPhaserBeats } from './engine/flmsyn.js';
@@ -12,7 +13,7 @@ import { flmText, menuItem } from './fxlaw.js';
 // (app/src/main/cpp/instruments.h and devices.h).
 export const INST = { FLM_3OSC: 36, FLM_SLICER: 35, FLM_DW: 30, FLM_GMS: 31, FLM_MINI: 32, FLM_SAW: 33, MINISYNTH: 1, SUPERSAW: 2, DRUM: 3, DIRECTWAVE: 4, GMS: 5, SOUNDFONT: 6, MOISTURE: 7, OSPHERE: 8, KEYSTONE: 9, SAMPLER: 10, WAVETABLE: 11, SIMPLER: 18, IMPULSE: 28, GRANULATOR: 29 };
 // Instruments a synth/sampler track can switch between (drums have their own track type).
-export const INST_LIST = [30, 31, 32, 33, 34, 35, 36, 18, 17, 16, 15, 14, 13, 11, 10, 28, 29, 25, 26, 27, 19, 20, 21, 22, 23, 24, 6, 7, 8, 9, 12];   // FLM instruments first; the classic Mini Synth / SuperSaw / DirectWave / GMS are replaced by them
+export const INST_LIST = [30, 31, 32, 33, 34, 35, 36, 37, 18, 17, 16, 15, 14, 13, 11, 10, 28, 29, 25, 26, 27, 19, 20, 21, 22, 23, 24, 6, 7, 8, 9, 12];   // FLM instruments first; the classic Mini Synth / SuperSaw / DirectWave / GMS are replaced by them
 
 export const INSTRUMENTS = {
   1: { name: 'Mini Synth', params: [
@@ -69,7 +70,7 @@ export const INSTRUMENTS = {
     { n: 'Gate', min: 0.1, max: 1, def: 0.7, unit: '%' } ] },
   6: { name: 'SoundFont', view: 'kit', params: [
     { n: 'Gain', min: 0, max: 1, def: 0.8, unit: '%' } ] },
-  7: { name: 'Moisture', params: [
+  7: { name: 'Moisture Klasik', params: [
     { n: 'Pos A', min: 0, max: 1, def: 0.25, unit: '%' },
     { n: 'Pos B', min: 0, max: 1, def: 0.6, unit: '%' },
     { n: 'B Level', min: 0, max: 1, def: 0.5, unit: '%' },
@@ -946,6 +947,7 @@ export function fmtParam(p, v) {
     case 'deg': return Math.round(v) + '\u00B0';
     case 'flmlist': return (p.items || [])[p.br ? menuItem(p.br, v) : Math.round(v * ((p.items || []).length - 1))] ?? '';
     case 'flm': return flmText(p, v);
+    case 'srm': return m2Text(p.k, v);
     case 'slfirst': return v < 1 ? 'Auto (C3)' : noteName(Math.round(v));
     case 'pct1': return (v * 100).toFixed(1) + ' %';
     case 'pan': return Math.abs(v) < 0.01 ? 'C' : (v < 0 ? Math.round(-v * 50) + 'L' : Math.round(v * 50) + 'R');
@@ -1258,3 +1260,5 @@ export function migrateClassicInst(inst) {
   }
   for (const k of Object.keys(CLASSIC_TO_FLM)) delete PRESETS[k];               // the classic instruments are gone from the app: their presets live on only in the FLM lists above
 }
+// Moisture (37): the Serum-style wavetable synth (js/moistdefs.js, native/engine/moist2.cpp). The old Moisture (7) stays as 'Moisture Klasik'.
+INSTRUMENTS[37] = moistureDef();

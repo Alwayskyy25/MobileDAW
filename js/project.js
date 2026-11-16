@@ -1608,6 +1608,7 @@ async function deserializeInner(text, onProgress) {
   for (let i = 0; i < state.tracks.length; i++) {
     const t = state.tracks[i];
     if (t.inst && t.inst.type === INST.SOUNDFONT && t.inst.sf) { const r = await loadSoundFontFor(i, t.inst.sf.path, t.inst.sf.preset); if (r && r.error) missing.push(t.inst.sf.path); }
+    if (t.inst && t.inst.type === 37) { t.inst.params[302] = t.inst.params[303] = -1; for (let o = 0; o < 2; o++) { const w = t.inst.wt && t.inst.wt[o]; if (!w) continue; const r = await loadMoistureTable(i, o, w.path); if (r && r.error) missing.push(w.path); } }   // Moisture wavetables: new sample ids each load
   }
   for (const t of state.tracks) {
     if (!t.inst || !t.inst.zones) continue;
@@ -2062,6 +2063,36 @@ function syncSoundFont(i) {
   eng.instParam(i, 100, t.inst.sf.id); eng.instParam(i, 1, t.inst.sf.preset || 0);
 }
 const t0Flm = (i) => { const sf = state.tracks[i] && state.tracks[i].inst && state.tracks[i].inst.sf; const v = sf && sf.flmPatch; return Number.isInteger(v) ? v : null; };
+// ---- Moisture (37): wavetables (a .wav read as stored, frames of 2048 points) and Serum presets (.fxp, js/serumfxp.js)
+export async function loadMoistureTable(i, osc, path) {
+  const t = state.tracks[i]; if (!t || !t.inst || t.inst.type !== 37) return { error: 'Bukan Moisture' };
+  const bytes = await eng.readBytes(path); if (!bytes) return { error: 'File wavetable tidak bisa dibaca.' };
+  const { parseWavetable, toFrames2048 } = await import('./serumfxp.js');
+  let f; try { f = toFrames2048(parseWavetable(bytes)); } catch (e) { return { error: e.message }; }
+  if (state.nextSample >= SAMPLE_MAX) return { error: SAMPLE_FULL };
+  const id = state.nextSample++; const m = await eng.putSampleBuffers(id, f, f); if (!m || m.error) return { error: (m && m.error) || 'Wavetable tidak bisa dimuat (hanya versi web).' };
+  t.inst.wt = t.inst.wt || [null, null]; t.inst.wt[osc] = { path, name: path.split('/').pop(), frames: f.length / 2048 };
+  t.inst.params[302 + osc] = id; eng.instParam(i, 302 + osc, id); emit('devices');
+  return { ok: true, frames: f.length / 2048 };
+}
+export function clearMoistureTable(i, osc) { const t = state.tracks[i]; if (!t || !t.inst || !t.inst.wt) return; t.inst.wt[osc] = null; t.inst.params[302 + osc] = -1; eng.instParam(i, 302 + osc, -1); emit('devices'); }
+export async function applySerumPreset(i, path) {
+  const t = state.tracks[i]; if (!t || t.kind !== 'midi') return { error: 'Pilih track instrumen (MIDI).' };
+  const bytes = await eng.readBytes(path); if (!bytes) return { error: 'File preset tidak bisa dibaca.' };
+  const { parseSerumFxp } = await import('./serumfxp.js'); const { encodeWav } = await import('./engine/wav.js');
+  let r; try { r = await parseSerumFxp(bytes); } catch (e) { return { error: e.message }; }
+  if (!t.inst || t.inst.type !== 37) setInstrument(i, 37);
+  const amt = new Set([...Array.from({ length: 16 }, (_, k) => 180 + 2 * k), ...Array.from({ length: 16 }, (_, k) => 228 + 2 * k)]);
+  let n = 0; for (let k = 0; k < 299; k++) { const v = r.params[k]; if (!Number.isFinite(v) || amt.has(k)) continue; setInstParam(i, k, v); n++; }
+  for (let k = 0; k < 32; k++) setInstParam(i, 332 + 2 * k, 0);   // the routings are not in the documented part of the file
+  const notes = r.notes.slice(); let tables = 0;
+  for (let o = 0; o < 2; o++) { const f = r.tables[o]; if (!f) continue;
+    const out = '/Samples/Wavetables/' + String((r.wtName && r.wtName[o]) || (r.name || 'Serum') + (o ? ' B' : ' A')).replace(/[^A-Za-z0-9 ._-]+/g, '_') + '.wav';
+    try { await eng.saveBytes(out, new Uint8Array(encodeWav([f], [f], f.length, 48000, 32))); const x = await loadMoistureTable(i, o, out); if (x && x.ok) tables++; else if (x && x.error) notes.push(x.error); } catch (e) { notes.push('Wavetable ' + (o ? 'B' : 'A') + ': ' + (e.message || e)); } }
+  t.inst.from = { app: 'Serum', name: r.name, path };
+  emit('devices');
+  return { ok: true, name: r.name, params: n, tables, notes };
+}
 async function loadSoundFontFor(i, path, preset = 0) {
   const r = await eng.loadSoundFont(path);
   if (!r || r.error) return r || { error: 'SoundFont tidak bisa dimuat' };

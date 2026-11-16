@@ -250,6 +250,19 @@ export const SCENARIOS = [
       P(25, 1); P(3, 2 / 3); P(110, 5 / 7); P(63, 1); P(107, 0.9); play(e, 1.2); P(131, 0.4); P(132, 0.2); P(134, 0.6); play(e, 1.2);
       P(131, 0); P(139, 0.2); P(145, 4 / 90); P(140, 0.3); e.bend(0, 1.5); play(e, 1.2); e.tempo(90); P(144, 1); P(120, 1); play(e, 1); e.stop(); play(e, 0.6);
     } },
+  { name: 'inst-moisture', native: true, info: 'C++ only (native/engine/moist2.cpp): Moisture (37), the Serum-style wavetable synth: wavetables A / B, WT position, unison + detune + blend, warp modes (sync, bend, PWM, FM from B), sub, noise, the filter types, Env 1-3, LFO -> matrix routes, mono glide, pitch bend, every effect of the rack, tempo change',
+    run(e) {
+      e.tempo(128); e.trackInst(0, 37);
+      const f = []; for (let k = 0; k < 24; k++) f.push(k * PPQ / 2, PPQ * (k % 3 === 0 ? 1.2 : 0.4), 45 + ((k * 7) % 24), 0.5 + (k % 4) * 0.12, 0); e.trackNotes(0, f, f.length / 5);
+      const P = (i, v) => e.instParam(0, i, v);
+      P(300, 1); P(11, 0.3); P(6, 7 / 16); P(7, 0.6); P(213, 1); P(301, 4); P(24, 0.5); P(216, 1); P(45, 0.62); P(46, 0.3);
+      e.play(); play(e, 1.5, [128, 77, 256]);
+      P(168, 2 / 21); P(9, 0.6); P(215, 1); P(33, 0.6); P(214, 1); P(27, 0.2); P(44, 3 / 95); P(332, 4); P(333, 45); P(180, 0.8); P(61, 0.6); play(e, 1.2);
+      P(168, 17 / 21); P(9, 0.4); P(44, 9 / 95); P(334, 2); P(335, 11); P(182, 0.9); P(53, 0.3); P(54, 0.2); play(e, 1.2);
+      P(163, 1); P(154, 1); P(97, 0.4); P(155, 1); P(156, 1); P(157, 1); play(e, 1.2);
+      P(158, 1); P(159, 1); P(160, 1); P(161, 1); P(92, 0.7); P(162, 1); P(143, 0.7); play(e, 1.2);
+      P(306, 1); P(65, 0.4); e.bend(0, 1.5); play(e, 1); e.tempo(96); P(99, 6 / 12); play(e, 1); e.stop(); play(e, 1.5);
+    } },
   { name: 'inst-flmdw', native: true, info: 'C++ only (native/engine/hddw.cpp, Honeydew DW Sampler): FL Studio Mobile DirectWave (30): key / vel zones (gain / pan), loop, reverse, root / tune, filter + filter envelope, frequency (pitch) envelope, LFO (Hertz / One Shot / Tempo) to filter / frequency / level / pan, slide / legato / mono, PB range + bend',
     run(e) {
       samples(e); testSample(e); e.tempo(124); e.trackInst(0, 30);

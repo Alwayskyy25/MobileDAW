@@ -5,7 +5,8 @@
 // (js/engine/flmsyn.js): filter response, envelopes (drag the handles), LFO with attack / one shot, GMS oscillator output with the
 // modulation kind, sample + zone map, unison and chorus voices, arpeggiator pattern / glide, delay taps, distortion / decimator, chorus,
 // phaser response, GMS FX X / Y pads (drag the point).
-import { h } from './ui.js';
+import { h, menu } from './ui.js';
+import { M2, M2_TABLES, M2_WARPS, M2_FILTERS, M2_DIST, M2_SUB, M2_LFO_SHAPES, M2_SOURCES, M2_DESTS, m2Bank, m2Text } from './moistdefs.js';
 import { lvTabs, lvBtn, lvPath, lvRing, lvEnvPts, DISPC } from './liveui.js';
 import { Biquad } from './engine/dsp.js';
 import { cutHz, syncBeats, GMS_SCALE, FLM_SYNC } from './engine/flmsyn.js';
@@ -563,4 +564,145 @@ export function addFlmPanels(VI) {
       { name: 'Distortion', build: () => DS('Distortion', { k: [KN(k, 52, 'Drive')], g: distWave(k, { drive: 52, dmax: 99, gain: 53 }), rows: [[NUM(k, 53, 'Gain')]] }) },
       { name: 'Delay', build: () => DS('Delay', { g: taps(k, { time: 54, fb: 55, filt: 56, mix: 57, beats: (i) => SS_DELAY_BEATS[clamp(Math.round(i), 0, 4)] }), rows: [[MEN(k, 54, 'Time', 64), NUM(k, 55, 'Feedback'), NUM(k, 56, 'Filter'), NUM(k, 57, 'Mix')]] }) }])],
   ], { 1: () => Math.round(k.get(1)) === 1, 3: () => k.get(32) !== 0, 7: () => k.get(52) > 0 || k.get(57) > 0 });
+}
+
+// ================================================================================================ Moisture (37)
+// The Serum-style wavetable synth (native/engine/moist2.cpp): Serum's page order (OSC with the sources, the modulators, MATRIX, FX, GLOBAL)
+// and its sections (OSC A / B with the wavetable in 3D, SUB, NOISE, FILTER, ENV 1-3, LFO 1-8, VOICING, MACROS), in MobileDAW's own drawing.
+const m2c = (v) => Math.min(1, Math.max(0, v));
+// a menu over a normalized parameter that holds a list index (Serum's continuous-coded lists: filter type, warp mode, ...)
+function SM(k, j, items, n, label, w = 92) {
+  const b = lvBtn('', (e) => { const r = e.currentTarget.getBoundingClientRect(), cur = Math.round(m2c(k.get(j)) * (n - 1));
+    menu(items.map((t, i) => ({ label: t, check: i === cur, fn: () => { k.set(j, n > 1 ? i / (n - 1) : 0); b.update(); } })), r.left, r.bottom + 1); }, { cls: 'lk-t m2-sm', w });
+  b.update = () => { b.textContent = m2Text(j, k.get(j)); }; b.update(); k.reg(b, j);
+  return label ? h('div', { class: 'lk-tl' }, h('span', { class: 'lk-lb' }, label), b) : b;
+}
+// the wavetables for the display (the engine builds the same shapes with 2048 points and band-limits them)
+const M2_DRAW = new Map();
+export function m2Frames(t) {
+  if (M2_DRAW.has(t)) return M2_DRAW.get(t);
+  const N = 128, F = 24, out = [], TAU = Math.PI * 2, sh = (k, x) => (k === 0 ? Math.sin(TAU * x) : k === 1 ? (x < 0.25 ? 4 * x : x < 0.75 ? 2 - 4 * x : 4 * x - 4) : k === 2 ? 2 * x - 1 : x < 0.5 ? 1 : -1);
+  const add = (amp) => (x) => { let s = 0; for (let h2 = 1; h2 < amp.length; h2++) if (amp[h2]) s += amp[h2] * Math.sin(TAU * h2 * x); return s; };
+  for (let f = 0; f < F; f++) {
+    const u = f / (F - 1); let fn;
+    switch (t) {
+      case 0: { const y = u * 3, k = Math.min(2, Math.floor(y)), fr = y - k; fn = (x) => (1 - fr) * sh(k, x) + fr * sh(k + 1, x); break; }
+      case 1: { const cut = 2 + u * u * 40, a = [0]; for (let q = 1; q < 48; q++) a.push(1 / q / Math.sqrt(1 + Math.pow(q / cut, 4))); fn = add(a); break; }
+      case 2: { const w = 0.5 - 0.47 * u; fn = (x) => (x < w ? 1 : -1) - (2 * w - 1); break; }
+      case 3: { const a = new Array(34).fill(0); a[1] = 0.5; a[1 + Math.round(u * 31)] += 1; fn = add(a); break; }
+      case 4: { const a = [0]; for (let q = 1; q < 40; q++) a.push(Math.exp(-0.5 * Math.pow((q * 110 - (300 + 600 * Math.abs(Math.sin(u * 3)))) / 120, 2)) + 0.5 * Math.exp(-0.5 * Math.pow((q * 110 - (1200 + 1200 * u)) / 200, 2))); fn = add(a); break; }
+      case 5: { const r = 1 + 7 * u; fn = (x) => (2 * ((x * r) % 1) - 1) * (1 - x * 0.3); break; }
+      case 6: { const g = 1 + 7 * u; fn = (x) => Math.sin(g * Math.sin(TAU * x)); break; }
+      case 7: { const a = new Array(18).fill(0); const D = [[1, 1, 1, 0, 0], [1, 1, 1, 1, 1], [0, 1, 0.75, 0, 0], [1, 1, 0, 0, 1]][Math.min(3, Math.floor(u * 4))]; [1, 2, 3, 4, 8].forEach((q, i) => { a[q] = D[i]; }); fn = add(a); break; }
+      case 8: { const cut = 1 + u * u * 30, a = [0]; for (let q = 1; q < 48; q++) a.push(q % 2 ? 1 / q / Math.sqrt(1 + Math.pow(q / cut, 4)) : 0); fn = add(a); break; }
+      default: { const st = 2 + Math.round(u * 31); fn = (x) => Math.floor(Math.sin(TAU * x) * st) / st; }
+    }
+    const pts = []; let pk = 1e-9; for (let i = 0; i <= N; i++) { const y = fn(i / N); pts.push(y); pk = Math.max(pk, Math.abs(y)); }
+    out.push(pts.map((y) => y / pk));
+  }
+  M2_DRAW.set(t, out); return out;
+}
+// OSC display: the frames stacked in depth (back to front), the playing frame bright; drag up / down = WT Pos
+function m2Wave(k, tblK, posK, warpK, warpModeK, onK) {
+  return disp(k, (g, w, hh) => {
+    const on = k.get(onK) > 0.5, fr = m2Frames(Math.round(k.get(tblK)) || 0), F = fr.length, pos = m2c(k.get(posK)), cur = Math.round(pos * (F - 1));
+    const depth = Math.min(hh * 0.32, 26), dx = Math.min(w * 0.18, 34), ww = w - dx - 12, amp = (hh - depth - 18) * 0.42, by = hh - 10 - amp;
+    for (let f = 0; f < F; f++) {
+      const z = f / (F - 1), ox = 6 + dx * (1 - z), oy = by - depth * (1 - z), isCur = f === cur;
+      g.strokeStyle = isCur ? (on ? '#5fd3ff' : '#888') : 'rgba(95,211,255,' + (on ? 0.08 + 0.12 * z : 0.05) + ')'; g.lineWidth = isCur ? 2 : 1; g.beginPath();
+      const pts = fr[f]; for (let i = 0; i < pts.length; i++) { const x = ox + ww * i / (pts.length - 1), y = oy - pts[i] * amp * (isCur ? 1 : 0.8); i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+    }
+    txt(g, M2_TABLES[Math.round(k.get(tblK))] || 'Custom', 6, 12, DISPC.ink, 9); txt(g, 'Frame ' + (1 + Math.round(pos * 255)), w - 6, 12, '#5fd3ff', 9, 'right');
+    const wm = Math.round(m2c(k.get(warpModeK)) * (M2_WARPS.length - 1)); if (wm) txt(g, M2_WARPS[wm] + ' ' + Math.round(k.get(warpK) * 100) + '%', w - 6, hh - 3, OR, 8, 'right');
+  }, { onDown: () => ({ v: k.get(posK) }), onMove: (x, y, dx2, dy2, st) => { k.set(posK, m2c(st.v - dy2 / 120)); } }, { min: 150, w: 1.4 });
+}
+// filter response (the engine's SVF families) at the cutoff / resonance, with the type's name
+function m2Filt(k) {
+  return disp(k, (g, w, hh) => {
+    const on = k.get(216) > 0.5, ti = Math.round(m2c(k.get(44)) * 95), T = [[0, 1], [0, 2], [0, 3], [0, 4], [0, 1], [0, 2], [0, 3], [0, 4], [1, 1], [1, 2], [1, 3], [1, 4], [2, 2], [2, 4], [3, 2], [3, 4], [4, 2], [4, 4]][ti] || [0, 2];
+    const fc = 8 * Math.pow(2756.25, m2c(k.get(45))), Q = 1 / (2 - 1.97 * m2c(k.get(46))), top = 16, bot = hh - 12;
+    freqAxis(g, w, hh, top, bot);
+    g.strokeStyle = on ? CY : '#777'; g.lineWidth = 2; g.beginPath();
+    for (let x = 0; x <= w; x += 2) { const f = xl(x, w), r = f / fc; let m;
+      const lp2 = 1 / Math.sqrt(Math.pow(1 - r * r, 2) + Math.pow(r / Q, 2)), hp2 = r * r * lp2, bp = (r / Q) * lp2, lp1 = 1 / Math.sqrt(1 + r * r), hp1 = r * lp1;
+      const p2 = T[1] >= 3 ? 2 : 1, one = T[1] % 2 === 1;
+      m = T[0] === 0 ? (one ? lp1 : 1) * Math.pow(lp2, T[1] >= 2 ? Math.floor(T[1] / 2) : 0) : T[0] === 1 ? (one ? hp1 : 1) * Math.pow(hp2, T[1] >= 2 ? Math.floor(T[1] / 2) : 0) : T[0] === 2 ? Math.pow(bp, p2) : T[0] === 3 ? 1 + bp * 2 : Math.abs(1 - bp);
+      const db = 20 * Math.log10(Math.max(1e-5, m)), y = top + (bot - top) * (1 - (db + 36) / 54); x ? g.lineTo(x, Math.max(top - 6, Math.min(bot, y))) : g.moveTo(x, y); }
+    g.stroke(); txt(g, M2_FILTERS[ti] || 'Low 12', 6, 12, DISPC.ink, 9); txt(g, m2Text(45, k.get(45)), w - 6, 12, CY, 9, 'right');
+  }, { onDown: () => ({ c: k.get(45), r: k.get(46) }), onMove: (x, y, dx2, dy2, st) => { k.set(45, m2c(st.c + dx2 / 200)); k.set(46, m2c(st.r - dy2 / 150)); } }, { min: 150, w: 1.2 });
+}
+// envelope (AHDSR in Serum's laws), LFO shape
+function m2Env(k, base, sel) {
+  return disp(k, (g, w, hh) => {
+    const o = [[35, 36, 37, 38, 39], [51, 52, 53, 54, 55], [56, 57, 58, 59, 60]][sel()], T = (j) => 32 * Math.pow(m2c(k.get(j)), 5), A = T(o[0]), Hd = T(o[1]), D = T(o[2]), S = m2c(k.get(o[3])), R = T(o[4]);
+    const sq = (t) => Math.sqrt(t + 1e-4), tot = sq(A) + sq(Hd) + sq(D) + 0.6 + sq(R), kx = (w - 16) / tot, top = 18, bot = hh - 10, Y = (v) => bot - (bot - top) * v;
+    let x = 8; const pts = [[x, Y(0)]]; x += sq(A) * kx; pts.push([x, Y(1)]); x += sq(Hd) * kx; pts.push([x, Y(1)]); x += sq(D) * kx; pts.push([x, Y(S)]); x += 0.6 * kx; pts.push([x, Y(S)]); x += sq(R) * kx; pts.push([x, Y(0)]);
+    g.fillStyle = 'rgba(95,211,255,0.12)'; g.beginPath(); pts.forEach(([a, b2], i) => (i ? g.lineTo(a, b2) : g.moveTo(a, b2))); g.lineTo(pts[pts.length - 1][0], bot); g.closePath(); g.fill();
+    g.strokeStyle = '#5fd3ff'; g.lineWidth = 2; g.beginPath(); pts.forEach(([a, b2], i) => (i ? g.lineTo(a, b2) : g.moveTo(a, b2))); g.stroke();
+    txt(g, 'ENV ' + (sel() + 1), 6, 12, DISPC.ink, 9); void base;
+  }, null, { min: 160, w: 1.2 });
+}
+function m2Lfo(k, sel) {
+  return disp(k, (g, w, hh) => {
+    const j = sel(), shp = Math.round(k.get(M2.LFO_SHAPE + j)), top = 16, bot = hh - 10, mid = (top + bot) / 2, a = (bot - top) / 2;
+    g.strokeStyle = OR; g.lineWidth = 2; g.beginPath(); let sv = 0.6;
+    for (let x = 0; x <= w - 12; x++) { const ph = (x / (w - 12) * 2) % 1; let y;
+      if (shp === 0) y = Math.sin(ph * 2 * Math.PI); else if (shp === 1) y = ph < 0.25 ? 4 * ph : ph < 0.75 ? 2 - 4 * ph : 4 * ph - 4; else if (shp === 2) y = 2 * ph - 1; else if (shp === 3) y = 1 - 2 * ph; else if (shp === 4) y = ph < 0.5 ? 1 : -1; else { if (x % Math.round((w - 12) / 8) === 0) sv = Math.sin(x * 12.9898) % 1; y = sv; }
+      const X = 6 + x, Y = mid - y * a; x ? g.lineTo(X, Y) : g.moveTo(X, Y); }
+    g.stroke(); txt(g, 'LFO ' + (j + 1) + ' · ' + M2_LFO_SHAPES[shp], 6, 12, DISPC.ink, 9);
+    const rk = j < 4 ? 61 + j : 260 + j - 4; txt(g, k.get(M2.LFO_SYNC + j) > 0.5 ? m2Text(rk, k.get(rk)) : (Math.pow(2, -6 + 13 * m2c(k.get(rk)))).toFixed(2) + ' Hz', w - 6, 12, OR, 9, 'right');
+  }, null, { min: 160, w: 1 });
+}
+const M2SEL = new Map();
+function m2Picker(k, key, n, label, after) {   // 1..n buttons (ENV 1-3, LFO 1-8)
+  const id = k.d.id + ':' + key, get = () => M2SEL.get(id) || 0;
+  const bs = Array.from({ length: n }, (_, i) => { const b = lvBtn(String(i + 1), () => { M2SEL.set(id, i); bs.forEach((x, q) => x.classList.toggle('on', q === i)); after(); }, { cls: 'lk-t m2-pk' }); b.classList.toggle('on', i === get()); return b; });
+  return { el: h('div', { class: 'lk-row m2-pks' }, h('span', { class: 'lk-lb' }, label), ...bs), get };
+}
+export function addMoisturePanel(VI) {
+  VI[37] = (k) => tabs(k, ['OSC', 'MOD', 'MATRIX', 'FX', 'GLOBAL'], [
+    () => [
+      ...[['OSC A', 212, 300, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 10, 168], ['OSC B', 213, 301, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25, 26, 23, 169]].map(([t, on, tb, vol, pan, oct, semi, fine, uni, det, bl, warp, pos, rnd, ph, crs, wm]) =>
+        DS(t, { sw: k.T(on, '', { cls: 'flm-sw', w: 14 }), k: [KN(k, pos, 'WT Pos'), KN(k, warp, 'Warp')], g: m2Wave(k, tb, pos, warp, wm, on), r: [KN(k, pan, 'Pan'), KN(k, vol, 'Level')],
+          rows: [[MEN(k, tb, 'Wavetable', 108), SM(k, wm, M2_WARPS, M2_WARPS.length, 'Warp mode', 96)], [NUM(k, oct, 'Oct', 40), NUM(k, semi, 'Semi', 40), NUM(k, fine, 'Fine', 44), NUM(k, crs, 'Coarse', 56)],
+            [NUM(k, uni, 'Unison', 40), NUM(k, det, 'Detune', 44), NUM(k, bl, 'Blend', 44), NUM(k, ph, 'Phase', 40), NUM(k, rnd, 'Rand', 44)]] })),
+      h('div', { class: 'flm-sec m2-stack' },
+        DS('SUB', { sw: k.T(215, '', { cls: 'flm-sw', w: 14 }), k: [KN(k, 33, 'Level')], rows: [[SM(k, 170, M2_SUB, 6, 'Shape', 84), NUM(k, 171, 'Oct', 40), NUM(k, 34, 'Pan', 40)]] }),
+        DS('NOISE', { sw: k.T(214, '', { cls: 'flm-sw', w: 14 }), k: [KN(k, 27, 'Level')], rows: [[NUM(k, 28, 'Pitch', 44), NUM(k, 29, 'Fine', 44), NUM(k, 30, 'Pan', 40)]] })),
+      DS('FILTER', { sw: k.T(216, '', { cls: 'flm-sw', w: 14 }), k: [KN(k, 45, 'Cutoff'), KN(k, 46, 'Res')], g: m2Filt(k), r: [KN(k, 47, 'Drive'), KN(k, 49, 'Mix')],
+        rows: [[SM(k, 44, M2_FILTERS, 96, 'Type', 92), NUM(k, 50, 'Pan', 40), NUM(k, 48, 'Fat', 40)], [h('span', { class: 'lk-lb' }, 'Route'), k.T(40, 'A', { w: 26 }), k.T(41, 'B', { w: 26 }), k.T(42, 'N', { w: 26 }), k.T(43, 'S', { w: 26 })]] })],
+    () => { let envD, lfoD; const ep = m2Picker(k, 'env', 3, 'ENV', () => { envD.cv.paint(); rows(); }), lp = m2Picker(k, 'lfo', 8, 'LFO', () => { lfoD.cv.paint(); lrow(); });
+      envD = m2Env(k, 0, ep.get); lfoD = m2Lfo(k, lp.get);
+      const er = h('div', { class: 'lk-row flm-dr' }), lr = h('div', { class: 'lk-row flm-dr' });
+      const rows = () => { const o = [[35, 36, 37, 38, 39], [51, 52, 53, 54, 55], [56, 57, 58, 59, 60]][ep.get()]; er.replaceChildren(NUM(k, o[0], 'Attack', 50), NUM(k, o[1], 'Hold', 50), NUM(k, o[2], 'Decay', 50), NUM(k, o[3], 'Sustain', 50), NUM(k, o[4], 'Release', 50)); };
+      const lrow = () => { const j = lp.get(), rk = j < 4 ? 61 + j : 260 + j - 4; lr.replaceChildren(MEN(k, M2.LFO_SHAPE + j, 'Shape', 84), NUM(k, rk, 'Rate', 56), k.T(M2.LFO_SYNC + j, 'BPM', { w: 40 }), MEN(k, M2.LFO_MODE + j, 'Mode', 64), NUM(k, 273 + j, 'Rise', 44), NUM(k, 281 + j, 'Delay', 44)); };
+      rows(); lrow();
+      return [DS('ENVELOPES', { g: envD, rows: [ep.el, er] }), DS('LFO', { g: lfoD, rows: [lp.el, lr] }),
+        DS('VOICING', { rows: [[k.T(M2.MONO, 'Mono', { w: 48 }), k.T(M2.LEGATO, 'Legato', { w: 56 }), NUM(k, M2.VOICES, 'Voices', 44)], [NUM(k, 65, 'Porta', 56), NUM(k, 66, 'Curve', 44)], [NUM(k, 166, 'Bend +', 44), NUM(k, 167, 'Bend -', 44)]] }),
+        DS('MACROS', { k: [KN(k, 218, 'Macro 1'), KN(k, 219, 'Macro 2')], r: [KN(k, 220, 'Macro 3'), KN(k, 221, 'Macro 4')], rows: [] })]; },
+    () => { const list = h('div', { class: 'm2-mx' });
+      list.append(h('div', { class: 'm2-mxh' }, ...['#', 'Source', 'Amount', 'Destination', 'Output'].map((t) => h('span', {}, t))));
+      for (let r = 0; r < M2.ROUTES; r++) { const dj = M2.ROUTE + 2 * r + 1, b = m2Bank(r);
+        const dst = lvBtn('', (e) => { const rc = e.currentTarget.getBoundingClientRect(), cur = Math.round(k.get(dj));
+          menu([{ label: '—', check: cur < 0, fn: () => { k.set(dj, -1); dst.update(); } }, ...M2_DESTS.map(([pi, n]) => ({ label: n, check: pi === cur, fn: () => { k.set(dj, pi); dst.update(); } }))], rc.left, rc.bottom + 1); }, { cls: 'lk-t m2-sm', w: 110 });
+        dst.update = () => { const cur = Math.round(k.get(dj)), d = M2_DESTS.find(([pi]) => pi === cur); dst.textContent = d ? d[1] : '—'; }; dst.update(); k.reg(dst, dj);
+        list.append(h('div', { class: 'm2-mxr' }, h('span', { class: 'lk-lb' }, String(r + 1)), k.S(M2.ROUTE + 2 * r, { w: 96 }), k.NT(b, { w: 54, cls: 'or' }), dst, k.NT(b + 1, { w: 50, cls: 'or' }))); }
+      return [h('div', { class: 'flm-sec m2-mxs grow' }, h('div', { class: 'flm-st' }, h('span', {}, 'MATRIX')), list)]; },
+    () => [fxPage(k, [
+      { name: 'Hyper/Dimension', on: 163, build: () => DS('Hyper / Dimension', { k: [KN(k, 148, 'Rate'), KN(k, 149, 'Detune')], r: [KN(k, 152, 'Size'), KN(k, 153, 'Mix Dim')], rows: [[NUM(k, 150, 'Unison', 44), k.T(151, 'Retrig', { w: 52 }), NUM(k, 147, 'Mix', 44)]] }) },
+      { name: 'Distortion', on: 154, build: () => DS('Distortion', { k: [KN(k, 97, 'Drive')], r: [KN(k, 96, 'Mix')], rows: [[SM(k, 99, M2_DIST, 13, 'Mode', 104), SM(k, 102, ['Pre', 'Post'], 2, 'Filter', 56)], [NUM(k, 98, 'L/B/H', 44), NUM(k, 100, 'Freq', 56), NUM(k, 101, 'BW', 44)]] }) },
+      { name: 'Flanger', on: 155, build: () => DS('Flanger', { k: [KN(k, 105, 'Rate'), KN(k, 106, 'Depth')], r: [KN(k, 107, 'Feed'), KN(k, 103, 'Mix')], rows: [[k.T(104, 'BPM', { w: 40 }), NUM(k, 108, 'Phase', 44)]] }) },
+      { name: 'Phaser', on: 156, build: () => DS('Phaser', { k: [KN(k, 111, 'Rate'), KN(k, 112, 'Depth')], r: [KN(k, 114, 'Feed'), KN(k, 109, 'Mix')], rows: [[k.T(110, 'BPM', { w: 40 }), NUM(k, 113, 'Freq', 56), NUM(k, 115, 'Phase', 44)]] }) },
+      { name: 'Chorus', on: 157, build: () => DS('Chorus', { k: [KN(k, 118, 'Rate'), KN(k, 121, 'Depth')], r: [KN(k, 122, 'Feed'), KN(k, 116, 'Mix')], rows: [[k.T(117, 'BPM', { w: 40 }), NUM(k, 119, 'Delay 1', 50), NUM(k, 120, 'Delay 2', 50), NUM(k, 123, 'Filter', 56)]] }) },
+      { name: 'Delay', on: 158, build: () => DS('Delay', { k: [KN(k, 132, 'Feedback')], r: [KN(k, 124, 'Mix')], rows: [[k.T(127, 'BPM', { w: 40 }), k.T(128, 'Link', { w: 40 }), SM(k, 131, ['Normal', 'Ping-Pong', 'Tap->Delay'], 3, 'Mode', 88)],
+        [NUM(k, 129, 'Left', 50), NUM(k, 130, 'Right', 50), NUM(k, 133, 'Off L', 44), NUM(k, 134, 'Off R', 44)], [NUM(k, 125, 'Freq', 56), NUM(k, 126, 'BW', 44)]] }) },
+      { name: 'Compressor', on: 159, build: () => DS('Compressor', { k: [KN(k, 135, 'Thresh'), KN(k, 136, 'Ratio')], r: [KN(k, 139, 'Gain'), KN(k, 269, 'Mix')], rows: [[NUM(k, 137, 'Attack', 50), NUM(k, 138, 'Release', 50), k.T(140, 'Multiband', { w: 70 })]] }) },
+      { name: 'Reverb', on: 160, build: () => DS('Reverb', { k: [KN(k, 82, 'Size'), KN(k, 85, 'Damp')], r: [KN(k, 87, 'Width'), KN(k, 81, 'Mix')], rows: [[NUM(k, 83, 'Pre Dly', 50), NUM(k, 84, 'Low Cut', 50), NUM(k, 86, 'High Cut', 50)]] }) },
+      { name: 'EQ', on: 161, build: () => DS('EQ', { k: [KN(k, 88, 'Freq L'), KN(k, 92, 'Gain L')], r: [KN(k, 89, 'Freq H'), KN(k, 93, 'Gain H')], rows: [[SM(k, 94, ['Shelf', 'Peak', 'Cut'], 3, 'Type L', 64), NUM(k, 90, 'Q L', 44), SM(k, 95, ['Shelf', 'Peak', 'Cut'], 3, 'Type H', 64), NUM(k, 91, 'Q H', 44)]] }) },
+      { name: 'Filter', on: 162, build: () => DS('FX Filter', { k: [KN(k, 143, 'Cutoff'), KN(k, 144, 'Res')], r: [KN(k, 145, 'Drive'), KN(k, 141, 'Mix')], rows: [[SM(k, 142, M2_FILTERS, 96, 'Type', 92), NUM(k, 268, 'Pan', 44), NUM(k, 146, 'Var', 44)]] }) }])],
+    () => [DS('MASTER', { k: [KN(k, 0, 'Master')], rows: [[NUM(k, 66, 'Port Curve', 56), k.T(164, 'A Key', { w: 52 }), k.T(165, 'B Key', { w: 52 })], [NUM(k, 172, 'A Uni Width', 56), NUM(k, 173, 'B Uni Width', 56)], [NUM(k, 176, 'A Uni WT', 50), NUM(k, 177, 'B Uni WT', 50)]] }),
+      DS('WAVETABLES & PRESETS', { rows: [[lvBtn('Muat wavetable A (.wav)\u2026', () => document.dispatchEvent(new CustomEvent('mdaw-m2wt', { detail: { i: k.ctx.i, osc: 0 } })), { cls: 'lk-t' })],
+        [lvBtn('Muat wavetable B (.wav)\u2026', () => document.dispatchEvent(new CustomEvent('mdaw-m2wt', { detail: { i: k.ctx.i, osc: 1 } })), { cls: 'lk-t' })],
+        [lvBtn('Impor preset Serum (.fxp)\u2026', () => document.dispatchEvent(new CustomEvent('mdaw-m2fxp', { detail: { i: k.ctx.i } })), { cls: 'lk-t' })]] })],
+  ], { 0: () => k.get(212) > 0.5 || k.get(213) > 0.5, 2: () => { for (let r = 0; r < M2.ROUTES; r++) if (k.get(M2.ROUTE + 2 * r) > 0) return true; return false; }, 3: () => [154, 155, 156, 157, 158, 159, 160, 161, 162, 163].some((j) => k.get(j) > 0.5) });
 }

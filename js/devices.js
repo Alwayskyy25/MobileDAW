@@ -82,6 +82,13 @@ function zoneEditor(i, k) {
 const zonesMenu = (i, r) => { const t = state.tracks[i]; if (!t || !t.inst) return; const zs = t.inst.zones || [];
   menu([...zs.map((z, k) => ({ label: `Zona ${k + 1}: ${z.sample ? z.sample.name : '(kosong)'}`, fn: () => zoneEditor(i, k) })), { sep: true },
     { label: '+ Zona', dim: zs.length >= P.MAX_ZONES, fn: () => { const k = P.addZone(i); if (k !== null) zoneEditor(i, k); } }], r.left, r.bottom + 1); };
+// Moisture (37): load a wavetable into oscillator A / B, import a Serum preset (.fxp)
+document.addEventListener('mdaw-m2wt', async (e) => { const { i, osc } = e.detail; const f = await eng.importFiles('.wav'); if (!f.length) return;
+  const r = await P.loadMoistureTable(i, osc, f[0]); toast(r.error || 'Wavetable ' + (osc ? 'B' : 'A') + ': ' + r.frames + ' frame dimuat.', r.error ? 4500 : 2200); });
+document.addEventListener('mdaw-m2wtclr', (e) => { P.clearMoistureTable(e.detail.i, e.detail.osc); toast('Wavetable bawaan dipakai lagi.', 1600); });
+document.addEventListener('mdaw-m2fxp', async (e) => { const { i } = e.detail; const f = await eng.importFiles('.fxp'); if (!f.length) return;
+  const r = await P.applySerumPreset(i, f[0]); if (r.error) { toast(r.error, 5000); return; }
+  toast('Preset Serum "' + r.name + '": ' + r.params + ' parameter' + (r.tables ? ', ' + r.tables + ' wavetable' : '') + '. Routing modulasi tidak ikut (format belum terdokumentasi).' + (r.notes.length ? ' ' + r.notes.join(' ') : ''), 7000); });
 document.addEventListener('mdaw-zone', (e) => { const { i, k, list, rect } = e.detail; const t = state.tracks[i]; if (!t || !t.inst) return;
   if (list) { zonesMenu(i, rect); return; }
   const z = (t.inst.zones || [])[k]; if (z && z.sample) zoneEditor(i, k); else BR.openBrowser('file', { track: i, zone: k || 0 }); });
@@ -170,7 +177,7 @@ export function openDeviceWindow(devId) {
 export function openInstWindow(trackId) {
   const idx = () => state.tracks.findIndex((x) => x.id === trackId);
   const i0 = idx(); if (i0 < 0 || !state.tracks[i0].inst) return;
-  FW.openFloat({ id: 'i:' + trackId, title: INSTRUMENTS[state.tracks[i0].inst.type].name + ' \u2022 ' + state.tracks[i0].name, sub: state.tracks[i0].name, mergeHead: true, color: '#ffa722', fit: true,
+  FW.openFloat({ id: 'i:' + trackId, title: INSTRUMENTS[state.tracks[i0].inst.type].name + ' \u2022 ' + state.tracks[i0].name, sub: state.tracks[i0].name, mergeHead: true, color: '#ffa722', fit: true, ...(state.tracks[i0].inst.type === 37 ? { w: 1040, h: 660, color: '#38c8ff' } : {}),
     build(api) {
       const i = idx(); if (i < 0 || !state.tracks[i].inst) return null;
       const t = state.tracks[i]; api.setTitle(INSTRUMENTS[t.inst.type].name + ' \u2022 ' + t.name, t.name);
@@ -209,7 +216,7 @@ function instCard(i, t, o = {}) {
       menu(items, r.left - 60, r.bottom);
     } }, 'Preset'));
   }
-  if (!o.floating && (FW.isOpen('i:' + t.id) || (prefs.floatPlugins && bigMod(def)))) return floatedCard('i:' + t.id, def.name, () => openInstWindow(t.id), { head });
+  if (!o.floating && (FW.isOpen('i:' + t.id) || def.floatOnly || (prefs.floatPlugins && bigMod(def)))) return floatedCard('i:' + t.id, def.name, () => openInstWindow(t.id), { head });   // floatOnly (Moisture): never inline
   const instPick = (r) => menu(INST_LIST.map((k) => ({ label: INSTRUMENTS[k].name, check: t.inst.type === k, fn: () => P.setInstrument(i, k) })), r.left - 60, r.bottom);
   if (t.kind === 'midi') head.append(swapBtn('Ganti instrumen', instPick));
   if (!o.floating) head.append(popBtn(() => openInstWindow(t.id)));

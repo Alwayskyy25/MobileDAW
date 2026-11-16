@@ -21,7 +21,8 @@ import { DsKick, DsSnare, DsTom, DsHH, DsClap, DsFm } from './engine/ds.js';
 import { WT_CATS, WT_LIST, WT_COUNT, WT_N_FRAMES, wtTable, wtCatOf } from './engine/live.js';
 import { offerAutomation } from './automate.js';
 import { Biquad } from './engine/dsp.js';
-import { addFlmPanels } from './flmpanels.js';
+import { addFlmPanels, addMoisturePanel } from './flmpanels.js';
+import { moistureView } from './moistview.js';
 import { eng, MASTER, RET0 } from './engine.js';
 import * as P from './project.js';
 import * as BR from './browser.js';
@@ -1481,13 +1482,13 @@ VI[29] = (k) => {
     h('div', { class: 'lk-row lk-dsk' }, k.col(k.S(0, { w: 86 }), glyph), k.sep(), k.K(1, { big: true }), k.swapN(0, (m) => (m === 2 ? k.K(6, { big: true }) : k.K(2, { big: true }))), k.K(3, { big: true }), k.K(4, { big: true }), k.sep(), k.K(5), k.swapN(0, (m) => (m === 1 ? k.K(7, { n: 'Loop' }) : k.K(8, { n: 'Pitch' }))), k.K(9), k.sep(), k.K(10), k.K(11), k.sep(), k.K(12), k.K(13)));
 };
 // synths with many sections (Drift, Operator, Poli, Analog, Meld, Wavetable, Sampler, Simpler, the FLM synths) keep the denser size; effects and compact instruments use Live's larger text and dials
-const DENSE_INST = new Set([10, 11, 14, 15, 16, 17, 18, 30, 31, 32, 33]);
+const DENSE_INST = new Set([10, 11, 14, 15, 16, 17, 18, 30, 31, 32, 33, 37]);
 export function instKitView(i, t, every) {
   const def = INSTRUMENTS[t.inst.type]; if (!VI[t.inst.type]) return null;
   const d = { id: 'in' + t.id, type: t.inst.type, params: new Proxy({}, { get: (_, kk) => t.inst.params[kk] ?? (def.params[kk] ? def.params[kk].def : undefined) }) };
   const ctx = { i, di: -1, d, def, every, setParam: (kk, v) => P.setInstParam(i, +kk, v),
     autoFn: (kk) => (rect) => offerAutomation(rect, { kind: 5, strip: P.stripOf(i), param: +kk, def: def.params[kk] }, `${t.name} • ${def.params[kk].n}`) };
-  const k = kit(ctx), el = VI[t.inst.type](k); el.classList.add('lk', 'lk-inst'); if (DENSE_INST.has(t.inst.type)) el.classList.add('lk-dense'); return { el, draw: k.redraw };
+  const k = kit(ctx), el = VI[t.inst.type](k); if (!el.classList.contains('m2x')) el.classList.add('lk', 'lk-inst'); if (DENSE_INST.has(t.inst.type) && !el.classList.contains('m2x')) el.classList.add('lk-dense'); return { el, draw: k.redraw };
 }
 
 // ---- shared pieces for the Live 12 layouts: Sync / Time switch (orange "Sync" when synced, cyan "Time" when free), icon choices, checkbox
@@ -2002,3 +2003,4 @@ export function padChainView(i, k, every) {
 // ================================================================================================ FL Studio Mobile instruments (30..33)
 // DirectWave / GMS / MiniSynth / SuperSaw panels: js/flmpanels.js (tabs as in FLM, Live 12 sections, displays that fill the card)
 addFlmPanels(VI);
+addMoisturePanel(VI); VI[37] = moistureView;   // Moisture (37): its own plug-in window (js/moistview.js)
