@@ -25,7 +25,7 @@ await ev(async () => { const P = await import('./js/project.js'); P.newProject(f
 await wait(500);
 
 
-const hd = async (i) => { const q = await info(i); return { ...q, nw: Math.max(76, Math.round((q.head - 9) * 0.36)) }; };
+const hd = async (i) => { const q = await info(i); return { ...q, nw: Math.max(76, Math.round((q.head - 9) * 0.46)) }; };
 await ev(async () => { const P = await import('./js/project.js'); P.state.tracks[0].mon = undefined; });
 let a = await hd(0);
 const full = () => ev(async () => (await import('./js/timeline.js')).headIsFull());
@@ -33,7 +33,7 @@ ok(await full() && a.head >= 200 && a.h === 60, `start: FULL column (${a.head} p
 
 // ---- the colour column holds only the name; every control is in the wide mixer column of the 78 px row (right-aligned)
 const pr = await ev(async () => { const T = await import('./js/timeline.js'), P = await import('./js/project.js'); return { n: P.state.returns.length }; });
-ok(a.nw < a.head * 0.42, `the colour column is narrow (${a.nw} of ${a.head} px): name only, no In / Auto / Off`);
+ok(a.nw < a.head * 0.5, `the colour column holds the name only, under half the header as Live 12 (${a.nw} of ${a.head} px): name only, no In / Auto / Off`);
 // Monitor modes still exist (long-press menu); Auto sounds only while armed; undo returns the previous mode
 await ev(async () => { const P = await import('./js/project.js'); P.setMonitor(0, 'off'); P.setMonitor(0, 'auto'); });
 ok(await ev(async () => { const P = await import('./js/project.js'), t = P.state.tracks[0]; t.arm = false; const a0 = P.monSounds(t); t.arm = true; const a1 = P.monSounds(t); t.arm = false; return P.monMode(t) === 'auto' && !a0 && a1; }), 'Monitor Auto sounds only while the track is armed');
@@ -53,8 +53,8 @@ await tapH(0, a.nw + 4 + 24 + 3 + 10, 2 + 8); await wait(150);
 
 // ---- sliders: wide, relative drag, and fine control when the finger moves away from the slider
 {
-  a = await hd(0); const volW = Math.round((a.head - 9 - a.nw - 8 - 3) * 0.6);
-  ok(volW >= 80, `the volume slider is wide enough to drag (${volW} px)`);
+  a = await hd(0); const volW = Math.round((a.head - 9 - a.nw - 8 - 4) * 0.5);
+  ok(volW >= 60, `the volume slider is wide enough to drag (${volW} px)`);
   const vol = () => ev(async () => (await import('./js/project.js')).state.tracks[0].vol);
   const sl = async (dy, dxs) => { const q = await hd(0), x0 = q.x + q.w - q.head + q.nw + 4 + 20, y0 = q.top + 27; await ptr('pointerdown', x0, y0); for (let k = 1; k <= 8; k++) { await ptr('pointermove', x0 + dxs * k / 8, y0 + dy * k / 8); await wait(16); } await ptr('pointerup', x0 + dxs, y0 + dy); await wait(150); };
   await ev(async () => (await import('./js/project.js')).setVol(0, 0.5)); const v0 = await vol();

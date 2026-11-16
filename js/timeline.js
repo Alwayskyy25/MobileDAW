@@ -97,7 +97,7 @@ const headLim = () => (full() ? [150, 460] : [56, 160]);
 const headAuto = () => (full() ? (W >= 1100 ? 262 : W >= 760 ? 240 : 208) : (W >= 760 ? 96 : 84));   // about a fifth of the screen, as Live's track header
 const headPref = () => (full() ? prefs.headW : prefs.headWc) || 0;
 function applyHead() { const [lo, hi] = headLim(); HEAD = headPref() > 0 ? Math.round(clamp(headPref(), lo, Math.min(hi, Math.max(lo, W - 120)))) : headAuto(); CW = Math.max(60, W - HEAD); }
-const nameW = () => (full() ? Math.max(76, Math.round((HEAD - METW) * 0.36)) : HEAD - METW);   // coloured column width: only the name; the rest, left of the meter, is the wide mixer column
+const nameW = () => (full() ? Math.max(76, Math.round((HEAD - METW) * 0.46)) : HEAD - METW);   // Live 12 (refs/live12-official): the coloured name block takes nearly half the header; coloured column width: only the name; the rest, left of the meter, is the wide mixer column
 export const headWidth = () => HEAD;
 export const headerLayout = (i) => (state.tracks[i] ? hdr(i) : null);
 export const subLayout = (i) => (state.tracks[i] ? P.subsOf(state.tracks[i]).map((_, k) => subHdr(i, k)) : []);   // tests: the sub-track rows of track i (y, h, M button)   // tests: where the header controls of track i are
@@ -336,7 +336,7 @@ function draw() {
     ctx.fillStyle = state.sel.track === i ? C('#333337') : C('#2a2a2c'); ctx.fillRect(0, y, CW, h);
     const sn = subN(state.tracks[i]);
     if (sn) { const mh = rhMain(i), sh = SUBH(), L = P.subsOf(state.tracks[i]); for (let k = 0; k < sn; k++) { const sy = y + mh + k * sh; ctx.fillStyle = C('#262628'); ctx.fillRect(0, sy, CW, sh); if (L[k].mute) { ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(0, sy, CW, sh); } ctx.fillStyle = C('#1a1a1c'); ctx.fillRect(0, sy - 1, CW, 1); } }   // sub-track rows: a shade darker, a thin line above each
-    ctx.fillStyle = C('#08080a'); ctx.fillRect(0, y + h - 2, CW, 2);                     // Live: a heavy line between tracks
+    ctx.fillStyle = C('#141416'); ctx.fillRect(0, y + h - 1, CW, 1);                     // Live 12 (refs/live12-official): a thin dark line between tracks
   }
   const xl = [];                                                                       // captions of the Master / effect lanes, drawn after the grid
   for (let i = Math.max(n, rowAt(RULER)); i < nn && i <= rowAt(LB); i++) {             // Master / effect track rows: no clips, they only mix
@@ -381,9 +381,8 @@ function draw() {
   // the "+" row: Live's "Drop Files and Devices Here" area
   { const y = rowY(nn), h = rh(nn);
     if (y < LB && y + h > RULER && CW > 120) {
-      ctx.setLineDash([4, 4]); ctx.strokeStyle = C('#3c3c41'); ctx.lineWidth = 1; ctx.strokeRect(6.5, y + 6.5, CW - 13, h - 13); ctx.setLineDash([]);
-      ctx.fillStyle = C('#6c6c73'); ctx.font = FONT(500, 11); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-      ctx.fillText(cut2('Seret sample, instrumen, atau efek ke sini • ketuk + untuk track baru', CW - 30), CW / 2, y + h / 2 + 0.5); ctx.textAlign = 'left';
+      ctx.fillStyle = C('#8b8b92'); ctx.font = FONT(500, 11);   // Live: only the words, centred, no box ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+      ctx.fillText(cut2('Seret file dan device ke sini', CW - 30), CW / 2, y + h / 2 + 0.5); ctx.textAlign = 'left';
     } }
   ctx.restore();
   // clips
@@ -699,7 +698,7 @@ function drawHeads() {
       ctx.fillStyle = C('#161617'); ctx.fillRect(r.hm.x, r.hm.y, r.hm.w, r.hm.h);
       const lh = Math.max(1.5, (r.hm.h - 3) / 2); ctx.fillStyle = C('#101011'); ctx.fillRect(r.hm.x + 2, r.hm.y + 1, r.hm.w - 4, lh); ctx.fillRect(r.hm.x + 2, r.hm.y + 2 + lh, r.hm.w - 4, lh);
     } else if (!auto) meterWell(); else { ctx.fillStyle = C('#161617'); ctx.fillRect(hx + HEAD - METW, y, METW, h - 1); }
-    ctx.fillStyle = C('#08080a'); ctx.fillRect(hx, y + h - 2, HEAD, 2);                  // the same heavy line as the lane
+    ctx.fillStyle = C('#141416'); ctx.fillRect(hx, y + h - 1, HEAD, 1);                  // the same thin line as the lane
     if (!t.fold && h >= MIN_ROW && (on || (drag && drag.k === 'rowh' && drag.i === i))) { ctx.fillStyle = drag && drag.k === 'rowh' && drag.i === i ? T('--accent') : C('#46464c'); ctx.fillRect(hx + (HEAD - METW) / 2 - 8, y + h - 3, 16, 1); }   // grip of the selected track: drag the bottom edge = row height
   }
   ctx.restore();
