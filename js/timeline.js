@@ -862,7 +862,9 @@ function handleHit(x, y) {
   if (s.start && zone(s.start, Math.min(HU, (s.x1 - s.x0) / 3), s.start.h)) return hit('left');
   return null;
 }
+const SHOW_HANDLES = false;   // owner (2026-11-16): the resize capsules and the stretch bar stay invisible; their touch zones still work
 function drawHandles() {
+  if (!SHOW_HANDLES) return;
   const s = selHandles(); if (!s) return;
   const light = currentTone() === 'light', frame = light ? 'rgba(20,20,24,.3)' : 'rgba(240,240,244,.3)', grip = light ? 'rgba(20,20,24,.7)' : 'rgba(240,240,244,.7)';
   const pill = (r) => { ctx.fillStyle = frame; ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, r.w / 2); ctx.fill();
