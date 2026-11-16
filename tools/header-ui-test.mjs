@@ -40,13 +40,14 @@ ok(await ev(async () => { const P = await import('./js/project.js'), t = P.state
 await ev(async () => (await import('./js/history.js')).undoOp()); await wait(200);
 ok(await ev(async () => { const P = await import('./js/project.js'); return P.monMode(P.state.tracks[0]); }) === 'off', 'one undo returns Monitor to the previous mode');
 await ev(async () => (await import('./js/project.js')).setMonitor(0, 'in'));
-{ const o = await ev(async () => { const T = await import('./js/timeline.js'), L = T.headerLayout(0), x0 = window.__el().getBoundingClientRect().width - T.headWidth(); return { x: L.out.x - x0 + L.out.w / 2, y: L.out.y - L.y + L.out.h / 2 }; }); await tapH(0, o.x, o.y); } await wait(350);   // the Output field: third row, after Send A / B
-let m = await menuTexts();
-ok(m.includes('Master'), 'Output field (mixer column) opens the routing menu (' + m.slice(0, 3).join(' | ') + ')');
+// Live 12's header has no output field (owner: the arrangement as Live's): the routing is in the header's menu (long press the name)
+{ const noOut = await ev(async () => { const T = await import('./js/timeline.js'); return !T.headerLayout(0).out && !T.headerLayout(0).aut; });
+  const q = await info(0); await page.mouse.move(q.x + q.w - q.head + 30, q.top + 8); await page.mouse.down(); await wait(900); await page.mouse.up(); await wait(350);
+  var m = await menuTexts(); ok(noOut && m.some((x) => /^Output:/.test(x)), 'no output / automation field in the header (as Live); the header menu has ' + (m.find((x) => /^Output:/.test(x)) || '-')); }
 await closeAll(); await wait(200);
 // the mixer column: Solo is the 2nd square of the first row
 await ev(async () => { (await import('./js/project.js')).state.tracks[0].solo = false; });
-await tapH(0, a.nw + 4 + 24 + 3 + 10, 2 + 8); await wait(200);
+{ const o = await ev(async () => { const T = await import('./js/timeline.js'), L = T.headerLayout(0), x0 = window.__el().getBoundingClientRect().width - T.headWidth(); return { x: L.solo.x - x0 + L.solo.w / 2, y: L.solo.y - L.y + L.solo.h / 2 }; }); await tapH(0, o.x, o.y); } await wait(200);
 ok(await ev(async () => (await import('./js/project.js')).state.tracks[0].solo === true) && await full(), 'Solo button in the mixer column toggles solo and does not switch the look');
 await tapH(0, a.nw + 4 + 24 + 3 + 10, 2 + 8); await wait(150);
 
@@ -100,17 +101,15 @@ ok(await ev(async () => { const T = await import('./js/timeline.js'); T.setHeadW
 {
   await ev(async () => { const P = await import('./js/project.js'); P.state.tracks[0].hx = 3; P.state.tracks[0].fold = false; P.emit('all'); }); await wait(500);
   const q = await hd(0); ok(q.h > 160, `row 0 is tall (${q.h.toFixed(0)} px)`);
-  { const o = await ev(async () => { const T = await import('./js/timeline.js'), L = T.headerLayout(0), x0 = window.__el().getBoundingClientRect().width - T.headWidth(); return { x: L.out.x - x0 + L.out.w / 2, y: L.out.y - L.y + L.out.h / 2 }; }); await tapH(0, o.x, o.y); } await wait(350);
-  const mm = await menuTexts(); ok(mm.includes('Master'), 'tall row: controls keep Live\'s small fixed size (Output cell in the third row)');
-  await closeAll(); await wait(200);
+  const Lt = await ev(async () => (await import('./js/timeline.js')).headerLayout(0)); ok([Lt.mute, Lt.vol, Lt.sa].every((q) => q && q.h === 15) && Lt.sa.y - Lt.y < 60, 'tall row: controls keep Live\'s small fixed size at the top (sends on the third row)');
   await ev(async () => { const P = await import('./js/project.js'); delete P.state.tracks[0].hx; P.emit('all'); }); await wait(300);
 }
 
 // ---- the default row holds all four header rows with their borders clear of the row separator (2 px at the bottom)
 {
   const L0 = await ev(async () => { const T = await import('./js/timeline.js'); return T.headerLayout(0); });
-  ok(L0.out && L0.out.y + L0.out.h <= L0.y + L0.h - 3 && L0.sa && L0.out.y === L0.sa.y && L0.out.x > L0.sb.x, `default row: Master after Send A / B on the third row, its border fully visible (ends ${L0.out.y + L0.out.h - L0.y} of ${L0.h} px)`);
-  ok([L0.mute, L0.solo, L0.vol, L0.pan, L0.sa, L0.sb, L0.out].every((q) => q && q.h === 15), 'all header controls (buttons, faders, sends, output) are the same height');
+  ok(L0.sa && L0.sa.y + L0.sa.h <= L0.y + L0.h - 3 && L0.sb.y === L0.sa.y && L0.vol.w === L0.mute.w && L0.sa.w === L0.mute.w, `default row: Live's three rows (activator | S | arm, volume | pan, send A | send B), the sends clear of the separator (end ${L0.sa.y + L0.sa.h - L0.y} of ${L0.h} px)`);
+  ok([L0.mute, L0.solo, L0.arm, L0.vol, L0.pan, L0.sa, L0.sb].every((q) => q && q.h === 15), 'all header controls (buttons, faders, sends) are the same height');
 }
 
 // ---- folded row: the level meter lies flat next to M / S / arm (open rows keep the vertical meter at the right edge)

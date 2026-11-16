@@ -144,22 +144,17 @@ function hdr(i) {
   // Mixer column like Live's: small fixed controls, ALL the same height (15 px, text 10 px), never growing with the row. Row 1 = activator / S / arm /
   // automation, row 2 = volume + pan, row 3 = Send A | Send B, row 4 = output (Master) across the whole width, right under the sends.
   // A shorter row drops row 4, then 3, then 2. When the column is wide enough the sends and the output share row 3 (no row 4).
-  const sends = state.returns.length >= 2, gap = 3, fs = 10, CH = 15; r.fs = fs;
-  const bw = Math.max(20, Math.min(24, Math.floor((R - L - gp * 3) / 4)));
-  const ys = [0, 1, 2, 3].map((k) => y + 2 + k * (CH + gap)), fits = (k) => h >= ys[k] - y + CH + 3;   // + the 2 px row separator: a control never touches it
-  r.mute = { x: L, y: ys[0], w: auto ? bw + 14 : bw, h: CH, fs };
+  // Live 12's arrangement track controls (refs/live12/058): three columns - half / quarter / quarter of the width. Row 1 = track activator (the
+  // number) | Solo | Arm, row 2 = volume | pan, row 3 = send A | send B as bare values. No automation button and no output field in the header
+  // (Live keeps them in the menus: the header's menu has Output... and the automation lanes). Small fixed controls (15 px), never growing.
+  const sends = state.returns.length >= 2, gap = 2, fs = 10, CH = 15; r.fs = fs;
+  const ys = [0, 1, 2].map((k) => y + 3 + k * (CH + gap)), fits = (k) => h >= ys[k] - y + CH + 3;
+  const A = Math.round((R - L - gp * 2) * 0.5), Q = Math.floor((R - L - gp * 2 - A) / 2), xB = L + A + gp, xC = xB + Q + gp;
+  r.mute = { x: L, y: ys[0], w: auto ? Math.min(R - L, A + 14) : A, h: CH, fs };
   if (!auto) {
-    r.solo = { x: L + bw + gp, y: ys[0], w: bw, h: CH, fs }; r.arm = { x: L + (bw + gp) * 2, y: ys[0], w: bw, h: CH, fs };
-    if (R - bw >= L + (bw + gp) * 3 - 2) r.aut = { x: R - bw, y: ys[0], w: bw, h: CH, fs };
-    let k = 1;
-    if (fits(k)) { const vw = Math.round((R - L - gp) * 0.6); r.vol = { x: L, y: ys[k], w: vw, h: CH, fs }; r.pan = { x: L + vw + gp, y: ys[k], w: R - L - vw - gp, h: CH, fs }; k++; }
-    if (sends && r.vol && fits(k) && R - L >= 140) {                  // wide enough: Send A | Send B | output on ONE row - three rows hold every control
-      const sw = Math.round((R - L - gp * 2) * 0.28); r.sa = { x: L, y: ys[k], w: sw, h: CH, fs }; r.sb = { x: L + sw + gp, y: ys[k], w: sw, h: CH, fs };
-      r.out = { x: L + (sw + gp) * 2, y: ys[k], w: R - L - (sw + gp) * 2, h: CH, fs }; k++;
-    } else {
-      if (sends && r.vol && fits(k)) { const hw = Math.round((R - L - gp) / 2); r.sa = { x: L, y: ys[k], w: hw, h: CH, fs }; r.sb = { x: L + hw + gp, y: ys[k], w: R - L - hw - gp, h: CH, fs }; k++; }
-      if (r.vol && fits(k)) r.out = { x: L, y: ys[k], w: R - L, h: CH, fs };
-    }
+    r.solo = { x: xB, y: ys[0], w: Q, h: CH, fs }; r.arm = { x: xC, y: ys[0], w: R - xC, h: CH, fs };
+    if (fits(1)) { r.vol = { x: L, y: ys[1], w: A, h: CH, fs }; r.pan = { x: xB, y: ys[1], w: R - xB, h: CH, fs }; }
+    if (sends && r.vol && fits(2)) { r.sa = { x: L, y: ys[2], w: A, h: CH, fs }; r.sb = { x: xB, y: ys[2], w: R - xB, h: CH, fs }; }
   }
   return r;
 }
@@ -246,7 +241,7 @@ function drawClip(t, c, y, hh) {
   const body = c.muted ? '#9a9a9f' : isSel ? tint(t.color, 0.32) : t.color;
   ctx.fillStyle = body; ctx.fillRect(x, y0, w, h0);
   if (tall) { ctx.fillStyle = isSel ? tint(col, 0.18) : col; ctx.fillRect(x, y0, w, hd); ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(x, y0 + hd, w, 1); }
-  ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 0.5, y0 + 0.5, Math.max(0, Math.round(w) - 1), h0 - 1);
+  ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 0.5, y0 + 0.5, Math.max(0, Math.round(w) - 1), h0 - 1);   // Live: a faint edge, no heavy outline
   if (isSel && !c.muted) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.strokeRect(Math.round(x) + 1.5, y0 + 1.5, Math.max(0, Math.round(w) - 3), h0 - 3); }   // selected: a light inner edge
   if (tall && w > 18) {
     ctx.fillStyle = ink(col); ctx.font = FONT(500, 10); ctx.textBaseline = 'middle';   // Live: clip names regular weight
@@ -358,7 +353,7 @@ function draw() {
   const light = currentTone() === 'light', INK = light ? '0,0,0' : '255,255,255', GI = 0.4 + 1.2 * (prefs.gridInt == null ? 0.5 : prefs.gridInt), line = (a) => `rgba(${INK},${Math.min(0.6, a * GI).toFixed(3)})`;
   ctx.fillStyle = light ? 'rgba(0,0,0,.04)' : 'rgba(0,0,0,.12)';
   for (let b = Math.floor(Math.max(0, P.barAt(view.x0)) / kb) * kb; tx(P.barStart(b)) < CW; b += kb) { if ((b / kb) & 1) { const x0 = tx(P.barStart(b)), x1 = tx(P.barStart(b + kb)); ctx.fillRect(x0, RULER, x1 - x0, gy1 - RULER); } }
-  const tEnd = view.x0 + CW / view.ppt + g, sub = line(light ? 0.05 : 0.035), beat = line(light ? 0.09 : 0.065);
+  const tEnd = view.x0 + CW / view.ppt + g, sub = line(light ? 0.05 : 0.05), beat = line(light ? 0.09 : 0.10);
   eachGrid(view.x0 - g, tEnd, g, (t, j) => {
     const x = Math.round(tx(t));
     if (x < 0 || x > CW) return;
@@ -367,7 +362,7 @@ function draw() {
     ctx.fillStyle = r % P.MM.bt[j] === 0 ? beat : sub;
     ctx.fillRect(x, RULER, 1, gy1 - RULER);
   });
-  const barL = line(light ? 0.14 : 0.10), grpL = line(light ? 0.24 : 0.19);
+  const barL = line(light ? 0.14 : 0.15), grpL = line(light ? 0.24 : 0.26);   // Live's dark grid reads clearly (refs/live12/058)
   for (let b = Math.max(0, P.barAt(view.x0)); tx(P.barStart(b)) < CW; b++) { const x = Math.round(tx(P.barStart(b))); if (x >= 0) { ctx.fillStyle = b % kb ? barL : grpL; ctx.fillRect(x, RULER, 1, gy1 - RULER); } }
   if (P.state.sigs.length) { ctx.fillStyle = 'rgba(255,167,34,.3)'; for (const c of P.state.sigs) { const x = Math.round(tx(P.barStart(c.bar))); if (x >= 0 && x <= CW) ctx.fillRect(x, RULER, 1, gy1 - RULER); } }
   for (const m of state.markers) { const x = Math.round(tx(m.t)); if (x < 0 || x > CW) continue; ctx.fillStyle = C('#0e0e10'); ctx.fillRect(x, RULER, 1, gy1 - RULER); }   // Live: a dark line down from every locator
@@ -699,7 +694,7 @@ function drawHeads() {
     }
     if (r.vol) drawSlider(r.vol, Math.sqrt(clamp(t.vol / VMAX, 0, 1)), dbTxt(t.vol) + ' dB', false);
     if (r.pan) drawSlider(r.pan, (clamp(t.pan, -1, 1) + 1) / 2, panTxt(t.pan), true);
-    for (const [k, rc] of [[0, r.sa], [1, r.sb]]) if (rc) { const v = (t.send && t.send[k]) || 0; drawSlider(rc, v, 'AB'[k] + ' ' + dbTxt(v), false); }   // Live: sends in dB, -inf at zero
+    for (const [k, rc] of [[0, r.sa], [1, r.sb]]) if (rc) { const v = (t.send && t.send[k]) || 0; drawSlider(rc, v, dbTxt(v), false); }   // Live: the sends as bare dB values (-inf at zero), A over B by position
     if (r.hm) {                                                                            // folded row: horizontal meter well (two thin lanes, L over R)
       ctx.fillStyle = C('#161617'); ctx.fillRect(r.hm.x, r.hm.y, r.hm.w, r.hm.h);
       const lh = Math.max(1.5, (r.hm.h - 3) / 2); ctx.fillStyle = C('#101011'); ctx.fillRect(r.hm.x + 2, r.hm.y + 1, r.hm.w - 4, lh); ctx.fillRect(r.hm.x + 2, r.hm.y + 2 + lh, r.hm.w - 4, lh);
