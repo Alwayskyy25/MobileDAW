@@ -16,8 +16,8 @@ const LIB = {
   medc:     { name: 'Dark Neutral Medium Contrast', base: 'dark', a: 10, b: 0.98 },
   // Live 12's default dark theme (refs/live12-official 01-03): the greys a little lighter and cool - lanes about #2c2e35, panels #23252a
   // Live 12's light theme (refs/live12-official 04): cool greys - lanes / ruler / header #a1a5ae, the alternate bands #989ca5
-  live12light: { name: 'Light (Live 12)', base: 'light', a: -33, b: 1.0, tint: [0, 4, 13], over: { '--line': '#3a3c43', '--sep': '#55585f', '--tb-bg': '#7d818d', '--tb-fld': '#a1a5ae', '--hd-bg': '#a1a5ae', '--hd-bgsel': '#b4b8c1', '--hd-fld': '#d2d4da', '--hd-ink': '#0f1014', '--hd-ink2': '#0f1014', '--hd-bd': '#3a3c43', '--hd-line': '#3a3c43', '--hd-well': '#e1e2e7', '--hd-vol': '#05c9d9', '--hd-vink': '#0f1014', '--hd-mw': '#a1a5ae', '--hd-mb': '#3a3c43', '--tb-line': '#3a3c43', '--tb-ico': '#0f1014' } },
-  live12:   { name: 'Dark (Live 12)', base: 'dark', a: 10, b: 0.96, tint: [-2, 0, 12], over: { '--tb-bg': '#272a33', '--tb-fld': '#333541', '--tb-line': '#1c1e25', '--tb-ico': '#d4d5db' } },   // lanes / ruler #323440 as sampled from refs/live12-official/02
+  live12light: { name: 'Light (Live 12)', base: 'light', a: -33, b: 1.0, tint: [0, 4, 13], over: { '--line': '#3a3c43', '--sep': '#55585f', '--tb-bg': '#7d818d', '--tb-fld': '#a1a5ae', '--hd-bg': '#a1a5ae', '--hd-bgsel': '#b4b8c1', '--hd-fld': '#d2d4da', '--hd-ink': '#0f1014', '--hd-ink2': '#0f1014', '--hd-bd': '#3a3c43', '--hd-line': '#3a3c43', '--hd-well': '#e1e2e7', '--hd-vol': '#05c9d9', '--hd-vink': '#0f1014', '--hd-mw': '#a1a5ae', '--hd-mb': '#3a3c43', '--tb-line': '#3a3c43', '--tb-ico': '#0f1014', '--btn-bd': '#3a3c43' } },
+  live12:   { name: 'Dark (Live 12)', base: 'dark', a: 10, b: 0.96, tint: [-2, 0, 12], over: { '--tb-bg': '#272a33', '--tb-fld': '#333541', '--tb-line': '#1c1e25', '--tb-ico': '#d4d5db', '--btn-bd': '#16171c' } },   // lanes / ruler #323440 as sampled from refs/live12-official/02
   lightmc:  { name: 'Light Neutral Medium Contrast', base: 'light', a: -26, b: 1.04 },
   lightlc:  { name: 'Light Neutral Low Contrast', base: 'light', a: -8, b: 0.86 },
   midlight: { name: 'Mid Light',                base: 'light', a: -42, b: 1.0 },
@@ -29,7 +29,7 @@ const LIB = {
   ableton:  { name: 'Light (Ableton Live)',  base: 'light', a: -33, b: 1.0, tint: [0, 4, 13], over: {
     '--lv-title': '#bbbbc5', '--lv-body': '#a1a5ae', '--lv-well': '#21252e', '--lv-ctl': '#b9bcc5', '--lv-ctl2': '#c6c9d1', '--lv-ink': '#0f1014', '--lv-dim': '#2e3038', '--lv-edge': '#7d818d',
     '--lv-trk': '#4e525c', '--lv-div': '#7d818d', '--lv-arc': '#05c9d9', '--lv-or': '#fdb443', '--lv-orink': '#1a1100', '--dim': '#2e3038', '--text': '#0f1014',
-    '--menu': '#dedfe3', '--tb-bg': '#7d818d', '--tb-fld': '#a1a5ae', '--line': '#3a3c43', '--sep': '#55585f', '--hd-bg': '#a1a5ae', '--hd-bgsel': '#b4b8c1', '--hd-fld': '#d2d4da', '--hd-ink': '#0f1014', '--hd-ink2': '#0f1014', '--hd-bd': '#3a3c43', '--hd-line': '#3a3c43', '--hd-well': '#e1e2e7', '--hd-vol': '#05c9d9', '--hd-vink': '#0f1014', '--hd-mw': '#a1a5ae', '--hd-mb': '#3a3c43', '--tb-line': '#3a3c43', '--tb-ico': '#0f1014' } },
+    '--menu': '#dedfe3', '--tb-bg': '#7d818d', '--tb-fld': '#a1a5ae', '--line': '#3a3c43', '--sep': '#55585f', '--hd-bg': '#a1a5ae', '--hd-bgsel': '#b4b8c1', '--hd-fld': '#d2d4da', '--hd-ink': '#0f1014', '--hd-ink2': '#0f1014', '--hd-bd': '#3a3c43', '--hd-line': '#3a3c43', '--hd-well': '#e1e2e7', '--hd-vol': '#05c9d9', '--hd-vink': '#0f1014', '--hd-mw': '#a1a5ae', '--hd-mb': '#3a3c43', '--tb-line': '#3a3c43', '--tb-ico': '#0f1014', '--btn-bd': '#3a3c43' } },
 };
 const grey = (hex) => { const h = hex.slice(1, 7), [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); return Math.max(r, g, b) - Math.min(r, g, b) < 14 ? (r + g + b) / 3 : -1; };
 for (const [id, t] of Object.entries(LIB)) {
