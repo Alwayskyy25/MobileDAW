@@ -110,7 +110,7 @@ export function parseFlm(buf, onProgress) {
     const clip = { pos: pos / 128, len: f64(h.a), cycle: f64(h.a + 8), offset: f64(h.a + 16), id: i32(h.a + 24), srcLen: f64(h.a + 28), muted: h.n > 36 && u[h.a + 36] === 1, events: [] };
     if (!(clip.len > 0)) { clip.len = clip.srcLen > 0 ? clip.srcLen : clip.cycle > 0 ? clip.cycle : 4; clip.lenFromCycle = true; }   // never resized (Honeydew lane.rs visible_ticks): the source length, else the loop length
     const e = one(ck, 'EVN2') || (() => { const v = one(ck, 'EVNT'); return v ? { a: v.a - 2, n: v.n + 2, legacy: true } : null; })();   // EVNT (legacy): no record size, 20-byte records
-    if (e && e.n >= 2) { const rs = e.legacy ? 20 : u16(e.a); if (rs >= 20) for (let p = e.a + 2; p + rs <= e.a + e.n; p += rs) clip.events.push({ t: u32(p) / 128, len: f64(p + 4), pitch: Math.max(0, Math.min(255, dv.getInt16(p + 12, true))),   /* Honeydew decode_events: i16 key, clamped (notes 0..127, pads 0..255) */ vel8: dv.getUint8(p + 14), pan8: dv.getUint8(p + 15), vel: u16(p + 16), value: u16(p + 16), repeat: dv.getInt8(p + 18), slide: u[p + 19] !== 0, flags: u16(p + 18) }); }
+    if (e && e.n >= 2) { const rs = e.legacy ? 20 : u16(e.a); if (rs >= 20) for (let p = e.a + 2; p + rs <= e.a + e.n; p += rs) clip.events.push({ t: u32(p) / 128, len: f64(p + 4), pitch: Math.max(0, Math.min(255, dv.getInt16(p + 12, true))), key: dv.getInt16(p + 12, true),   /* Honeydew decode_events: i16 key, clamped for notes / pads; audio envelopes use |key| - 1 */ vel8: dv.getUint8(p + 14), pan8: dv.getUint8(p + 15), vel: u16(p + 16), value: u16(p + 16), repeat: dv.getInt8(p + 18), slide: u[p + 19] !== 0, flags: u16(p + 18) }); }
     const sm = one(ck, 'CLSm');
     if (sm) {
       const sk = kids(sm), stc = one(sk, 'STRC'), pm = one(sk, 'PRMS'), main = one(sk, 'MAIN');
@@ -186,7 +186,7 @@ export function flmGain(v) { if (!(v > 0)) return 0; const db = 66 * Math.pow(v,
 export function clipEnvs(events) {
   const o = {}, lv = [], pn = []; let sp = 0;
   for (const e of events || []) {
-    const k = e.pitch > 32767 ? e.pitch - 65536 : e.pitch, p = Math.abs(k) - 1, v = e.value / 65535;
+    const k = e.key != null ? e.key : e.pitch > 32767 ? e.pitch - 65536 : e.pitch, p = Math.abs(k) - 1, v = e.value / 65535;
     if (p === 0) lv.push([e.t, flmGain(v)]); else if (p === 1) pn.push([e.t, v * 2 - 1]); else if (p === 2) sp++;
   }
   const srt = (a) => a.sort((x, y) => x[0] - y[0]);
