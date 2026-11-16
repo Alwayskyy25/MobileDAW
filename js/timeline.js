@@ -862,17 +862,18 @@ function handleHit(x, y) {
   if (s.start && zone(s.start, Math.min(HU, (s.x1 - s.x0) / 3), s.start.h)) return hit('left');
   return null;
 }
-const SHOW_HANDLES = false;   // owner (2026-11-16): the resize capsules and the stretch bar stay invisible; their touch zones still work
+// The handles drawn simply (owner, 2026-11-16: Honeydew's logic, not its look): a thin bar on each edge of the selected clip (start / end:
+// drag = trim / length) and, under an audio clip that does not loop, a small flat tab with a double arrow at its right end (drag = stretch).
+// The touch zones stay Honeydew's (selHandles / handleHit), larger than what is drawn.
 function drawHandles() {
-  if (!SHOW_HANDLES) return;
   const s = selHandles(); if (!s) return;
-  const light = currentTone() === 'light', frame = light ? 'rgba(20,20,24,.3)' : 'rgba(240,240,244,.3)', grip = light ? 'rgba(20,20,24,.7)' : 'rgba(240,240,244,.7)';
-  const pill = (r) => { ctx.fillStyle = frame; ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, r.w / 2); ctx.fill();
-    const gw = Math.max(2, r.w * 0.18 * 2), gh = r.h * 0.44; ctx.fillStyle = grip; ctx.beginPath(); ctx.roundRect(r.x + r.w / 2 - gw / 2, r.y + r.h / 2 - gh / 2, gw, gh, gw / 2); ctx.fill(); };
+  const ink = 'rgba(255,255,255,.9)', y0 = s.end.y, hh = s.end.h, st = drag && drag.k === 'stretch';
   ctx.save(); ctx.beginPath(); ctx.rect(0, RULER, CW, LANE_B() - RULER); ctx.clip();
-  if (s.start) pill(s.start); pill(s.end);
-  if (s.scale) { const r = s.scale, a = drag && drag.k === 'stretch'; ctx.fillStyle = a ? T('--accent') : frame; ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 3); ctx.fill();
-    ctx.strokeStyle = a ? '#15151a' : grip; ctx.lineWidth = 1.4; const cy = r.y + r.h / 2, l = r.x + 5, rr = r.x + r.w - 5; ctx.beginPath(); ctx.moveTo(l, cy); ctx.lineTo(rr, cy); ctx.moveTo(l + 3, cy - 3); ctx.lineTo(l, cy); ctx.lineTo(l + 3, cy + 3); ctx.moveTo(rr - 3, cy - 3); ctx.lineTo(rr, cy); ctx.lineTo(rr - 3, cy + 3); ctx.stroke(); }   // ↔
+  ctx.fillStyle = ink; ctx.fillRect(Math.round(s.x1) - 3, y0, 2, hh); if (s.start) ctx.fillRect(Math.round(s.x0) + 1, y0, 2, hh);
+  if (s.scale) { const w = 18, h2 = 9, x = Math.round(s.x1) - w, y = Math.round(s.y1) + 2;
+    ctx.fillStyle = st ? T('--accent') : 'rgba(0,0,0,.55)'; ctx.fillRect(x, y, w, h2);
+    ctx.strokeStyle = st ? '#15151a' : ink; ctx.lineWidth = 1; const cy = y + h2 / 2 + 0.5; ctx.beginPath(); ctx.moveTo(x + 4, cy); ctx.lineTo(x + w - 4, cy);
+    ctx.moveTo(x + 6.5, cy - 2.5); ctx.lineTo(x + 4, cy); ctx.lineTo(x + 6.5, cy + 2.5); ctx.moveTo(x + w - 6.5, cy - 2.5); ctx.lineTo(x + w - 4, cy); ctx.lineTo(x + w - 6.5, cy + 2.5); ctx.stroke(); }
   ctx.restore();
 }
 function hit(x, y) {
