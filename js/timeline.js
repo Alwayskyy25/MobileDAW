@@ -147,7 +147,7 @@ function hdr(i) {
   // Live 12's arrangement track controls (refs/live12/058): three columns - half / quarter / quarter of the width. Row 1 = track activator (the
   // number) | Solo | Arm, row 2 = volume | pan, row 3 = send A | send B as bare values. No automation button and no output field in the header
   // (Live keeps them in the menus: the header's menu has Output... and the automation lanes). Small fixed controls (15 px), never growing.
-  const sends = state.returns.length >= 2, gap = 2, fs = 10, CH = 15; r.fs = fs;
+  const sends = state.returns.length >= 2, gap = 2, fs = 9.5, CH = 14; r.fs = fs;   // Live: compact 14 px fields
   const ys = [0, 1, 2].map((k) => y + 3 + k * (CH + gap)), fits = (k) => h >= ys[k] - y + CH + 3;
   const A = Math.round((R - L - gp * 2) * 0.5), Q = Math.floor((R - L - gp * 2 - A) / 2), xB = L + A + gp, xC = xB + Q + gp;
   r.mute = { x: L, y: ys[0], w: auto ? Math.min(R - L, A + 14) : A, h: CH, fs };
@@ -220,8 +220,10 @@ const contentInk = (hex) => (ink(hex).startsWith('rgba(14') ? 'rgba(10,10,12,.86
 function drawClip(t, c, y, hh) {
   if (t.fold && t.kind !== 'auto') {                                         // Live: a folded track shows its clips as a thin band in their colour
     const g0 = gl.get(c.id), x = tx(g0 ? g0.s : c.start), w = (g0 ? g0.l : c.len) * view.ppt; if (x > CW || x + w < 0) return;
-    const by = Math.round(y + hh / 2 - 3); ctx.fillStyle = c.muted ? '#8a8a8f' : tone(t.color); ctx.fillRect(x, by, w, 6);
-    if (state.sel.clip === c.id || msel.has(c.id)) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 0.5, by - 0.5, Math.max(1, Math.round(w) - 1), 7); }
+    const col = c.muted ? '#8a8a8f' : tone(t.color), by = y + 1, bh2 = hh - 2;   // Live 12 (refs/live12-official 04): the folded row is filled by the clip colour, "..." at its start
+    ctx.fillStyle = col; ctx.fillRect(x, by, w, bh2);
+    if (w > 16) { ctx.fillStyle = ink(col); ctx.font = FONT(700, 10); ctx.textBaseline = 'middle'; ctx.fillText('...', Math.max(x, 0) + 4, by + bh2 / 2); }
+    if (state.sel.clip === c.id || msel.has(c.id)) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 1.5, by + 0.5, Math.max(1, Math.round(w) - 3), bh2 - 1); }
     return; }
   { const tc = tone(t.color); if (tc !== t.color) t = { __proto__: t, color: tc }; }   // Color Intensity / Hue of the theme reach the clip colours
   const g = gl.get(c.id), cs = g ? g.s : c.start, cl = g ? g.l : c.len;

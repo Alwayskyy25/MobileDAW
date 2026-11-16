@@ -15,6 +15,8 @@ const LIB = {
   highc:    { name: 'Dark Neutral High Contrast', base: 'dark', a: -8, b: 1.14 },
   medc:     { name: 'Dark Neutral Medium Contrast', base: 'dark', a: 10, b: 0.98 },
   // Live 12's default dark theme (refs/live12-official 01-03): the greys a little lighter and cool - lanes about #2c2e35, panels #23252a
+  // Live 12's light theme (refs/live12-official 04): cool greys - lanes / ruler / header #a1a5ae, the alternate bands #989ca5
+  live12light: { name: 'Light (Live 12)', base: 'light', a: -33, b: 1.0, tint: [0, 4, 13] },
   live12:   { name: 'Dark (Live 12)', base: 'dark', a: 10, b: 0.96, tint: [-2, 0, 12] },   // lanes / ruler #323440 as sampled from refs/live12-official/02
   lightmc:  { name: 'Light Neutral Medium Contrast', base: 'light', a: -26, b: 1.04 },
   lightlc:  { name: 'Light Neutral Low Contrast', base: 'light', a: -8, b: 0.86 },
@@ -40,8 +42,8 @@ for (const [id, t] of Object.entries(LIB)) {
 }
 // the Light theme IS the Ableton Live reference palette (owner's request: 'pakai tema light'); the derived Mid Light / High Contrast themes were built from the old values above
 THEMES.light = THEMES.ableton; delete THEMES.ableton;
-export const THEME_TONE = { light: 'light', midlight: 'light', lighthc: 'light', lightmc: 'light', lightlc: 'light' };
-export const THEME_NAMES = { dark: 'Dark', middark: 'Mid Dark', lowc: 'Dark Neutral Low Contrast', live12: 'Dark (Live 12)', medc: 'Dark Neutral Medium Contrast', highc: 'Dark Neutral High Contrast', live: 'Live Classic', black: 'Darkest (OLED)', midlight: 'Mid Light', light: 'Light (Ableton Live)', lightmc: 'Light Neutral Medium Contrast', lightlc: 'Light Neutral Low Contrast', lighthc: 'Light Neutral High Contrast' };
+export const THEME_TONE = { live12light: 'light', light: 'light', midlight: 'light', lighthc: 'light', lightmc: 'light', lightlc: 'light' };
+export const THEME_NAMES = { dark: 'Dark', middark: 'Mid Dark', lowc: 'Dark Neutral Low Contrast', live12: 'Dark (Live 12)', live12light: 'Light (Live 12)', medc: 'Dark Neutral Medium Contrast', highc: 'Dark Neutral High Contrast', live: 'Live Classic', black: 'Darkest (OLED)', midlight: 'Mid Light', light: 'Light (Ableton Live)', lightmc: 'Light Neutral Medium Contrast', lightlc: 'Light Neutral Low Contrast', lighthc: 'Light Neutral High Contrast' };
 // swatches for the theme picker: background, panel, control, text
 export const themeSwatch = (id) => { const t = THEMES[id] || THEMES.dark; return [t['--bg'], t['--panel2'], t['--raise2'], t['--text']]; };
 // ---- Live 12's theme adjustments (Settings -> Tema): every theme can be shifted without making a new one.

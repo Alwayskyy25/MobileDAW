@@ -101,7 +101,7 @@ ok(await ev(async () => { const T = await import('./js/timeline.js'); T.setHeadW
 {
   await ev(async () => { const P = await import('./js/project.js'); P.state.tracks[0].hx = 3; P.state.tracks[0].fold = false; P.emit('all'); }); await wait(500);
   const q = await hd(0); ok(q.h > 160, `row 0 is tall (${q.h.toFixed(0)} px)`);
-  const Lt = await ev(async () => (await import('./js/timeline.js')).headerLayout(0)); ok([Lt.mute, Lt.vol, Lt.sa].every((q) => q && q.h === 15) && Lt.sa.y - Lt.y < 60, 'tall row: controls keep Live\'s small fixed size at the top (sends on the third row)');
+  const Lt = await ev(async () => (await import('./js/timeline.js')).headerLayout(0)); ok([Lt.mute, Lt.vol, Lt.sa].every((q) => q && q.h === 14) && Lt.sa.y - Lt.y < 60, 'tall row: controls keep Live\'s small fixed size at the top (sends on the third row)');
   await ev(async () => { const P = await import('./js/project.js'); delete P.state.tracks[0].hx; P.emit('all'); }); await wait(300);
 }
 
@@ -109,7 +109,7 @@ ok(await ev(async () => { const T = await import('./js/timeline.js'); T.setHeadW
 {
   const L0 = await ev(async () => { const T = await import('./js/timeline.js'); return T.headerLayout(0); });
   ok(L0.sa && L0.sa.y + L0.sa.h <= L0.y + L0.h - 3 && L0.sb.y === L0.sa.y && L0.vol.w === L0.mute.w && L0.sa.w === L0.mute.w, `default row: Live's three rows (activator | S | arm, volume | pan, send A | send B), the sends clear of the separator (end ${L0.sa.y + L0.sa.h - L0.y} of ${L0.h} px)`);
-  ok([L0.mute, L0.solo, L0.arm, L0.vol, L0.pan, L0.sa, L0.sb].every((q) => q && q.h === 15), 'all header controls (buttons, faders, sends) are the same height');
+  ok([L0.mute, L0.solo, L0.arm, L0.vol, L0.pan, L0.sa, L0.sb].every((q) => q && q.h === 14), 'all header controls (buttons, faders, sends) are the same height');
 }
 
 // ---- folded row: the level meter lies flat next to M / S / arm (open rows keep the vertical meter at the right edge)
