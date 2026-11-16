@@ -24,7 +24,8 @@ const geo = await page.evaluate(async () => {
   for (const c of TU.CHAPTERS) {
     TU.startTutorial(c.id);
     for (let k = 0; k < c.steps.length; k++) {
-      await wait(260);
+      await wait(260); for (let q = 0; q < 200 && document.querySelector('.tut-card.busy'); q++) await wait(100);   // a step that prepares something (the showcase opens its song)
+      await wait(80);
       const ring = document.querySelector('.tut-ring'), card = document.querySelector('.tut-card'), s = c.steps[k];
       const rr = ring && ring.style.display !== 'none' ? ring.getBoundingClientRect() : null, cr = card.getBoundingClientRect();
       const inView = (r) => r.left >= -1 && r.top >= -1 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1;
@@ -41,7 +42,7 @@ const geo = await page.evaluate(async () => {
   return out;
 });
 const missing = geo.filter((g) => g.wantsTarget && !g.spot), outside = geo.filter((g) => !g.spotIn || !g.cardIn), covered = geo.filter((g) => g.cover > 0.35);
-ok(geo.length >= 45, 'the tutorial has ' + geo.length + ' steps in ' + new Set(geo.map((g) => g.ch)).size + ' chapters');
+ok(geo.length >= 60, 'the tutorial has ' + geo.length + ' steps in ' + new Set(geo.map((g) => g.ch)).size + ' chapters');
 ok(!missing.length, 'every step finds its control on screen' + (missing.length ? ': missing ' + missing.map((g) => g.ch + '#' + g.k + ' ' + g.t).join(', ') : ''));
 ok(!outside.length, 'spotlight and card inside the screen' + (outside.length ? ': ' + outside.map((g) => g.ch + '#' + g.k).join(', ') : ''));
 ok(!covered.length, 'the card never hides the control it explains' + (covered.length ? ': ' + covered.map((g) => g.ch + '#' + g.k + ' ' + g.cover).join(', ') : ''));
@@ -68,9 +69,9 @@ await page.click('[data-view="mix"]'); const a4 = await waitTitle('Mixer');
 if (shots) await page.screenshot({ path: path.join(root, 'docs/redesign/tutorial/03-mixer.png') });
 await next(); await page.click('[data-view="arr"]'); const a5 = await waitTitle('Menu proyek');
 ok(a4 && a5, 'Mixer and back to Arrange as practice steps');
-await page.evaluate(() => [...document.querySelectorAll('.tut-card .b')].find((x) => x.textContent === 'Kembali').click()); await page.waitForTimeout(200);
+await page.evaluate(() => [...document.querySelectorAll('.tut-card .b')].find((x) => /Kembali/.test(x.textContent)).click()); await page.waitForTimeout(200);
 ok((await title()) === 'Kembali ke Arrange', 'Kembali goes one step back');
-await page.evaluate(() => [...document.querySelectorAll('.tut-card .b')].find((x) => x.textContent === 'Tutup').click()); await page.waitForTimeout(200);
+await page.evaluate(() => [...document.querySelectorAll('.tut-card .b')].find((x) => x.textContent === 'Tutup').click()); await page.waitForTimeout(450);   // it fades out
 ok(!(await page.$('.tut')), 'Tutup closes the tutorial');
 // the beat exercise
 await page.evaluate(async () => { const P = await import('./js/project.js'); P.newProject(false); (await import('./js/tutorial.js')).startTutorial('beat'); }); await page.waitForTimeout(300);
@@ -91,13 +92,36 @@ await page.evaluate(async () => { const P = await import('./js/project.js'); con
 const b4 = await waitTitle('5. Putar');
 ok(n0 >= 0 && b1 && b2 && b3 && b4, `beat exercise: + Track -> Drum (${b1}), double tap the lane = clip (${b2}), double tap the clip = step editor (${b3}), steps placed (${b4})`);
 await page.evaluate(async () => { (await import('./js/tutorial.js')).stopTutorial(); const { eng } = await import('./js/engine.js'); eng.stop && eng.stop(); });
+// 2b. the showcase: the song opens, its sections play from the live map, the card explains with tips, the finger shows the gesture
+await page.evaluate(async () => { const P = await import('./js/project.js'); P.newProject(false); (await import('./js/tutorial.js')).startTutorial('show', true); }); await page.waitForTimeout(500);
+const s0 = await page.evaluate(() => ({ splash: !!document.querySelector('.tut-card .tut-splash'), tips: document.querySelectorAll('.tut-card .tut-tips li').length, prog: !!document.querySelector('.tut-prog i') }));
+if (shots) await page.screenshot({ path: path.join(root, 'docs/redesign/tutorial/06-showcase-intro.png') });
+await next(); for (let q = 0; q < 300 && await page.evaluate(() => !!document.querySelector('.tut-card.busy')); q++) await page.waitForTimeout(100);
+const s1 = await page.evaluate(async () => { const P = await import('./js/project.js'); return { name: P.state.projectName, tracks: P.state.tracks.map((t) => t.name), markers: P.state.markers.length, bpm: P.state.bpm }; });
+ok(s0.splash && s0.tips >= 3 && s0.prog && /Neon Horizon/.test(s1.name) && s1.markers === 7 && s1.bpm === 128 && ['Kick', 'Drums', 'Bass', 'Pluck Arp', 'Pad', 'Lead', 'Riser'].every((n) => s1.tracks.includes(n)),
+  'showcase: chapter splash + tips + progress; "Neon Horizon" opens (128 BPM, 7 markers, ' + s1.tracks.length + ' tracks)');
+await next(); await page.waitForTimeout(400);                        // "Dengarkan dulu": live map + play buttons
+await page.evaluate(() => [...document.querySelectorAll('.tut-xacts .b')].find((x) => /Drop/.test(x.textContent)).click());
+await page.waitForTimeout(1600);
+const s2 = await page.evaluate(async () => { const P = await import('./js/project.js'); const on = document.querySelector('.tut-seg.on'); return { segs: document.querySelectorAll('.tut-seg').length, on: on && on.textContent, playing: P.state.playing, bar: Math.floor(P.state.pos / 3840) + 1, now: (document.querySelector('.tut-now b') || {}).textContent }; });
+if (shots) await page.screenshot({ path: path.join(root, 'docs/redesign/tutorial/07-showcase-live.png') });
+ok(s2.segs === 7 && s2.playing && s2.bar >= 33 && s2.on === 'Drop' && /Drop/.test(s2.now || ''), 'live map: 7 sections, "Ke Drop" plays from bar 33 and the Drop section lights up (' + JSON.stringify(s2) + ')');
+await next(); await page.waitForTimeout(500);                        // marker step: a finger shows the tap
+const s3 = await page.evaluate(() => { const g = document.querySelector('.tut-g'); return { finger: g && g.style.display === 'block' && g.classList.contains('tap') }; });
+ok(s3.finger, 'an animated finger shows the gesture on the spotlit control');
+for (let k = 0; k < 3; k++) { await next(); for (let q = 0; q < 50 && await page.evaluate(() => !!document.querySelector('.tut-card.busy')); q++) await page.waitForTimeout(100); }
+await page.waitForTimeout(500);
+const s4 = await page.evaluate(async () => { const P = await import('./js/project.js'); const r = document.querySelector('.tut-ring').getBoundingClientRect(); const c = [...document.querySelectorAll('#dbody .card')].find((x) => x.textContent.slice(0, 80).includes('Autoduck')); const cr = c && c.getBoundingClientRect(); return { title: document.querySelector('.tut-card h4').textContent, sel: P.state.tracks[P.state.sel.track].name, onCard: !!(cr && Math.abs(cr.left - r.left) < 12 && Math.abs(cr.top - r.top) < 12) }; });
+if (shots) await page.screenshot({ path: path.join(root, 'docs/redesign/tutorial/08-showcase-sidechain.png') });
+ok(/sidechain/.test(s4.title) && s4.sel === 'Bass' && s4.onCard, 'sidechain step: the Bass track selected, the spotlight on its Autoduck card (' + JSON.stringify(s4) + ')');
+await page.evaluate(async () => { (await import('./js/tutorial.js')).stopTutorial(); const P = await import('./js/project.js'); if (P.state.playing) P.togglePlay(); });
 // 3. the menu entry and the chapter list
 await page.click('#btn-menu'); await page.waitForTimeout(700);
 const item = await page.evaluate(() => { const it = [...document.querySelectorAll('#layer .mi')].find((x) => /Tutorial interaktif/.test(x.textContent)); if (!it) return false; it.click(); return true; });
 await page.waitForTimeout(400);
 const list = await page.evaluate(() => [...document.querySelectorAll('.tut-list .b')].map((x) => x.textContent));
 if (shots) await page.screenshot({ path: path.join(root, 'docs/redesign/tutorial/05-chapters.png') });
-ok(item && list.length === 5, 'Menu -> Tutorial interaktif lists the chapters: ' + list.join(' | '));
+ok(item && list.length === 6 && /Showcase/.test(list[0]), 'Menu -> Tutorial interaktif lists the showcase and the chapters: ' + list.map((x) => x.slice(0, 40)).join(' | '));
 ok(!errs.length, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
 await b.close(); server.close();
 console.log(bad ? `\n${bad} FAILED` : '\ntutorial-test: all passed'); process.exit(bad ? 1 : 0);

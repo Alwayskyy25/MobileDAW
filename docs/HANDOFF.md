@@ -842,3 +842,17 @@ Permintaan pemilik: SEMUA efek dan instrumen diganti dengan set stok Ableton Liv
   pengguna. Termasuk latihan membuat beat pertama. Dibuka dari Menu → Tutorial interaktif; ditawarkan sekali saat pertama kali dibuka
   (tidak saat diuji otomatis). Overlay diletakkan tepat sebelum #layer agar menu / dialog tetap di atasnya. `T.tutorialRects()` memberi
   posisi bagian arrangement (canvas). Tes: tools/tutorial-test.mjs (`--shots` → docs/redesign/tutorial/).
+
+## Tutorial showcase "Neon Horizon" + animasi tutorial (sesi 2026-11-16, lanjutan)
+- demos/progressive-house.mdaw: lagu progressive house asli 2:00 (128 BPM, F minor, 64 bar), dibuat oleh tools/make-proghouse.mjs lewat
+  API proyek di Chromium (`--render out.wav` untuk mixdown). Instrumen bawaan saja; sidechain Autoduck dari Kick ke Bass / Pluck / Pad;
+  otomasi Auto Filter pad, pitch riser, volume master; Reverb + Delay return; Glue + Limiter master. Level terukur (solo, RMS):
+  Kick -15, Lead -17, Pad -20, Bass -21, Pluck / Drums -27 dB; puncak mix -1,9 dBFS, tanpa clipping. Terdaftar di DEMOS (`neon-horizon`).
+- js/tutorial.js v2: bab "Showcase" (16 langkah) membuka demo itu dan membongkarnya sambil diputar: struktur + marker, kick, drum,
+  bass + sidechain, pluck + delay 3/16, pad + otomasi filter, lead, riser, return, master, latihan mute. Langkah bisa punya `acts`
+  (tombol: putar dari bagian, solo...), `tips` (Detail & tips), `gest` (jari animasi tap / dtap / hold / drag / swipe), `live` (peta lagu:
+  marker sebagai bagian berwarna, playhead mengikuti lagu, bagian aktif menyala, ketuk = lompat), `finale` (hujan konfeti), `pre` async.
+  Animasi: kartu masuk dengan spring + isi bertahap, spotlight meluncur dan berdenyut, splash bab dengan equalizer, progress bar, burst saat
+  latihan berhasil. Semua mati dengan prefers-reduced-motion. Kartu pindah ke samping target bila atas / bawah tidak muat.
+  `startTutorial(id, only)`; menu tutorial menampilkan showcase sebagai kartu utama. `T.revealRow()` menggulir lane / "+ Track" ke layar.
+- docs/redesign/tutorial/neon-horizon.mp3: render mixdown untuk didengar.

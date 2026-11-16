@@ -1227,6 +1227,13 @@ function clearSel() { if (!msel.size) return; msel.clear(); marq = null; updateB
 // canvas coordinates of a tick on track row i (UI tests drive real touches with it)
 // page rectangles of parts of the arrangement (the interactive tutorial, js/tutorial.js, spotlights them): the ruler, the clip area, the header
 // column, the "+ Track" button, and track i's header parts (title, mute, solo, arm, volume, pan, sends)
+// scrolls the arrangement vertically so row i (a track, or state.tracks.length + nX() = the "+ Track" row) is in view
+export function revealRow(i) {
+  if (!canvas) return; const LB = LANE_B(), y = rowY(i), hh = rh(i);
+  if (y < RULER) view.y0 += y - RULER - 4; else if (y + hh > LB) view.y0 += y + hh - LB + 8;
+  clampView(); invalidate();
+}
+export const addRowIndex = () => state.tracks.length + nX();
 export function tutorialRects(i = 0) {
   if (!canvas) return {};
   const o = canvasOrigin(), at = (r) => (r ? { left: o.left + r.x, top: o.top + r.y, width: r.w, height: r.h } : null), LB = LANE_B(), nn = state.tracks.length + nX();
