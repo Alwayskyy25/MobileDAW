@@ -98,7 +98,21 @@ for (const th of ['dark', 'light', 'midlight', 'live', 'lightlc', 'medc']) { awa
   await page.screenshot({ path: path.join(out, 'lock-envelopes-off.png') });
   await ev(async () => { const p = await import('./js/prefs.js'); p.prefs.lockEnv = true; }); await setup(); await page.waitForTimeout(400); await dragClip(); const b1 = await peakAt();
   await ev(async () => { const p = await import('./js/prefs.js'); p.prefs.lockEnv = false; });
+  await page.screenshot({ path: path.join(out, 'automation-over-clips.png') });   // Automation Mode: the lane's curve drawn over the track's clip
+  const red = await ev(async () => { const T = await import('./js/timeline.js'), P = await import('./js/project.js'); const c = document.querySelector('#arr canvas'), g = c.getContext('2d'), d = window.devicePixelRatio || 1, q = T.probe(6 * P.BAR, 0); let n = 0;
+    const im = g.getImageData(Math.round(q.x * d) - 40, Math.round(q.top * d), 80, Math.round((T.probe(0, 1).top - q.top) * d)).data; for (let k = 0; k < im.length; k += 4) if (im[k] > 220 && im[k + 1] < 110 && im[k + 2] < 110) n++; return n; });
+  ok(red > 20, `Automation Mode draws the track's automation over its clip in red (${red} red pixels around bar 6)`);
   ok(a1.start === 4 && a1.bar === a0.bar + 4 && b1.start === 4 && b1.bar === a0.bar, `Lock Envelopes off: clip bar ${a0.start} -> ${a1.start}, its automation peak bar ${a0.bar} -> ${a1.bar}; on: the peak stays at bar ${b1.bar}`); }
+// MIDI editor: Live 12's velocity tools - Ramp lines the velocities up from the first note to the last, Randomize moves each one
+{ await ev(async () => { const P = await import('./js/project.js'), T = await import('./js/timeline.js'); P.newProject(false); P.addTrack('midi');
+    const c = P.addClip(0, 0, 2 * P.BAR); for (let k = 0; k < 16; k++) c.notes.push({ t: k * 240, d: 200, p: 60 + (k % 8), v: 0.4 + 0.5 * ((k * 7) % 10) / 10 }); c.notes[15].v = 0.9; c.notes[0].v = 0.3;
+    P.clipChanged(0); P.selectClip(0, c.id); P.emit('all'); T.openEditor(); }); await page.waitForTimeout(800);
+  const vs = () => ev(async () => (await import('./js/project.js')).state.tracks[0].clips[0].notes.slice().sort((a, b) => a.t - b.t).map((n) => n.v));
+  await ev(() => [...document.querySelectorAll('button')].find((b) => b.textContent === 'Ramp').click()); await page.waitForTimeout(300); const r = await vs();
+  await page.screenshot({ path: path.join(out, 'editor-velocity.png') });
+  await ev(() => [...document.querySelectorAll('button')].find((b) => b.textContent === 'Randomize').click()); await page.waitForTimeout(300); const q = await vs();
+  ok(r.every((x, k) => k === 0 || x >= r[k - 1] - 1e-9) && Math.abs(r[0] - 0.3) < 1e-6 && Math.abs(r[15] - 0.9) < 1e-6 && q.filter((x, k) => Math.abs(x - r[k]) > 1e-3).length >= 12,
+    `MIDI editor velocity tools: Ramp ${Math.round(r[0] * 127)} -> ${Math.round(r[15] * 127)} in a line, Randomize moved ${q.filter((x, k) => Math.abs(x - r[k]) > 1e-3).length} of 16`); }
 ok(!errs.length, 'no page errors' + (errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''));
 await b.close(); server.close();
 console.log(bad ? `\narr-live-test: ${bad} FAILED` : '\narr-live-test: all passed'); process.exit(bad ? 1 : 0);

@@ -1239,6 +1239,18 @@ function toolbar() {
     B('Pilih semua', () => { sel = new Set(c.clip.notes); invalidate(); if (sel.size) noteBar(null, 80, RULER + 60); }), SEP(),
     B('Lane', () => { cfg.vel = !cfg.vel; clampV(cur().clip); invalidate(); toolbar(); }, cfg.vel),
   );
+  // Live 12's velocity tools (refs/live12/010): Randomize and Ramp, on the selected notes (all notes when none is selected)
+  if (cfg.vel && cfg.lane === 'vel') tools.append(SEP(), h('div', { class: 'ed-g' },
+    B('Randomize', () => velTool('rand')), B('Ramp', () => velTool('ramp'))));
+}
+// Randomize: every note's velocity moves by a random amount up to +-20 (of 127); Ramp: the velocities run in a straight line from the first note's
+// (in time) to the last note's. One undo step each.
+function velTool(kind) {
+  const c = cur(); if (!c) return; const ns = (sel.size ? [...sel] : [...c.clip.notes]).sort((a, b) => a.t - b.t || a.p - b.p); if (ns.length < (kind === 'ramp' ? 3 : 1)) { toast(kind === 'ramp' ? 'Ramp butuh minimal 3 not.' : 'Tidak ada not.', 1400); return; }
+  checkpoint();
+  if (kind === 'rand') for (const n of ns) n.v = clamp(n.v + (Math.random() * 2 - 1) * 20 / 127, 1 / 127, 1);
+  else { const a = ns[0], z = ns[ns.length - 1], t0 = a.t, span = Math.max(1, z.t - t0); for (const n of ns) n.v = clamp(a.v + (z.v - a.v) * (n.t - t0) / span, 1 / 127, 1); }
+  changed(); toast(kind === 'rand' ? `Velocity ${ns.length} not diacak (\u00b120).` : `Velocity ${ns.length} not dibuat ramp ${Math.round(ns[0].v * 127)} \u2192 ${Math.round(ns[ns.length - 1].v * 127)}.`, 1500);
 }
 
 function showCanvas(on) { canvas.style.display = ov.style.display = on ? '' : 'none'; }

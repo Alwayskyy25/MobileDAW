@@ -396,6 +396,26 @@ function draw() {
   // clips
   const first = Math.max(0, rowAt(RULER)), last = Math.min(n - 1, rowAt(LB));
   for (let i = first; i <= last; i++) for (const c of state.tracks[i].clips) { const b = laneBox(i, c); if (b.h < 2) continue; drawClip(state.tracks[i], c, b.y, b.h); }   // a clip of a sub-track sits in its row
+  // Automation Mode (Live, refs/live12/112-115): the track's automation drawn over its clips - a red line with its breakpoints, the parameter's
+  // name at the lane's top left. Display only: the curve is edited on its automation lane. The first visible lane of the track is shown.
+  if (autoMode()) for (let i = first; i <= last; i++) {
+    const t = state.tracks[i]; if (t.kind === 'auto' || t.fold) continue;
+    const sid = P.stripOf(i), lane = state.tracks.find((q) => q.kind === 'auto' && q.target && q.target.strip === sid && !q.mute && q.clips.some((c) => c.pts && c.pts.length)); if (!lane) continue;
+    const y0 = rowY(i) + 16, hh = rhMain(i) - 22; if (hh < 10) continue;
+    const yy = (v) => y0 + hh - clamp(v, 0, 1) * hh, cs = [...lane.clips].filter((c) => !c.muted && c.pts.length).sort((a, b) => a.start - b.start);
+    ctx.save(); ctx.beginPath(); ctx.rect(0, Math.max(RULER, rowY(i)), CW, Math.max(0, Math.min(LB, rowY(i) + rhMain(i)) - Math.max(RULER, rowY(i)))); ctx.clip();
+    ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.fillRect(0, rowY(i), CW, rhMain(i));                                      // Live dims the clips under the envelope
+    ctx.strokeStyle = '#ff4f45'; ctx.lineWidth = 1.6; ctx.beginPath(); let first2 = true, lastV = null;
+    for (const c of cs) { const pts = [...c.pts].sort((a, b) => a.t - b.t);
+      if (lastV != null) ctx.lineTo(tx(c.start), yy(lastV));
+      for (const [pt, pv] of densify(pts)) { const X = tx(c.start + pt), Y = yy(pv); if (first2) { ctx.moveTo(Math.min(X, 0), Y); first2 = false; } ctx.lineTo(X, Y); }
+      lastV = pts[pts.length - 1].v; }
+    if (lastV != null) ctx.lineTo(CW, yy(lastV)); ctx.stroke();
+    ctx.fillStyle = '#ff4f45'; for (const c of cs) for (const p of c.pts) { const X = tx(c.start + p.t); if (X > -4 && X < CW + 4) ctx.fillRect(Math.round(X) - 2, Math.round(yy(p.v)) - 2, 5, 5); }
+    const nm = String(lane.name || '').replace(/^Auto:\s*/, ''); ctx.font = FONT(600, 9); ctx.textBaseline = 'top'; const tw = ctx.measureText(nm).width;
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(4, rowY(i) + rhMain(i) - 15, tw + 8, 12); ctx.fillStyle = '#ff8a80'; ctx.fillText(nm, 8, rowY(i) + rhMain(i) - 14);
+    ctx.restore();
+  }
   if (sel) { const a = Math.max(0, tx(sel.a)), b = Math.min(CW, tx(sel.b)); ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fillRect(a, RULER, Math.max(0, b - a), gy1 - RULER); ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(Math.round(a), RULER, 1, gy1 - RULER); ctx.fillRect(Math.round(b), RULER, 1, gy1 - RULER); }   // Live: the selection is a white wash with bright edges
   if (marq) {
     const ax = tx(marq.t0), bx = tx(marq.t1), ay = RULER - view.y0 + marq.y0, by = RULER - view.y0 + marq.y1;
