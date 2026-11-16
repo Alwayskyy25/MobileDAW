@@ -358,13 +358,13 @@ function draw() {
     ctx.fillStyle = state.sel.track === i ? C('#333337') : state.tracks[i].kind === 'auto' ? C('#262628') : C('#2a2a2c'); ctx.fillRect(0, y, CW, h);   // automation lanes a shade darker (Live)
     const sn = subN(state.tracks[i]);
     if (sn) { const mh = rhMain(i), sh = SUBH(), L = P.subsOf(state.tracks[i]); for (let k = 0; k < sn; k++) { const sy = y + mh + k * sh; ctx.fillStyle = C('#262628'); ctx.fillRect(0, sy, CW, sh); if (L[k].mute) { ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(0, sy, CW, sh); } ctx.fillStyle = C('#1a1a1c'); ctx.fillRect(0, sy - 1, CW, 1); } }   // sub-track rows: a shade darker, a thin line above each
-    ctx.fillStyle = C('#141416'); ctx.fillRect(0, y + h - 1, CW, 1);                     // Live 12 (refs/live12-official): a thin dark line between tracks
+    ctx.fillStyle = HD('--hd-line', '#141416'); ctx.fillRect(0, y + h - 1, CW, 1);                     // Live 12 (refs/live12-official): a thin dark line between tracks
   }
   const xl = [];                                                                       // captions of the Master / effect lanes, drawn after the grid
   for (const i of visRows()) { if (i < n || i >= nn) continue;                          // Master / effect track rows: no clips, they only mix
     const y = rowY(i), h = rh(i), x = xInfo(i);
     ctx.fillStyle = state.sel.track === x.strip ? C('#2f2f33') : C('#252527'); ctx.fillRect(0, y, CW, h);   // theme background first, so the tint below is a real transparent wash in dark AND light themes
-     ctx.fillStyle = C('#141415'); ctx.fillRect(0, y + h - 1, CW, 1);
+     ctx.fillStyle = HD('--hd-line', '#141415'); ctx.fillRect(0, y + h - 1, CW, 1);
     const src = x.master ? state.tracks.filter((q) => q.kind !== 'auto' && !q.mute).length : state.tracks.filter((q) => q.out === x.k && !q.mute).length;
     xl.push({ y, h, t: `${src} track aktif → ${x.name}` });
   }
@@ -631,35 +631,37 @@ function foldTri(cx, cy, folded, col) {        // Live 12 fold toggle: a ring wi
   else { ctx.moveTo(cx - 3, cy - 1.5); ctx.lineTo(cx + 3, cy - 1.5); ctx.lineTo(cx, cy + 2.5); }
   ctx.closePath(); ctx.fill();
 }
+// header colours: a theme can set them exactly (--hd-* tokens, the light themes sampled from Live 12 light); otherwise the dark design mapped by C()
+const HD = (tok, dark) => T(tok) || C(dark);
 // header button: flat grey with a 1 px border when off, filled with its colour when on (activator yellow, solo blue, arm red)
 function drawBtn(r, label, on, col, quiet) {
-  if (quiet) { ctx.fillStyle = C('#3e3e43'); ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);   // quiet switch: only the text lights up (input monitoring is on by default)
-    ctx.fillStyle = on ? col : C('#8b8b92'); ctx.font = FONT(700, 10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(cut2(label, r.w - 2), r.x + r.w / 2, r.y + r.h / 2 + 0.5); ctx.textAlign = 'left'; return; }
-  ctx.fillStyle = on ? col : C('#3e3e43'); ctx.fillRect(r.x, r.y, r.w, r.h);
-  ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+  if (quiet) { ctx.fillStyle = HD('--hd-fld', '#3e3e43'); ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = HD('--hd-bd', '#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);   // quiet switch: only the text lights up (input monitoring is on by default)
+    ctx.fillStyle = on ? col : HD('--hd-ink2', '#8b8b92'); ctx.font = FONT(700, 10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(cut2(label, r.w - 2), r.x + r.w / 2, r.y + r.h / 2 + 0.5); ctx.textAlign = 'left'; return; }
+  ctx.fillStyle = on ? col : HD('--hd-fld', '#3e3e43'); ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.strokeStyle = HD('--hd-bd', '#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
   const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
-  if (label === 'arm') { ctx.fillStyle = on ? '#ffffff' : C('#8b8b92'); ctx.beginPath(); ctx.arc(cx, cy, Math.min(4.5, r.h / 2 - 3), 0, 6.2832); ctx.fill(); return; }
+  if (label === 'arm') { ctx.fillStyle = on ? '#ffffff' : HD('--hd-ink', '#8b8b92'); ctx.beginPath(); ctx.arc(cx, cy, Math.min(4.5, r.h / 2 - 3), 0, 6.2832); ctx.fill(); return; }
   if (label === 'aut') {                       // automation: a small breakpoint envelope
-    ctx.strokeStyle = on ? '#15151a' : C('#b4b4ba'); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(cx - 6, cy + 4); ctx.lineTo(cx - 2, cy - 3); ctx.lineTo(cx + 2, cy + 1); ctx.lineTo(cx + 6, cy - 4); ctx.stroke(); return;
+    ctx.strokeStyle = on ? '#15151a' : HD('--hd-ink', '#b4b4ba'); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(cx - 6, cy + 4); ctx.lineTo(cx - 2, cy - 3); ctx.lineTo(cx + 2, cy + 1); ctx.lineTo(cx + 6, cy - 4); ctx.stroke(); return;
   }
-  ctx.fillStyle = on ? '#15151a' : C('#c8c8cc'); ctx.font = FONT(700, r.fs || (r.h < 16 ? 9 : 10.5)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = on ? '#15151a' : HD('--hd-ink', '#c8c8cc'); ctx.font = FONT(700, r.fs || (r.h < 16 ? 9 : 10.5)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(cut2(label, r.w - 2), cx, cy + 0.5); ctx.textAlign = 'left';
 }
 // Live's header slider: a dark well, a grey fill up to the value (from the centre for pan) and the value written over it
 function drawSlider(r, frac, label, fromCenter) {
-  ctx.fillStyle = C('#19191a'); ctx.fillRect(r.x, r.y, r.w, r.h);
-  ctx.fillStyle = T('--lv-sel');
+  ctx.fillStyle = HD('--hd-well', '#19191a'); ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.fillStyle = T('--hd-vol') || T('--lv-sel');
   if (fromCenter) { const c = r.x + r.w / 2, e = r.x + frac * r.w; if (Math.abs(e - c) >= 1) ctx.fillRect(Math.min(c, e), r.y + 1, Math.abs(e - c), r.h - 2); }
   else ctx.fillRect(r.x + 1, r.y + 1, Math.max(0, frac * (r.w - 2)), r.h - 2);
-  ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+  ctx.strokeStyle = HD('--hd-bd', '#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
   ctx.font = FONT(700, r.fs || 9.5); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillStyle = C('#f2f2f4'); ctx.fillText(cut2(label, r.w - 4), r.x + r.w / 2, r.y + r.h / 2 + 0.5); ctx.textAlign = 'left';
+  ctx.fillStyle = HD('--hd-vink', '#f2f2f4'); ctx.fillText(cut2(label, r.w - 4), r.x + r.w / 2, r.y + r.h / 2 + 0.5); ctx.textAlign = 'left';
 }
 function drawSwitch(r, label, on, isPressed) {   // Live-style switch: LED + text in a flat field
-  ctx.fillStyle = isPressed ? C('#55555b') : C('#3a3a3e'); ctx.fillRect(r.x, r.y, r.w, r.h);
-  ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+  ctx.fillStyle = isPressed ? HD('--hd-bgsel', '#55555b') : HD('--hd-fld', '#3a3a3e'); ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.strokeStyle = HD('--hd-bd', '#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
   const ly = r.y + r.h / 2; ctx.fillStyle = on ? T('--accent') : C('#55555b'); ctx.beginPath(); ctx.arc(r.x + 10, ly, 3.5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = on ? C('#e0e0e4') : C('#8b8b92'); ctx.font = FONT(600, 10); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.fillStyle = on ? HD('--hd-ink', '#e0e0e4') : HD('--hd-ink2', '#8b8b92'); ctx.font = FONT(600, 10); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
   ctx.fillText(cut2(label, r.w - 24), r.x + r.w / 2 + 6, ly + 0.5); ctx.textAlign = 'left';
 }
 function drawSubHeads(i) {                     // sub-track rows of a track header: a slim colour edge, the name (Steps / Notes) and an activator
@@ -676,7 +678,7 @@ function drawSubHeads(i) {                     // sub-track rows of a track head
 }
 function drawHeads() {
   const hx = CW, n = state.tracks.length, LB = LANE_B();
-  ctx.fillStyle = C('#1f1f21'); ctx.fillRect(hx, 0, HEAD, H);
+  ctx.fillStyle = HD('--hd-bg', '#1f1f21'); ctx.fillRect(hx, 0, HEAD, H);
   ctx.save(); ctx.beginPath(); ctx.rect(hx, RULER, HEAD, LB - RULER); ctx.clip();
   const nn = n + nX(), lanes = new Set();
   for (const q of state.tracks) if (q.kind === 'auto' && q.target) lanes.add(q.target.strip);
@@ -685,14 +687,14 @@ function drawHeads() {
     if (i < n && subN(state.tracks[i])) drawSubHeads(i);
     if (i === nn) {                                                                          // "+" row: one wide button
       const r = { x: hx + 6, y: y + 8, w: HEAD - METW - 12, h: Math.min(28, h - 16) };
-      ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = C('#3c3c41'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
-      ctx.fillStyle = C('#b4b4ba'); ctx.font = FONT(600, 11); ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.fillText('+  Track', r.x + r.w / 2, r.y + r.h / 2 + 0.5); ctx.textAlign = 'left';
+      ctx.fillStyle = HD('--hd-bg', '#2c2c2f'); ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = HD('--hd-bd', '#3c3c41'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+      ctx.fillStyle = HD('--hd-ink', '#b4b4ba'); ctx.font = FONT(600, 11); ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.fillText('+  Track', r.x + r.w / 2, r.y + r.h / 2 + 0.5); ctx.textAlign = 'left';
       continue;
     }
-    const meterWell = () => { ctx.fillStyle = C('#161617'); ctx.fillRect(hx + HEAD - METW, y, METW, h - 1); ctx.fillStyle = C('#101011'); ctx.fillRect(hx + HEAD - METW + 2, y + 3, 2.5, h - 7); ctx.fillRect(hx + HEAD - METW + 5.5, y + 3, 2.5, h - 7); };
+    const meterWell = () => { ctx.fillStyle = HD('--hd-mw', '#161617'); ctx.fillRect(hx + HEAD - METW, y, METW, h - 1); ctx.fillStyle = HD('--hd-mb', '#101011'); ctx.fillRect(hx + HEAD - METW + 2, y + 3, 2.5, h - 7); ctx.fillRect(hx + HEAD - METW + 5.5, y + 3, 2.5, h - 7); };
     if (i >= n) {                                                                            // Master / effect track header
       const x = xInfo(i), on = state.sel.track === x.strip, fx = !x.master, rt = fx ? state.returns[x.k] : null, r = xhdr(i), nw = nameW(), ik = ink(x.color);
-      ctx.fillStyle = on ? C('#3a3a3e') : C('#2c2c2f'); ctx.fillRect(hx, y, HEAD, h - 1);
+      ctx.fillStyle = on ? HD('--hd-bgsel', '#3a3a3e') : HD('--hd-bg', '#2c2c2f'); ctx.fillRect(hx, y, HEAD, h - 1);
       ctx.fillStyle = x.color; ctx.fillRect(hx, y, nw, h - 1);                                           // the whole name block in the colour, as in Live
       ctx.fillStyle = ik; ctx.font = FONT(700, 11); ctx.textBaseline = 'middle'; ctx.fillText(cut2(x.name, nw - 14), hx + 8, y + (h - 1) / 2 + 0.5);   // thin row like Live's return / main tracks: name centred
       if (fx) drawBtn(r.act, x.k < 2 ? 'AB'[x.k] : 'F' + (x.k - 1), !rt.mute, T('--mute'));
@@ -701,16 +703,17 @@ function drawHeads() {
         if (vr - vx > 30) drawSlider({ x: vx, y: r.act.y, w: vr - vx, h: r.act.h, fs: 10 }, Math.sqrt(clamp(vol / VMAX, 0, 1)), dbTxt(vol) + ' dB', false);
       }
       meterWell();
-      ctx.fillStyle = C('#141415'); ctx.fillRect(hx, y + h - 1, HEAD, 1);
+      ctx.fillStyle = HD('--hd-line', '#141415'); ctx.fillRect(hx, y + h - 1, HEAD, 1);
       continue;
     }
     let t = state.tracks[i]; if (rh(i) < 2) continue; { const tc = tone(t.color); if (tc !== t.color) t = { __proto__: t, color: tc }; }
     const on = state.sel.track === i, r = hdr(i), auto = t.kind === 'auto';
     const nw = r.nw, ik = auto ? C('#d0d0d4') : ink(t.color), fullLook = full();
-    ctx.fillStyle = on ? C('#3a3a3e') : C('#2c2c2f'); ctx.fillRect(hx, y, HEAD, h - 1);                    // selected track: the mixer column a step lighter
+    ctx.fillStyle = on ? HD('--hd-bgsel', '#3a3a3e') : HD('--hd-bg', '#2c2c2f'); ctx.fillRect(hx, y, HEAD, h - 1);                    // selected track: the mixer column a step lighter
     const par = auto && t.target ? state.tracks.find((q) => q.kind !== 'auto' && P.stripOf(state.tracks.indexOf(q)) === t.target.strip) : null;
     if (auto) { ctx.fillStyle = C('#323236'); ctx.fillRect(hx, y, nw, h - 1); ctx.fillStyle = tone(par ? par.color : t.color); ctx.fillRect(hx, y, 4, h - 1); }   // Live 12: an automation lane's header is grey, a stripe in its track's colour
     else { ctx.fillStyle = t.color; ctx.fillRect(hx, y, nw, h - 1); }                                     // the whole name block in the track colour, as in Live
+    if (fullLook) { ctx.fillStyle = HD('--hd-line', '#141415'); ctx.fillRect(hx + nw, y, 1, h - 1); }   // Live: a thin dark line between the name block and the mixer column
     if (t.mute) { ctx.fillStyle = 'rgba(30,30,34,.35)'; ctx.fillRect(hx, y, nw, h - 1); }                  // deactivated track: the block dims
     if (on) { ctx.strokeStyle = ik; ctx.globalAlpha = 0.55; ctx.lineWidth = 2; ctx.strokeRect(hx + 1, y + 1, nw - 2, h - 4); ctx.globalAlpha = 1; }   // selected: an inner outline
     foldTri(hx + 12, y + r.th / 2, !!t.fold, ik);
@@ -723,32 +726,32 @@ function drawHeads() {
     if (r.aut) drawBtn(r.aut, 'aut', lanes.has(t.id), T('--accent'));
     if (auto && fullLook && h >= 46) { const pr = state.tracks.find((q) => q.kind !== 'auto' && t.target && P.stripOf(state.tracks.indexOf(q)) === t.target.strip); ctx.fillStyle = ik; ctx.globalAlpha = 0.7; ctx.font = FONT(400, 9.5); ctx.textBaseline = 'middle'; ctx.fillText(cut2(pr ? pr.name : 'Otomasi', nw - 16), hx + 10, y + TH + 10); ctx.globalAlpha = 1; }   // the track it automates, under the parameter
     if (r.out) {                                                                                           // output: a dark field in the mixer column, the destination written in it
-      ctx.fillStyle = C('#19191a'); ctx.fillRect(r.out.x, r.out.y, r.out.w, r.out.h); ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.out.x + 0.5, r.out.y + 0.5, r.out.w - 1, r.out.h - 1);
-      ctx.fillStyle = C('#f2f2f4'); ctx.font = FONT(700, r.out.fs || 9.5); ctx.textAlign = 'center'; ctx.fillText(cut2(P.outLabel(t.out), r.out.w - 16), r.out.x + (r.out.w - 10) / 2, r.out.y + r.out.h / 2 + 0.5); ctx.textAlign = 'left';
-      ctx.fillStyle = C('#8b8b92'); { const cy = r.out.y + r.out.h / 2, q = Math.max(2.5, Math.min(4, r.out.h * 0.2)), cx = r.out.x + r.out.w - 4 - q; ctx.beginPath(); ctx.moveTo(cx - q, cy - q * 0.6); ctx.lineTo(cx + q, cy - q * 0.6); ctx.lineTo(cx, cy + q * 0.7); ctx.closePath(); ctx.fill(); }
+      ctx.fillStyle = HD('--hd-well', '#19191a'); ctx.fillRect(r.out.x, r.out.y, r.out.w, r.out.h); ctx.strokeStyle = HD('--hd-line', '#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.out.x + 0.5, r.out.y + 0.5, r.out.w - 1, r.out.h - 1);
+      ctx.fillStyle = HD('--hd-vink', '#f2f2f4'); ctx.font = FONT(700, r.out.fs || 9.5); ctx.textAlign = 'center'; ctx.fillText(cut2(P.outLabel(t.out), r.out.w - 16), r.out.x + (r.out.w - 10) / 2, r.out.y + r.out.h / 2 + 0.5); ctx.textAlign = 'left';
+      ctx.fillStyle = HD('--hd-ink2', '#8b8b92'); { const cy = r.out.y + r.out.h / 2, q = Math.max(2.5, Math.min(4, r.out.h * 0.2)), cx = r.out.x + r.out.w - 4 - q; ctx.beginPath(); ctx.moveTo(cx - q, cy - q * 0.6); ctx.lineTo(cx + q, cy - q * 0.6); ctx.lineTo(cx, cy + q * 0.7); ctx.closePath(); ctx.fill(); }
     }
     if (r.vol) drawSlider(r.vol, Math.sqrt(clamp(t.vol / VMAX, 0, 1)), dbTxt(t.vol) + ' dB', false);
     if (r.pan) drawSlider(r.pan, (clamp(t.pan, -1, 1) + 1) / 2, panTxt(t.pan), true);
     for (const [k, rc] of [[0, r.sa], [1, r.sb]]) if (rc) { const v = (t.send && t.send[k]) || 0; drawSlider(rc, v, dbTxt(v), false); }   // Live: the sends as bare dB values (-inf at zero), A over B by position
     if (r.hm) {                                                                            // folded row: horizontal meter well (two thin lanes, L over R)
-      ctx.fillStyle = C('#161617'); ctx.fillRect(r.hm.x, r.hm.y, r.hm.w, r.hm.h);
-      const lh = Math.max(1.5, (r.hm.h - 3) / 2); ctx.fillStyle = C('#101011'); ctx.fillRect(r.hm.x + 2, r.hm.y + 1, r.hm.w - 4, lh); ctx.fillRect(r.hm.x + 2, r.hm.y + 2 + lh, r.hm.w - 4, lh);
-    } else if (!auto) meterWell(); else { ctx.fillStyle = C('#161617'); ctx.fillRect(hx + HEAD - METW, y, METW, h - 1); }
-    ctx.fillStyle = C('#141416'); ctx.fillRect(hx, y + h - 1, HEAD, 1);                  // the same thin line as the lane
+      ctx.fillStyle = HD('--hd-mw', '#161617'); ctx.fillRect(r.hm.x, r.hm.y, r.hm.w, r.hm.h);
+      const lh = Math.max(1.5, (r.hm.h - 3) / 2); ctx.fillStyle = HD('--hd-mb', '#101011'); ctx.fillRect(r.hm.x + 2, r.hm.y + 1, r.hm.w - 4, lh); ctx.fillRect(r.hm.x + 2, r.hm.y + 2 + lh, r.hm.w - 4, lh);
+    } else if (!auto) meterWell(); else { ctx.fillStyle = HD('--hd-mw', '#161617'); ctx.fillRect(hx + HEAD - METW, y, METW, h - 1); }
+    ctx.fillStyle = HD('--hd-line', '#141416'); ctx.fillRect(hx, y + h - 1, HEAD, 1);                  // the same thin line as the lane
     if (!t.fold && h >= MIN_ROW && (on || (drag && drag.k === 'rowh' && drag.i === i))) { ctx.fillStyle = drag && drag.k === 'rowh' && drag.i === i ? T('--accent') : C('#46464c'); ctx.fillRect(hx + (HEAD - METW) / 2 - 8, y + h - 3, 16, 1); }   // grip of the selected track: drag the bottom edge = row height
   }
   ctx.restore();
-  ctx.fillStyle = C('#08080a'); ctx.fillRect(hx - 1, 0, 2, H);                                // line between clip area and headers
+  ctx.fillStyle = HD('--hd-line', '#08080a'); ctx.fillRect(hx - 1, 0, 2, H);                                // line between clip area and headers
   // top corner: Snap switch (tap: snap, follow, select / fold options)
-  ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(hx + 1, 0, HEAD - 1, RULER); ctx.fillStyle = C('#141415'); ctx.fillRect(hx, RULER - 1, HEAD, 1);
-  { const q = cornerRects(), tri = (r, dir) => { const cx = r.x + r.w / 2, cy = r.y + r.h / 2; ctx.fillStyle = C('#d4d4d8'); ctx.beginPath(); ctx.moveTo(cx - 4 * dir, cy); ctx.lineTo(cx + 3 * dir, cy - 4.5); ctx.lineTo(cx + 3 * dir, cy + 4.5); ctx.closePath(); ctx.fill(); };
-    drawBtn(q.set, 'Set', false, null, pressed !== 'locset'); for (const [r, ty, dir] of [[q.prev, 'locprev', 1], [q.next, 'locnext', -1]]) { ctx.fillStyle = pressed === ty ? C('#55555b') : C('#3a3a3e'); ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1); tri(r, dir); } }
+  ctx.fillStyle = HD('--hd-bg', '#2c2c2f'); ctx.fillRect(hx + 1, 0, HEAD - 1, RULER); ctx.fillStyle = HD('--hd-line', '#141415'); ctx.fillRect(hx, RULER - 1, HEAD, 1);
+  { const q = cornerRects(), tri = (r, dir) => { const cx = r.x + r.w / 2, cy = r.y + r.h / 2; ctx.fillStyle = HD('--hd-ink', '#d4d4d8'); ctx.beginPath(); ctx.moveTo(cx - 4 * dir, cy); ctx.lineTo(cx + 3 * dir, cy - 4.5); ctx.lineTo(cx + 3 * dir, cy + 4.5); ctx.closePath(); ctx.fill(); };
+    drawBtn(q.set, 'Set', false, null, pressed !== 'locset'); for (const [r, ty, dir] of [[q.prev, 'locprev', 1], [q.next, 'locnext', -1]]) { ctx.fillStyle = pressed === ty ? HD('--hd-bgsel', '#55555b') : HD('--hd-bgsel', '#3a3a3e'); ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = HD('--hd-line', '#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1); tri(r, dir); } }
   { const q = cornerRects(); if (q.auto.w) drawBtn(q.auto, 'aut', autoMode(), T('--accent'));
     if (q.lock.w) { const r = q.lock, on = lockEnv(); drawBtn(r, '', on, T('--accent')); const cx = r.x + r.w / 2, cy = r.y + r.h / 2 + 1; ctx.strokeStyle = on ? '#15151a' : C('#b4b4ba'); ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = 1.4;   // Live's Lock Envelopes: a padlock
       ctx.fillRect(cx - 4, cy - 1, 8, 6); ctx.beginPath(); ctx.arc(cx, cy - 2, 2.8, Math.PI, on ? 0 : -0.35 * Math.PI); ctx.stroke(); } }
   drawSwitch(snapRect(), HEAD > 260 ? 'Snap ' + SNAPS[cfg.snap][0] : SNAPS[cfg.snap][0], cfg.snap !== SNAP_OFF, pressed === 'corner');
   // bottom corner: Follow switch (the arrangement scrolls with the playhead)
-  ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(hx + 1, H - BOT, HEAD - 1, BOT); ctx.fillStyle = C('#141415'); ctx.fillRect(hx, H - BOT, HEAD, 1);
+  ctx.fillStyle = HD('--hd-bg', '#2c2c2f'); ctx.fillRect(hx + 1, H - BOT, HEAD - 1, BOT); ctx.fillStyle = HD('--hd-line', '#141415'); ctx.fillRect(hx, H - BOT, HEAD, 1);
   drawSwitch(followRect(), 'Follow', cfg.follow, pressed === 'follow');
 }
 

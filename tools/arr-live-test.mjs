@@ -39,7 +39,7 @@ ok(gh.rowH !== gw.rowH && fits.lastTop < fits.h - 30, `H fits the tracks into th
 await page.screenshot({ path: path.join(out, 'arr-fit.png') });
 // control bar: separate flat buttons of one size; Play lights green while playing, the metronome orange
 { const q = await ev(() => { const r = (id) => { const e = document.querySelector(id), b = e.getBoundingClientRect(), c = getComputedStyle(e); return { w: Math.round(b.width), h: Math.round(b.height), rad: c.borderTopLeftRadius, svg: !!e.querySelector('svg') }; }; return ['#btn-browser', '#btn-rew', '#btn-play', '#btn-rec', '#btn-metro', '#btn-menu'].map(r); });
-  ok(q.every((x) => x.svg && x.h === q[0].h && x.rad !== '0px') && q.slice(1, 5).every((x) => x.w === q[1].w), `control bar: six icon buttons, one height (${q[0].h} px), rounded (${q[0].rad}), transport buttons one width (${q[1].w} px)`);
+  ok(q.every((x) => x.svg && x.h === q[0].h && x.rad === '0px') && q.slice(1, 5).every((x) => x.w === q[1].w), `control bar: six icon buttons, one height (${q[0].h} px), square as Live 12 (radius ${q[0].rad}), transport buttons one width (${q[1].w} px)`);
   await page.locator('#top').screenshot({ path: path.join(out, 'controlbar.png') }); }
 // Live's control bar fields: song position "1. 1. 1", loop start / switch / length, time signature
 { await ev(async () => { const P = await import('./js/project.js'); P.setLoop({ start: 2 * P.BAR, end: 6 * P.BAR, on: false }); P.seekTo(4 * P.BAR + P.BEAT); }); await page.waitForTimeout(400);

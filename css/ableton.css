@@ -1796,3 +1796,16 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 /* Light theme (Live 12 light reference): every toolbar field / button carries a thin dark outline */
 [data-theme="light"] #top .b.ic, [data-theme="light"] #top .grp .b, [data-theme="light"] #top .readout, [data-theme="light"] #top-l #rd-bpm,
 [data-theme="light"] #top .perf, [data-theme="light"] #top .seg .b { box-shadow: inset 0 0 0 1px var(--line); }
+/* Live 12 control bar, both themes (refs/live12-official 01 dark, 04 light): square flat fields with a thin near-black outline, neighbours
+   share one border, the transport is bare icons (no field), record a grey circle until armed */
+#top .b.ic, #top .grp .b, #top .readout, #top-l #rd-bpm, #top .perf, #top .seg .b { border-radius: 0 !important; box-shadow: inset 0 0 0 1px var(--tb-line, #1c1e25) !important; }
+#top .grp.hist, #top .grp.lvloop, #top .seg { gap: 0 !important; }
+#top .grp.hist .b + .b, #top .grp.lvloop > * + *, #top .seg .b + .b { margin-left: -1px !important; }
+#top .tport, #top .tport .b { background: transparent !important; box-shadow: none !important; }
+#top .tport { gap: 2px !important; }
+#top .tport .b { color: var(--tb-ico, var(--text)); }
+#top .tport .b svg { width: 18px; height: 18px; }
+#top .tport #btn-rec:not(.on) { color: var(--tb-ico, var(--text)); }
+#top .b.ic:not(.on):not(.tport *), #top .readout, #top-l #rd-bpm, #top .seg .b:not(.on) { color: var(--tb-ico, var(--text)); }
+#top .tport #btn-rec:not(.on) svg { fill: currentColor; } #top .tport #btn-rec.on svg { fill: var(--rec); }
+#top .tport #btn-rec svg { width: 26px; height: 26px; } #top .tport #btn-play svg { width: 20px; height: 20px; }
