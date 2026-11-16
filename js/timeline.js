@@ -2,6 +2,7 @@
 // Gestures follow FL Studio Mobile (tap clip = controls, double-tap = editor, long-tap = menus,
 // right-edge handle = resize, ruler drag = time selection) on an Ableton-style layout.
 import { densify } from './autocurve.js';
+import { slicesOf } from './slicerdetect.js';
 import { C, T, currentTone, tone } from './theme.js';
 import { attachGestures, gestureTiming, haptic } from './gesture.js';
 import { menu, ask, modal, toast, clamp } from './ui.js';
@@ -248,7 +249,7 @@ function drawClip(t, c, y, hh) {
   ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 0.5, y0 + 0.5, Math.max(0, Math.round(w) - 1), h0 - 1);
   if (isSel && !c.muted) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.strokeRect(Math.round(x) + 1.5, y0 + 1.5, Math.max(0, Math.round(w) - 3), h0 - 3); }   // selected: a light inner edge
   if (tall && w > 18) {
-    ctx.fillStyle = ink(col); ctx.font = FONT(600, 10); ctx.textBaseline = 'middle';
+    ctx.fillStyle = ink(col); ctx.font = FONT(500, 10); ctx.textBaseline = 'middle';   // Live: clip names regular weight
     { const room = xe - xs - 10, nm = c.name || (c.sample ? c.sample.name : t.name); if (room > 8) ctx.fillText(cut2(nm, room), xs + 5, y0 + hd / 2 + 0.5); }   // owner: cut with an ellipsis ("11 Cas…"), never squeezed
   }
   const by = y0 + hd + 2, bh = h0 - hd - 4, INK = c.muted ? 'rgba(20,20,24,.6)' : contentInk(t.color);
@@ -469,7 +470,7 @@ function drawRuler(g) {
       if (drag && (drag.k === 'loop' || drag.k === 'loopL' || drag.k === 'loopR')) { ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(a, RULER - 7, b - a, 1); }
     }
   }
-  ctx.font = FONT(500, 10); ctx.textBaseline = 'top';
+  ctx.font = FONT(400, 9.5); ctx.textBaseline = 'top';   // Live's ruler numbers: small, regular
   const barPx = BAR * view.ppt; let k = 1; while (barPx * k < 34) k *= 2;
   const chg = new Map(P.state.sigs.map((c) => [c.bar, c]));
   const RI = currentTone() === 'light' ? '0,0,0' : '255,255,255';
@@ -479,8 +480,8 @@ function drawRuler(g) {
     const c = chg.get(b), x = Math.round(tx(P.barStart(b)));
     if (b % k && !c) { ctx.fillStyle = `rgba(${RI},.34)`; ctx.fillRect(x, LT - 10, 1, 9); continue; }   // unlabelled bars: a longer tick
     ctx.fillStyle = c ? C('#ffa722') : `rgba(${RI},.5)`; ctx.fillRect(x, LT - 12, 1, 11);   // Live: a short line up from the ruler's bottom edge, the number right of it
-    const lab = String(b + 1); ctx.fillStyle = c ? C('#ffa722') : T('--text'); ctx.fillText(lab, x + 3, 4);
-    if (c) { ctx.font = FONT(700, 9); ctx.fillText(c.n + '/' + c.d, x + 8 + ctx.measureText(lab).width, 5); ctx.font = FONT(500, 10); }
+    const lab = String(b + 1); ctx.fillStyle = c ? C('#ffa722') : `rgba(${RI},.72)`; ctx.fillText(lab, x + 3, 4);
+    if (c) { ctx.font = FONT(700, 9); ctx.fillText(c.n + '/' + c.d, x + 8 + ctx.measureText(lab).width, 5); ctx.font = FONT(400, 9.5); }
   }
   if (PUon()) { ctx.fillStyle = C('#ff3636'); ctx.fillRect(tx(state.punch.start), RULER - 3, tx(state.punch.end) - tx(state.punch.start), 2); ctx.fillRect(tx(state.punch.start) - 1, RULER - 11, 4, 9); ctx.fillRect(tx(state.punch.end) - 3, RULER - 11, 4, 9); }
   // locators (markers): a flag with its name on the locator strip
@@ -683,7 +684,7 @@ function drawHeads() {
     if (t.mute) { ctx.fillStyle = 'rgba(30,30,34,.35)'; ctx.fillRect(hx, y, nw, h - 1); }                  // deactivated track: the block dims
     if (on) { ctx.strokeStyle = ik; ctx.globalAlpha = 0.55; ctx.lineWidth = 2; ctx.strokeRect(hx + 1, y + 1, nw - 2, h - 4); ctx.globalAlpha = 1; }   // selected: an inner outline
     foldTri(hx + 12, y + r.th / 2, !!t.fold, ik);
-    ctx.fillStyle = ik; ctx.font = FONT(on ? 700 : 600, 11); ctx.textBaseline = 'middle';
+    ctx.fillStyle = ik; ctx.font = FONT(on ? 600 : 500, 10.5); ctx.textBaseline = 'middle';   // Live: the track name in a regular weight, a step smaller
     const nameR = !fullLook && r.mute ? r.mute.x - 4 : hx + nw - 6;
     ctx.fillText(cut2((P.isFrozen(i) ? '\u2744 ' : '') + t.name, nameR - hx - 28), hx + 24, y + r.th / 2 + 0.5);   // \u2744 = frozen; one line + ellipsis, never split mid-word
     if (r.mute) drawBtn(r.mute, auto ? 'On' : String(i + 1), !t.mute, T('--lv-or') || T('--mute'));   // Live 12's track activator: orange with the track number
@@ -945,6 +946,9 @@ function clipMenu(i, c, tick, sx, sy) {
     { label: 'Rename', fn: () => renameClip(i, c) },
     { label: 'Split', fn: () => { checkpoint(); P.splitClip(i, c.id, snapT(tick)); } },
     { label: 'Snap Edges to Grid', fn: () => snapClip(i, c) },
+    { label: 'Chop\u2026', sub: [{ label: 'EVERY', dim: true }, ...[6, 4, 3, 2, 1].map((n) => ({ label: n === 1 ? '1 beat' : '1/' + n + ' beat', fn: () => chopClip(i, c, { every: n }) })),
+      ...(t.kind === 'audio' ? [{ sep: true }, { label: 'AT', dim: true }, { label: 'Transients', fn: () => chopClip(i, c, { transients: true }) }] : [])] },
+    ...(t.kind === 'audio' && !P.loopOf(c) ? [{ label: 'Tempo\u2026', sub: [{ label: 'Half Time (x2 length)', fn: () => tempoClip(i, c, 2) }, { label: 'Double Time (/2 length)', fn: () => tempoClip(i, c, 0.5) }] }] : []),
     ...(c.notes ? [{ label: 'Combine with Next Clip', dim: !nextClip(i, c), fn: () => combineNext(i, c) }] : []),
     { label: c.muted ? 'Activate Clip' : 'Deactivate Clip', fn: () => { checkpoint(); P.setClipsMuted([{ i, c }], !c.muted); invalidate(); } },
     ...(c.notes && P.loopOf(c) ? [{ label: 'Unlink Loop', fn: () => { checkpoint(); P.bakeLoop(c, i); P.emit('clips'); invalidate(); toast('Pengulangan jadi not biasa.', 1600); } }] : []),
@@ -957,6 +961,30 @@ function combineNext(i, c) {                                                // F
   checkpoint(); const r = P.combineClips(i, [c.id, n.id]);
   if (r.error) { revertLast(); return toast(r.error); }
   P.selectClip(i, r.id); invalidate(); toast('2 klip digabung jadi satu.', 1400);
+}
+// Honeydew's Chop... (src/ui/clips.rs every_ticks / chop, GPL-3.0-or-later): cuts the clip every 1/n beat of its content (the offset taken into
+// account: the cuts fall on the content's beat grid), or an audio clip at its sample's transients (the Slicer's detection at its default
+// Sensitivity 0.25); at most 256 pieces. One undo step.
+function chopClip(i, c, o) {
+  const t = state.tracks[i], end = c.start + c.len; let ticks = [];
+  if (o.every) {
+    const d = PPQ / o.every, off = t.kind === 'audio' ? (c.offset || 0) * state.bpm / 60 * PPQ : (c.lp || 0), first = c.start + (d - (((off % d) + d) % d));
+    for (let k = first; k < end && ticks.length < 255; k += d) if (k > c.start) ticks.push(Math.round(k));
+  } else {
+    const es = c.dsample || c.sample, pyr = es && es.pyr; if (!pyr || !pyr.l) { toast('Sample belum siap untuk dicari transiennya.', 1600); return; }
+    const fr = pyr.l.length, st = slicesOf(pyr, 0.25) || [];
+    for (const f of st) { const sec = f / fr * es.duration - (c.offset || 0), tk = Math.round(c.start + sec * state.bpm / 60 * PPQ); if (tk > c.start && tk < end) ticks.push(tk); }
+    ticks = ticks.slice(0, 255);
+  }
+  ticks = [...new Set(ticks)].sort((a, b) => b - a); if (!ticks.length) { toast('Tidak ada titik potong di klip ini.', 1400); return; }
+  checkpoint(); for (const tk of ticks) P.splitClip(i, c.id, tk);
+  invalidate(); toast(`Klip dipotong jadi ${ticks.length + 1} bagian.`, 1400);
+}
+export const testChop = (i, id, o) => chopClip(i, state.tracks[i].clips.find((q) => q.id === id), o);   // UI tests
+// Honeydew's Half / Double tempo of an audio clip: its audio stretched to twice / half its length (pitch kept)
+function tempoClip(i, c, k) {
+  const r0 = c.warp ? c.warp.ratio || 1 : 1;
+  checkpoint(); P.restretchClip(i, c.id, r0 * k, { len: Math.round(c.len * k) }).then((o) => { if (o && o.error) toast(o.error, 2600); else toast(k > 1 ? 'Half Time: klip 2x lebih panjang.' : 'Double Time: klip 2x lebih pendek.', 1400); invalidate(); });
 }
 function renameClip(i, c) { ask('Nama klip', c.name || '', (v) => { checkpoint(); c.name = String(v || '').trim().slice(0, 40); P.emit('clips'); invalidate(); }); }
 function snapClip(i, c) {

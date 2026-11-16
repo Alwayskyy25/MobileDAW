@@ -126,6 +126,16 @@ for (const th of ['dark', 'light', 'midlight', 'live', 'lightlc', 'medc']) { awa
   ok(r1.s === 2 && r1.l === 6, `end capsule: length 4 -> ${r1.l} bars, start stays at bar ${r1.s + 1}`);
   ok(r2.s === 4 && r2.l === 2 && r2.o > 3.9 && r2.o < 4.1, `start capsule: start bar 3 -> ${r2.s + 1}, length ${r2.l}, audio offset ${r2.o.toFixed(2)} s (the audio stays in place)`);
   ok(mid.l > 5.5, `the bar under the clip stretches it while dragged: length 4 -> ${mid.l.toFixed(2)} bars, without Stretch mode`); }
+// Honeydew's Chop...: a 4-bar MIDI clip every 1 beat = 16 clips end to end; an audio clip at its transients = one clip per hit
+{ const r = await ev(async () => { const P = await import('./js/project.js'), T = await import('./js/timeline.js'), W = await import('./js/waveform.js');
+    P.newProject(false); P.addTrack('midi'); const c = P.addClip(0, 0, 4 * P.BAR); for (let k = 0; k < 16; k++) c.notes.push({ t: k * 480, d: 240, p: 60, v: 0.8 }); P.clipChanged(0);
+    T.testChop(0, c.id, { every: 1 }); const m = P.state.tracks[0].clips.map((q) => [q.start, q.len]).sort((a, b) => a[0] - b[0]);
+    P.addTrack('audio'); const sr = 44100, n = sr * 4, l = new Float32Array(n); for (const at of [0.1, 0.9, 1.7, 2.6, 3.3]) { const s0 = Math.round(at * sr); for (let k = 0; k < sr * 0.6 && s0 + k < n; k++) l[s0 + k] += Math.exp(-k / 3000) * Math.sin(k / 7); }
+    const smp = { id: 0, path: 'test/chop.wav', name: 'chop.wav', duration: 4, pyr: W.buildPyramid(l, l), peaks: [] }; P.state.samples[smp.path] = smp;
+    P.state.tracks[1].clips.push({ id: 990001, start: 0, len: 4 * P.BAR, name: '', sample: smp, offset: 0, gain: 1 }); T.testChop(1, 990001, { transients: true });
+    return { m, contiguous: m.every((q, k) => k === 0 || q[0] === m[k - 1][0] + m[k - 1][1]), beat: P.BEAT, audio: P.state.tracks[1].clips.length }; });
+  ok(r.m.length === 16 && r.contiguous && r.m.every((q) => q[1] === r.beat), `Chop every 1 beat: 4 bars -> ${r.m.length} clips of one beat, end to end`);
+  ok(r.audio === 6, `Chop at transients: an audio clip with 5 hits -> ${r.audio} clips (the lead-in before the first hit, then one per hit)`); }
 // MIDI editor: Live 12's velocity tools - Ramp lines the velocities up from the first note to the last, Randomize moves each one
 { await ev(async () => { const P = await import('./js/project.js'), T = await import('./js/timeline.js'); P.newProject(false); P.addTrack('midi');
     const c = P.addClip(0, 0, 2 * P.BAR); for (let k = 0; k < 16; k++) c.notes.push({ t: k * 240, d: 200, p: 60 + (k % 8), v: 0.4 + 0.5 * ((k * 7) % 10) / 10 }); c.notes[15].v = 0.9; c.notes[0].v = 0.3;
