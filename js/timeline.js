@@ -218,6 +218,9 @@ function ink(hex) {                     // text on a colour: dark on light colou
 
 const contentInk = (hex) => (ink(hex).startsWith('rgba(14') ? 'rgba(10,10,12,.86)' : 'rgba(250,250,252,.88)');   // Live: black content on light clip colours, white on dark ones
 function drawClip(t, c, y, hh) {
+  if (t.kind === 'auto') {                                                    // Live 12: automation has no clip boxes - the lane's envelope is drawn by drawEnvelopes; a selected
+    if (state.sel.clip === c.id || msel.has(c.id)) { const x = tx(c.start), w = c.len * view.ppt; ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.fillRect(x, y + 1, w, hh - 2); ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 0.5, y + 1.5, Math.max(1, Math.round(w) - 1), hh - 3); }   // piece shows as a light frame
+    return; }
   if (t.fold && t.kind !== 'auto') {                                         // Live: a folded track shows its clips as a thin band in their colour
     const g0 = gl.get(c.id), x = tx(g0 ? g0.s : c.start), w = (g0 ? g0.l : c.len) * view.ppt; if (x > CW || x + w < 0) return;
     const col = c.muted ? '#8a8a8f' : tone(t.color), by = y + 1, bh2 = hh - 2;   // Live 12 (refs/live12-official 04): the folded row is filled by the clip colour, "..." at its start
@@ -337,7 +340,7 @@ function draw() {
   // lanes: one flat grey per track, the selected track a step lighter (as Live highlights the selected track's lane)
   for (let i = Math.max(0, rowAt(RULER)); i <= Math.min(n - 1, rowAt(LB)); i++) {
     const y = rowY(i), h = rh(i); if (h < 2) continue;   // a hidden automation lane (Automation Mode off)
-    ctx.fillStyle = state.sel.track === i ? C('#333337') : C('#2a2a2c'); ctx.fillRect(0, y, CW, h);
+    ctx.fillStyle = state.sel.track === i ? C('#333337') : state.tracks[i].kind === 'auto' ? C('#262628') : C('#2a2a2c'); ctx.fillRect(0, y, CW, h);   // automation lanes a shade darker (Live)
     const sn = subN(state.tracks[i]);
     if (sn) { const mh = rhMain(i), sh = SUBH(), L = P.subsOf(state.tracks[i]); for (let k = 0; k < sn; k++) { const sy = y + mh + k * sh; ctx.fillStyle = C('#262628'); ctx.fillRect(0, sy, CW, sh); if (L[k].mute) { ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(0, sy, CW, sh); } ctx.fillStyle = C('#1a1a1c'); ctx.fillRect(0, sy - 1, CW, 1); } }   // sub-track rows: a shade darker, a thin line above each
     ctx.fillStyle = C('#141416'); ctx.fillRect(0, y + h - 1, CW, 1);                     // Live 12 (refs/live12-official): a thin dark line between tracks
@@ -346,7 +349,7 @@ function draw() {
   for (let i = Math.max(n, rowAt(RULER)); i < nn && i <= rowAt(LB); i++) {             // Master / effect track rows: no clips, they only mix
     const y = rowY(i), h = rh(i), x = xInfo(i);
     ctx.fillStyle = state.sel.track === x.strip ? C('#2f2f33') : C('#252527'); ctx.fillRect(0, y, CW, h);   // theme background first, so the tint below is a real transparent wash in dark AND light themes
-    ctx.fillStyle = washRgba(x.color, 0.06); ctx.fillRect(0, y, CW, h); ctx.fillStyle = C('#141415'); ctx.fillRect(0, y + h - 1, CW, 1);
+     ctx.fillStyle = C('#141415'); ctx.fillRect(0, y + h - 1, CW, 1);
     const src = x.master ? state.tracks.filter((q) => q.kind !== 'auto' && !q.mute).length : state.tracks.filter((q) => q.out === x.k && !q.mute).length;
     xl.push({ y, h, t: `${src} track aktif → ${x.name}` });
   }
@@ -393,6 +396,18 @@ function draw() {
   const first = Math.max(0, rowAt(RULER)), last = Math.min(n - 1, rowAt(LB));
   for (let i = first; i <= last; i++) for (const c of state.tracks[i].clips) { const b = laneBox(i, c); if (b.h < 2) continue; drawClip(state.tracks[i], c, b.y, b.h); }   // a clip of a sub-track sits in its row
   drawHandles();
+  // automation lanes: one continuous envelope across the lane (Live 12): red line, the value held before the first and after the last point,
+  // small round breakpoints; the lane a shade darker than a track's
+  for (let i = first; i <= last; i++) { const t = state.tracks[i]; if (t.kind !== 'auto' || rh(i) < 12) continue;
+    const y0 = rowY(i) + 6, hh = rh(i) - 13, yy = (v) => y0 + hh - clamp(v, 0, 1) * hh, cs = [...t.clips].filter((c) => c.pts && c.pts.length).sort((a, b) => a.start - b.start); if (!cs.length) continue;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, Math.max(RULER, rowY(i)), CW, Math.max(0, Math.min(LB, rowY(i) + rh(i)) - Math.max(RULER, rowY(i)))); ctx.clip();
+    const col = t.mute ? C('#8b8b92') : '#ff5a4e'; ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.beginPath(); let st = false, lv = null;
+    for (const c of cs) { const pts = [...c.pts].sort((a, b) => a.t - b.t); if (c.muted) continue;
+      for (const [pt, pv] of densify(pts)) { const X = tx(c.start + pt), Y = yy(pv); if (!st) { ctx.moveTo(Math.min(0, X), Y); st = true; } else if (lv != null && X > tx(c.start) - 0.5 && pt === pts[0].t) ctx.lineTo(X, yy(lv)); ctx.lineTo(X, Y); }
+      lv = pts[pts.length - 1].v; }
+    if (lv != null) ctx.lineTo(CW, yy(lv)); ctx.stroke();
+    ctx.fillStyle = col; for (const c of cs) for (const p of c.pts) { const X = tx(c.start + p.t); if (X > -4 && X < CW + 4) { ctx.beginPath(); ctx.arc(X, yy(p.v), 2.6, 0, 6.2832); ctx.fill(); } }
+    ctx.restore(); }
   // Automation Mode (Live, refs/live12/112-115): the track's automation drawn over its clips - a red line with its breakpoints, the parameter's
   // name at the lane's top left. Display only: the curve is edited on its automation lane. The first visible lane of the track is shown.
   if (autoMode()) for (let i = first; i <= last; i++) {
@@ -676,20 +691,22 @@ function drawHeads() {
     }
     let t = state.tracks[i]; if (rh(i) < 2) continue; { const tc = tone(t.color); if (tc !== t.color) t = { __proto__: t, color: tc }; }
     const on = state.sel.track === i, r = hdr(i), auto = t.kind === 'auto';
-    const nw = r.nw, ik = ink(t.color), fullLook = full();
+    const nw = r.nw, ik = auto ? C('#d0d0d4') : ink(t.color), fullLook = full();
     ctx.fillStyle = on ? C('#3a3a3e') : C('#2c2c2f'); ctx.fillRect(hx, y, HEAD, h - 1);                    // selected track: the mixer column a step lighter
-    ctx.fillStyle = t.color; ctx.fillRect(hx, y, nw, h - 1);                                              // the whole name block in the track colour, as in Live
+    const par = auto && t.target ? state.tracks.find((q) => q.kind !== 'auto' && P.stripOf(state.tracks.indexOf(q)) === t.target.strip) : null;
+    if (auto) { ctx.fillStyle = C('#323236'); ctx.fillRect(hx, y, nw, h - 1); ctx.fillStyle = tone(par ? par.color : t.color); ctx.fillRect(hx, y, 4, h - 1); }   // Live 12: an automation lane's header is grey, a stripe in its track's colour
+    else { ctx.fillStyle = t.color; ctx.fillRect(hx, y, nw, h - 1); }                                     // the whole name block in the track colour, as in Live
     if (t.mute) { ctx.fillStyle = 'rgba(30,30,34,.35)'; ctx.fillRect(hx, y, nw, h - 1); }                  // deactivated track: the block dims
     if (on) { ctx.strokeStyle = ik; ctx.globalAlpha = 0.55; ctx.lineWidth = 2; ctx.strokeRect(hx + 1, y + 1, nw - 2, h - 4); ctx.globalAlpha = 1; }   // selected: an inner outline
     foldTri(hx + 12, y + r.th / 2, !!t.fold, ik);
     ctx.fillStyle = ik; ctx.font = FONT(on ? 600 : 500, 10.5); ctx.textBaseline = 'middle';   // Live: the track name in a regular weight, a step smaller
     const nameR = !fullLook && r.mute ? r.mute.x - 4 : hx + nw - 6;
-    ctx.fillText(cut2((P.isFrozen(i) ? '\u2744 ' : '') + t.name, nameR - hx - 28), hx + 24, y + r.th / 2 + 0.5);   // \u2744 = frozen; one line + ellipsis, never split mid-word
+    ctx.fillText(cut2((P.isFrozen(i) ? '\u2744 ' : '') + (auto ? String(t.name).replace(/^Auto:\s*/, '') : t.name), nameR - hx - 28), hx + 24, y + r.th / 2 + 0.5);   // an automation lane shows its parameter only (Live)   // \u2744 = frozen; one line + ellipsis, never split mid-word
     if (r.mute) drawBtn(r.mute, auto ? 'On' : String(i + 1), !t.mute, T('--lv-or') || T('--mute'));   // Live 12's track activator: orange with the track number
     if (r.solo) drawBtn(r.solo, 'S', t.solo, T('--solo'));
     if (r.arm) drawBtn(r.arm, 'arm', !!t.arm, T('--rec'));
     if (r.aut) drawBtn(r.aut, 'aut', lanes.has(t.id), T('--accent'));
-    if (auto && fullLook && h >= 46) { ctx.fillStyle = ik; ctx.globalAlpha = 0.7; ctx.font = FONT(500, 10); ctx.textBaseline = 'middle'; ctx.fillText('Otomasi', hx + 8, y + TH + 12, nw - 14); ctx.globalAlpha = 1; }
+    if (auto && fullLook && h >= 46) { const pr = state.tracks.find((q) => q.kind !== 'auto' && t.target && P.stripOf(state.tracks.indexOf(q)) === t.target.strip); ctx.fillStyle = ik; ctx.globalAlpha = 0.7; ctx.font = FONT(400, 9.5); ctx.textBaseline = 'middle'; ctx.fillText(cut2(pr ? pr.name : 'Otomasi', nw - 16), hx + 10, y + TH + 10); ctx.globalAlpha = 1; }   // the track it automates, under the parameter
     if (r.out) {                                                                                           // output: a dark field in the mixer column, the destination written in it
       ctx.fillStyle = C('#19191a'); ctx.fillRect(r.out.x, r.out.y, r.out.w, r.out.h); ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.out.x + 0.5, r.out.y + 0.5, r.out.w - 1, r.out.h - 1);
       ctx.fillStyle = C('#f2f2f4'); ctx.font = FONT(700, r.out.fs || 9.5); ctx.textAlign = 'center'; ctx.fillText(cut2(P.outLabel(t.out), r.out.w - 16), r.out.x + (r.out.w - 10) / 2, r.out.y + r.out.h / 2 + 0.5); ctx.textAlign = 'left';
