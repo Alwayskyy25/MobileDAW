@@ -240,8 +240,10 @@ function drawClip(t, c, y, hh) {
   // a deactivated clip is grey. Folded / short rows show only the colour + content (no strip).
   const body = c.muted ? '#9a9a9f' : isSel ? tint(t.color, 0.32) : t.color;
   ctx.fillStyle = body; ctx.fillRect(x, y0, w, h0);
-  if (tall) { ctx.fillStyle = isSel ? tint(col, 0.18) : col; ctx.fillRect(x, y0, w, hd); ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(x, y0 + hd, w, 1); }
-  ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 0.5, y0 + 0.5, Math.max(0, Math.round(w) - 1), h0 - 1);   // Live: a faint edge, no heavy outline
+  if (tall) { ctx.fillStyle = isSel ? tint(col, 0.18) : col; ctx.fillRect(x, y0, w, hd); ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.fillRect(x, y0 + hd, w, 1); }   // the name strip: same colour, a faint line under it
+  // Live 12 (refs/live12-official/02): no outline around a clip; the arrangement grid runs through its body as faint darker lines (beats, bars)
+  { const gx = gridT(), bp = BAR * view.ppt; if (gx * view.ppt >= 6) { ctx.fillStyle = 'rgba(0,0,0,.08)'; for (let tk = Math.ceil(cs / gx) * gx; tk < cs + cl; tk += gx) { const lx = Math.round(tx(tk)); if (lx > xs && lx < xe) ctx.fillRect(lx, y0 + hd, 1, h0 - hd); } }
+    if (bp >= 4) { ctx.fillStyle = 'rgba(0,0,0,.12)'; for (let b = Math.max(0, P.barAt(cs)); P.barStart(b) < cs + cl; b++) { const lx = Math.round(tx(P.barStart(b))); if (lx > xs && lx < xe) ctx.fillRect(lx, y0 + hd, 1, h0 - hd); } } }
   if (isSel && !c.muted) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.strokeRect(Math.round(x) + 1.5, y0 + 1.5, Math.max(0, Math.round(w) - 3), h0 - 3); }   // selected: a light inner edge
   if (tall && w > 18) {
     ctx.fillStyle = ink(col); ctx.font = FONT(500, 10); ctx.textBaseline = 'middle';   // Live: clip names regular weight
@@ -258,7 +260,7 @@ function drawClip(t, c, y, hh) {
     ctx.fillStyle = INK; for (const p of pts) { const px = x + p.t * view.ppt; if (px >= xs - 3 && px <= xe + 3) ctx.fillRect(px - 2, yy(p.v) - 2, 4, 4); }   // breakpoints, as in Live's automation
   } else if (t.kind === 'audio' && (c.dsample || c.sample) && ((c.dsample || c.sample).pyr || (c.dsample || c.sample).peaks) && bh > 8) {
     const es = c.dsample || c.sample, lk = live.get(c.id) || 1, o = c.offset || 0;
-    ctx.fillStyle = INK;
+    ctx.fillStyle = c.muted ? INK : shade(t.color, 0.72);   // Live 12 (refs/live12-official 02, 03): the waveform in a deep tone of the clip colour, not black
     for (const g of P.loopSegs(c)) {                            // a clip longer than its audio repeats it: every repeat is drawn from the start of the content
       const sx = x + g.o * view.ppt, sw = g.len * view.ppt;
       if (sx > xe || sx + sw < xs) continue;
@@ -278,7 +280,7 @@ function drawClip(t, c, y, hh) {
     }
   } else if (c.notes && bh > 6) {
     const [lo, hi] = noteBox(c), span = hi - lo + 1, nh = Math.max(2, Math.min(bh / span * 0.8, 7));   // Live: solid note bars, about 4/5 of a pitch row
-    ctx.fillStyle = INK;
+    ctx.fillStyle = c.muted ? INK : shade(t.color, 0.85);   // Live 12: notes nearly black, in the clip colour's darkest tone
     for (const g of P.loopSegs(c)) {                            // looped MIDI: the notes are drawn again in every repeat (no empty bars)
       const gx = x + g.o * view.ppt;
       if (gx > xe || gx + g.len * view.ppt < xs) continue;
@@ -351,9 +353,9 @@ function draw() {
   // zoomed-out arrangement is not striped with bright bar lines; every other labelled group a shade darker. Grid Line Intensity scales them.
   const barPx = BAR * view.ppt; let kb = 1; while (barPx * kb < 34) kb *= 2;                     // the same step as the ruler's bar numbers
   const light = currentTone() === 'light', INK = light ? '0,0,0' : '255,255,255', GI = 0.4 + 1.2 * (prefs.gridInt == null ? 0.5 : prefs.gridInt), line = (a) => `rgba(${INK},${Math.min(0.6, a * GI).toFixed(3)})`;
-  ctx.fillStyle = light ? 'rgba(0,0,0,.04)' : 'rgba(0,0,0,.12)';
+  ctx.fillStyle = light ? 'rgba(0,0,0,.04)' : 'rgba(0,0,0,.035)';   // Live 12 dark: the bands barely show
   for (let b = Math.floor(Math.max(0, P.barAt(view.x0)) / kb) * kb; tx(P.barStart(b)) < CW; b += kb) { if ((b / kb) & 1) { const x0 = tx(P.barStart(b)), x1 = tx(P.barStart(b + kb)); ctx.fillRect(x0, RULER, x1 - x0, gy1 - RULER); } }
-  const tEnd = view.x0 + CW / view.ppt + g, sub = line(light ? 0.05 : 0.05), beat = line(light ? 0.09 : 0.10);
+  const tEnd = view.x0 + CW / view.ppt + g, sub = line(light ? 0.05 : 0.025), beat = line(light ? 0.09 : 0.04);
   eachGrid(view.x0 - g, tEnd, g, (t, j) => {
     const x = Math.round(tx(t));
     if (x < 0 || x > CW) return;
@@ -362,7 +364,7 @@ function draw() {
     ctx.fillStyle = r % P.MM.bt[j] === 0 ? beat : sub;
     ctx.fillRect(x, RULER, 1, gy1 - RULER);
   });
-  const barL = line(light ? 0.14 : 0.15), grpL = line(light ? 0.24 : 0.26);   // Live's dark grid reads clearly (refs/live12/058)
+  const barL = line(light ? 0.14 : 0.06), grpL = line(light ? 0.24 : 0.10);   // Live 12's dark grid is faint: about 3-5 levels off the lane (sampled from refs/live12-official/02)
   for (let b = Math.max(0, P.barAt(view.x0)); tx(P.barStart(b)) < CW; b++) { const x = Math.round(tx(P.barStart(b))); if (x >= 0) { ctx.fillStyle = b % kb ? barL : grpL; ctx.fillRect(x, RULER, 1, gy1 - RULER); } }
   if (P.state.sigs.length) { ctx.fillStyle = 'rgba(255,167,34,.3)'; for (const c of P.state.sigs) { const x = Math.round(tx(P.barStart(c.bar))); if (x >= 0 && x <= CW) ctx.fillRect(x, RULER, 1, gy1 - RULER); } }
   for (const m of state.markers) { const x = Math.round(tx(m.t)); if (x < 0 || x > CW) continue; ctx.fillStyle = C('#0e0e10'); ctx.fillRect(x, RULER, 1, gy1 - RULER); }   // Live: a dark line down from every locator
@@ -449,7 +451,7 @@ let loopA = 0;                                                   // drawn bright
 const PUon = () => state.punch.on && state.punch.end > state.punch.start;
 function drawRuler(g) {
   ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(0, 0, CW, LT);                                 // beat-time ruler
-  ctx.fillStyle = C('#232325'); ctx.fillRect(0, LT, CW, RULER - LT);                       // scrub area: locators, loop brace
+  ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(0, LT, CW, RULER - LT);                       // scrub area: locators, loop brace (Live 12: the ruler's colour)
   ctx.fillStyle = C('#08080a'); ctx.fillRect(0, LT - 1, CW, 1); ctx.fillRect(0, RULER - 2, CW, 2);
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, CW, RULER); ctx.clip();
   if (sel) { ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(tx(sel.a), 0, tx(sel.b) - tx(sel.a), LT - 1); }

@@ -15,7 +15,7 @@ const LIB = {
   highc:    { name: 'Dark Neutral High Contrast', base: 'dark', a: -8, b: 1.14 },
   medc:     { name: 'Dark Neutral Medium Contrast', base: 'dark', a: 10, b: 0.98 },
   // Live 12's default dark theme (refs/live12-official 01-03): the greys a little lighter and cool - lanes about #2c2e35, panels #23252a
-  live12:   { name: 'Dark (Live 12)', base: 'dark', a: 12, b: 0.96, tint: [-3, 0, 6] },
+  live12:   { name: 'Dark (Live 12)', base: 'dark', a: 10, b: 0.96, tint: [-2, 0, 12] },   // lanes / ruler #323440 as sampled from refs/live12-official/02
   lightmc:  { name: 'Light Neutral Medium Contrast', base: 'light', a: -26, b: 1.04 },
   lightlc:  { name: 'Light Neutral Low Contrast', base: 'light', a: -8, b: 0.86 },
   midlight: { name: 'Mid Light',                base: 'light', a: -42, b: 1.0 },
