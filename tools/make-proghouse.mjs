@@ -1,6 +1,7 @@
 // Builds the tutorial showcase song demos/progressive-house.mdaw: "Neon Horizon", an original progressive house track, 128 BPM, F minor,
-// 64 bars = 2:00, made only with MobileDAW's built-in instruments (FL Studio Mobile's SuperSaw, MiniSynth, GMS and the drum sampler's
-// synthesized kit) and stock effects, through the app's own project API in Chromium, so the file is exactly what the app writes.
+// 64 bars = 2:00, made with MobileDAW's built-in instruments (FL Studio Mobile's SuperSaw, MiniSynth, GMS), stock effects and CC0 drum
+// samples from the Stargate DAW sample pack (demos/Samples/NH *.wav, see demos/README.txt), through the app's own project API in Chromium,
+// so the file is exactly what the app writes.
 // Form (bars): Intro 1-8, Build 9-16, Groove 17-24, Breakdown 25-32 (riser + snare roll), Drop 33-48, Drop B 49-56, Outro 57-64.
 // Chords i-VI-III-VII (Fm - Db - Ab - Eb), two bars each. Bass, pad and pluck duck under the kick (Autoduck = sidechain).
 // Usage: node tools/make-proghouse.mjs [--render out.wav]   (the render is a mixdown for listening checks)
@@ -20,6 +21,10 @@ const out = await page.evaluate(async (render) => {
   const P = await import('./js/project.js'), { PRESETS, DEVICES, normOf } = await import('./js/defs.js'), { eng } = await import('./js/engine.js');
   const PPQ = 960, BEAT = PPQ, BAR = 4 * BEAT, S16 = BEAT / 4, bar = (n) => (n - 1) * BAR;   // bar(1) = song start
   P.newProject(false); P.HK.on = false;
+  // the CC0 samples, as the demo loader puts them (demos.js: demos/Samples/<name>.wav -> /Samples/Demo/<name>.wav)
+  const SMP = ['NH Kick', 'NH Clap', 'NH Hat Closed', 'NH Hat Open', 'NH Snare', 'NH Crash', 'NH Ride', 'NH Noise Riser'];
+  for (const n of SMP) await eng.saveBytes('/Samples/Demo/' + n + '.wav', await (await fetch('demos/Samples/' + encodeURIComponent(n) + '.wav')).arrayBuffer());
+  const smp = (n) => '/Samples/Demo/' + n + '.wav';
   P.setBpm(128); P.state.projectName = 'Neon Horizon (Progressive House Showcase)';
   const preset = (i, type, name) => { const p = (PRESETS[type] || []).find((x) => x.name === name); if (!p) throw new Error('preset ' + name); P.applyPreset(i, p); };
   const track = (kind, name, color) => { P.addTrack(kind); const i = P.state.tracks.length - 1; P.renameTrack(i, name); if (color) P.state.tracks[i].color = color; return i; };
@@ -35,12 +40,14 @@ const out = await page.evaluate(async (render) => {
   // ---- harmony: Fm - Db - Ab - Eb, two bars each (8-bar cycle)
   const CH = [[53, 56, 60, 65], [53, 56, 61, 65], [51, 56, 60, 63], [51, 55, 58, 63]], ROOT = [41, 37, 44, 39];
   // ---- 1. Kick (its own track: the sidechain source)
-  const kick = track('drum', 'Kick', '#ff5f4a'); P.state.tracks[kick].vol = 0.9;
+  const kick = track('drum', 'Kick', '#ff5f4a'); P.state.tracks[kick].vol = 0.68;
+  await P.setPadSample(kick, 0, smp('NH Kick'));
   const four = rep(4, (k) => [[k, 0.25, 36, 1]]);
   for (const [a, n] of [[1, 24], [33, 32]]) clip(kick, a, n, 1, four, 'Kick 4/4');
   dev(kick, 31, { 0: 1, 1: 0, 2: 35, 15: 1, 16: 3, 17: 3500, 18: 2, 19: 0.8 });          // EQ Eight: low cut 35 Hz, a little click at 3.5 kHz
   // ---- 2. Drums: clap 2 & 4, offbeat hat, 16th ghost hats in the drops, open hat, snare roll into the drop
-  const dr = track('drum', 'Drums', '#ffb347'); P.state.tracks[dr].vol = 0.95;
+  const dr = track('drum', 'Drums', '#ffb347'); P.state.tracks[dr].vol = 0.55;
+  for (const [k, n] of [[1, 'NH Snare'], [2, 'NH Clap'], [3, 'NH Hat Closed'], [4, 'NH Hat Open']]) await P.setPadSample(dr, k, smp(n));
   const hatOff = rep(4, (k) => [[k + 0.5, 0.2, 42, 0.85]]);
   const clap = [[1, 0.25, 39, 0.95], [3, 0.25, 39, 0.95]];
   const ghost = rep(16, (k) => (k % 4 === 2 ? [] : [[k / 4, 0.1, 42, k % 2 ? 0.35 : 0.5]]));
@@ -54,6 +61,14 @@ const out = await page.evaluate(async (render) => {
   clip(dr, 49, 8, 1, [...ghost, ...clap, ...rep(4, (k) => [[k + 0.5, 0.35, 46, 0.75]]), [2.75, 0.2, 41, 0.6]], 'Drop B Drums');
   clip(dr, 57, 8, 1, [...hatOff, ...clap], 'Outro');
   dev(dr, 7, { 0: 0.35, 2: 0.12 });                                                    // a little room on the claps and hats
+  // ---- 2b. Cymbals: a crash on every section's downbeat, a ride on the beat in Drop B
+  const cy = track('drum', 'Cymbals', '#ffd166'); P.state.tracks[cy].vol = 0.3;
+  const cr = await P.addPadSample(cy, smp('NH Crash')), rd = await P.addPadSample(cy, smp('NH Ride'));
+  const CR = P.state.tracks[cy].inst.pads[cr.k].pitch, RD = P.state.tracks[cy].inst.pads[rd.k].pitch;
+  for (const b0 of [9, 17, 33, 57]) clip(cy, b0, 1, 0, [[0, 2, CR, 0.9]], 'Crash');
+  clip(cy, 49, 8, 1, [[0, 0.5, RD, 0.55], [1, 0.5, RD, 0.5], [2, 0.5, RD, 0.55], [3, 0.5, RD, 0.5]], 'Ride');
+  P.state.tracks[cy].clips.find((c) => c.start === bar(49)).notes.push({ t: 0, d: 1920, p: CR, v: 0.9 });
+  dev(cy, 31, { 0: 1, 1: 0, 2: 300 });                                               // cymbals: nothing below 300 Hz
   // ---- 3. Bass: rolling offbeat 16ths on the chord root (classic progressive house), ducked by the kick
   const bass = track('midi', 'Bass', '#4fd1ff'); P.setInstrument(bass, 32); preset(bass, 32, 'Round Saw Bass'); P.state.tracks[bass].vol = 1.25;
   const roll16 = (root) => rep(4, (k) => [[k + 0.25, 0.2, root, 0.85], [k + 0.5, 0.22, root + 12, 0.95], [k + 0.75, 0.2, root, 0.8]]);
@@ -89,10 +104,14 @@ const out = await page.evaluate(async (render) => {
   // ---- 7. Riser: a held chord whose pitch climbs an octave over the last 4 bars of the breakdown
   const rs = track('midi', 'Riser', '#ffe066'); P.setInstrument(rs, 33); preset(rs, 33, 'Huge Pad Bright'); P.state.tracks[rs].vol = 0.2;
   clip(rs, 29, 4, 0, [[0, 15.9, 53, 0.8], [0, 15.9, 60, 0.8], [0, 15.9, 65, 0.8]], 'Riser');
+  // ---- 7b. Noise riser: 4 bars of white noise (7.5 s = 4 bars at 128 BPM) through an Auto Filter that opens from 250 Hz to 18 kHz
+  const nz = track('audio', 'Noise Riser', '#e0e0e0'); P.state.tracks[nz].vol = 0.3;
+  const nc = await P.addAudioClip(nz, smp('NH Noise Riser'), bar(29)); if (nc) { nc.len = 4 * BAR; nc.fadeOut = 0; }
+  const nzF = dev(nz, 1, { 0: 0, 1: 250, 2: 1.6 });
   // ---- returns: A = big reverb, B = tempo delay; sends
   for (const [k, ps] of [[65, { 0: 0.82, 1: 0.45, 2: 1, 3: 25, 6: 250 }], [66, { 1: 2, 5: 3, 9: 0.45, 19: 1 }]]) dev(k, k === 65 ? 7 : 17, ps);
   P.state.returns[0].name = 'Reverb'; P.state.returns[1].name = 'Delay';
-  for (const [i, a, bb] of [[dr, 0.08, 0], [pl, 0.22, 0.18], [pad, 0.3, 0], [ld, 0.32, 0.2], [rs, 0.45, 0.15]]) { P.setSend(i, 0, a); P.setSend(i, 1, bb); }
+  for (const [i, a, bb] of [[dr, 0.08, 0], [cy, 0.12, 0], [pl, 0.22, 0.18], [pad, 0.3, 0], [ld, 0.32, 0.2], [rs, 0.45, 0.15], [nz, 0.35, 0.2]]) { P.setSend(i, 0, a); P.setSend(i, 1, bb); }
   // ---- master: glue compression, gentle tilt, limiter
   dev(64, 24, { 0: 1, 1: 1, 2: 0, 3: -14, 4: 2, 7: 1 });
   dev(64, 5, { 0: -0.5 });
@@ -102,6 +121,7 @@ const out = await page.evaluate(async (render) => {
   const fNorm = (hz) => { const d = DEVICES[1].params[1]; return Math.log(hz / d.min) / Math.log(d.max / d.min); };
   auto({ kind: 4, strip: P.stripOf(pad), devId: P.state.tracks[pad].devices[padF].id, param: 1, def: DEVICES[1].params[1] }, 'Pad • Auto Filter Freq',
     [[0, fNorm(500)], [16, fNorm(6000)], [24, fNorm(9000)], [24.01, fNorm(700)], [32, fNorm(16000)], [56, fNorm(16000)], [64, fNorm(400)]]);
+  auto({ kind: 4, strip: P.stripOf(nz), devId: P.state.tracks[nz].devices[nzF].id, param: 1, def: DEVICES[1].params[1] }, 'Noise Riser \u2022 Auto Filter Freq', [[0, fNorm(250)], [28, fNorm(250)], [32, fNorm(18000)], [64, fNorm(18000)]]);
   const pitchDef = { n: 'Pitch', min: -24, max: 24 };
   auto({ kind: 5, strip: P.stripOf(rs), param: 90, def: pitchDef }, 'Riser • Pitch', [[28, 0.5], [32, 0.75]]);
   auto({ kind: 0, strip: 'master', param: 0, def: P.AUTO_VOL }, 'Master • Volume', [[0, normOf(P.AUTO_VOL, 0.85)], [60, normOf(P.AUTO_VOL, 0.85)], [64, 0]]);

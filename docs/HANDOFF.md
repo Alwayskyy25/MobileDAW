@@ -856,3 +856,9 @@ Permintaan pemilik: SEMUA efek dan instrumen diganti dengan set stok Ableton Liv
   latihan berhasil. Semua mati dengan prefers-reduced-motion. Kartu pindah ke samping target bila atas / bawah tidak muat.
   `startTutorial(id, only)`; menu tutorial menampilkan showcase sebagai kartu utama. `T.revealRow()` menggulir lane / "+ Track" ke layar.
 - docs/redesign/tutorial/neon-horizon.mp3: render mixdown untuk didengar.
+- Sample drum showcase (permintaan pemilik "cari sendiri"): Stargate DAW sample pack, lisensi CC0 1.0 (domain publik, boleh didistribusikan
+  bersama aplikasi). Dipilih dan diukur: kick `stargate/kick-1-C` (dasar ~64 Hz = C, kuint F minor), clap / hat / ride `x0xproc1` (gaya 909),
+  snare `x0xproc2` (roll), crash `distkit`, white noise 7,5 s (= 4 bar di 128 BPM) untuk Noise Riser. Dipotong + dinormalisasi ke -1 dBFS
+  di demos/Samples/NH *.wav (2,2 MB); DEMOS `neon-horizon` menyalinnya ke /Samples/Demo saat dibuka. Track baru: Cymbals (crash di setiap
+  bagian, ride di Drop B) dan Noise Riser (audio + Auto Filter 250 Hz → 18 kHz). Level solo RMS: Kick -13, Lead -17, Pad -20, Bass -21,
+  Drums -22..-26, Pluck -27 dB; mix puncak -3,3 dBFS. Kredit: demos/README.txt, THIRD_PARTY_NOTICES.md.

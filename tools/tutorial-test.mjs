@@ -25,7 +25,7 @@ const geo = await page.evaluate(async () => {
     TU.startTutorial(c.id);
     for (let k = 0; k < c.steps.length; k++) {
       await wait(260); for (let q = 0; q < 200 && document.querySelector('.tut-card.busy'); q++) await wait(100);   // a step that prepares something (the showcase opens its song)
-      await wait(80);
+      await wait(480);                                         // the card's entrance animation (0.42 s) has ended
       const ring = document.querySelector('.tut-ring'), card = document.querySelector('.tut-card'), s = c.steps[k];
       const rr = ring && ring.style.display !== 'none' ? ring.getBoundingClientRect() : null, cr = card.getBoundingClientRect();
       const inView = (r) => r.left >= -1 && r.top >= -1 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1;
@@ -97,9 +97,9 @@ await page.evaluate(async () => { const P = await import('./js/project.js'); P.n
 const s0 = await page.evaluate(() => ({ splash: !!document.querySelector('.tut-card .tut-splash'), tips: document.querySelectorAll('.tut-card .tut-tips li').length, prog: !!document.querySelector('.tut-prog i') }));
 if (shots) await page.screenshot({ path: path.join(root, 'docs/redesign/tutorial/06-showcase-intro.png') });
 await next(); for (let q = 0; q < 300 && await page.evaluate(() => !!document.querySelector('.tut-card.busy')); q++) await page.waitForTimeout(100);
-const s1 = await page.evaluate(async () => { const P = await import('./js/project.js'); return { name: P.state.projectName, tracks: P.state.tracks.map((t) => t.name), markers: P.state.markers.length, bpm: P.state.bpm }; });
-ok(s0.splash && s0.tips >= 3 && s0.prog && /Neon Horizon/.test(s1.name) && s1.markers === 7 && s1.bpm === 128 && ['Kick', 'Drums', 'Bass', 'Pluck Arp', 'Pad', 'Lead', 'Riser'].every((n) => s1.tracks.includes(n)),
-  'showcase: chapter splash + tips + progress; "Neon Horizon" opens (128 BPM, 7 markers, ' + s1.tracks.length + ' tracks)');
+const s1 = await page.evaluate(async () => { const P = await import('./js/project.js'); const k = P.state.tracks.find((t) => t.name === 'Kick'), nz = P.state.tracks.find((t) => t.name === 'Noise Riser'); return { name: P.state.projectName, tracks: P.state.tracks.map((t) => t.name), markers: P.state.markers.length, bpm: P.state.bpm, kickSmp: !!(k && k.inst.pads[0].sample && /NH Kick/.test(k.inst.pads[0].sample.path) && k.inst.pads[0].sample.duration > 0.3), noise: !!(nz && nz.clips[0] && nz.clips[0].sample && nz.clips[0].sample.duration > 7) }; });
+ok(s0.splash && s0.tips >= 3 && s0.prog && /Neon Horizon/.test(s1.name) && s1.markers === 7 && s1.bpm === 128 && ['Kick', 'Drums', 'Cymbals', 'Bass', 'Pluck Arp', 'Pad', 'Lead', 'Riser', 'Noise Riser'].every((n) => s1.tracks.includes(n)) && s1.kickSmp && s1.noise,
+  'showcase: chapter splash + tips + progress; "Neon Horizon" opens (128 BPM, 7 markers, ' + s1.tracks.length + ' tracks) with its CC0 samples loaded (kick ' + s1.kickSmp + ', noise riser ' + s1.noise + ')');
 await next(); await page.waitForTimeout(400);                        // "Dengarkan dulu": live map + play buttons
 await page.evaluate(() => [...document.querySelectorAll('.tut-xacts .b')].find((x) => /Drop/.test(x.textContent)).click());
 await page.waitForTimeout(1600);
