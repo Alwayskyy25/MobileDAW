@@ -25,7 +25,8 @@ const P = {
   play: 'M8 5v14l11-7z', pause: 'M7 5h3.5v14H7zm6.5 0H17v14h-3.5z', stop: 'M6 6h12v12H6z', rew: 'M6 6h2v12H6zm3.5 6L18 6v12z',
   loop: 'M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z',
   metro: 'M7.5 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm9 0a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 1.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4z',   // Live's metronome: a full and an empty dot
-  panel: 'M3 5h18v14H3zm1.8 1.8v10.4H9V6.8zm6 0v10.4h8.4V6.8z',   // Live's browser toggle: a window with its side panel
+  panel: 'M3 5h18v14H3zm1.8 1.8v10.4H9V6.8zm6 0v10.4h8.4V6.8z',
+  loopic: 'M4 7h13l-2.5-2.5 1.2-1.2L20.4 8l-4.7 4.7-1.2-1.2L17 9H6v4H4zm16 10H7l2.5 2.5-1.2 1.2L3.6 16l4.7-4.7 1.2 1.2L7 15h11v-4h2z',   // Live's loop switch   // Live's browser toggle: a window with its side panel
   undo: 'M12.5 8c-2.65 0-5.05 1-6.9 2.6L2 7v9h9l-3.6-3.6A8 8 0 0 1 12.5 10c3.5 0 6.5 2.3 7.6 5.5l2.4-.8C21.1 10.7 17.2 8 12.5 8z',
   redo: 'M11.5 8c2.65 0 5.05 1 6.9 2.6L22 7v9h-9l3.6-3.6A8 8 0 0 0 11.5 10c-3.5 0-6.5 2.3-7.6 5.5l-2.4-.8C2.9 10.7 6.8 8 11.5 8z',
   menu: 'M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',

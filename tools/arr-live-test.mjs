@@ -41,6 +41,12 @@ await page.screenshot({ path: path.join(out, 'arr-fit.png') });
 { const q = await ev(() => { const r = (id) => { const e = document.querySelector(id), b = e.getBoundingClientRect(), c = getComputedStyle(e); return { w: Math.round(b.width), h: Math.round(b.height), rad: c.borderTopLeftRadius, svg: !!e.querySelector('svg') }; }; return ['#btn-browser', '#btn-rew', '#btn-play', '#btn-rec', '#btn-metro', '#btn-menu'].map(r); });
   ok(q.every((x) => x.svg && x.h === q[0].h && x.rad !== '0px') && q.slice(1, 5).every((x) => x.w === q[1].w), `control bar: six icon buttons, one height (${q[0].h} px), rounded (${q[0].rad}), transport buttons one width (${q[1].w} px)`);
   await page.locator('#top').screenshot({ path: path.join(out, 'controlbar.png') }); }
+// Live's control bar fields: song position "1. 1. 1", loop start / switch / length, time signature
+{ await ev(async () => { const P = await import('./js/project.js'); P.setLoop({ start: 2 * P.BAR, end: 6 * P.BAR, on: false }); P.seekTo(4 * P.BAR + P.BEAT); }); await page.waitForTimeout(400);
+  const t0 = await ev(() => ({ pos: document.querySelector('#rd-pos2').textContent, ls: document.querySelector('#rd-lst').textContent, ll: document.querySelector('#rd-llen').textContent, sig: document.querySelector('#rd-sig2').textContent }));
+  await page.locator('#btn-loop').click(); await page.waitForTimeout(300); const on = await ev(async () => (await import('./js/project.js')).state.loop.on);
+  ok(t0.pos === '5. 2. 1' && t0.ls === '3. 1. 1' && t0.ll === '4. 0. 0' && t0.sig === '4 / 4' && on, `control bar fields as Live's: position ${t0.pos}, loop ${t0.ls} / ${t0.ll}, ${t0.sig}; the loop switch turns the loop on`);
+  await ev(async () => { const P = await import('./js/project.js'); P.setLoop({ on: false }); P.seekTo(0); }); }
 // lit states of the transport: Play green while playing, Record red while armed, the metronome orange
 { await ev(() => { document.querySelector('#btn-metro').click(); document.querySelector('#btn-play').click(); }); await page.waitForTimeout(500);
   const on = await ev(() => ['#btn-play', '#btn-metro'].map((id) => { const e = document.querySelector(id); return { on: e.classList.contains('on'), bg: getComputedStyle(e).backgroundColor }; }));

@@ -1771,3 +1771,22 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .card > h4 > .lv-tabs.lk-htabs { gap: 2px; }
 .card > h4 > .lv-tabs.lk-htabs .lv-tab { border: 0; border-radius: 4px 4px 0 0; background: rgba(0, 0, 0, .16); color: var(--lv-ink); text-transform: none; padding: 0 8px; }
 .card > h4 > .lv-tabs.lk-htabs .lv-tab.on { background: var(--lv-body); color: var(--lv-ink); box-shadow: inset 0 2px 0 var(--lv-or, var(--accent)); }
+/* Control bar as Live 12's (refs/live12-official, sampled): the bar a step darker than the lanes, every field / button a flat box a step
+   lighter (#333540 on #282a33 in the dark theme), no borders, 2 px radius, small gaps; light-grey regular text, the tempo in the same ink;
+   the position "1. 1. 1", the loop start / switch / length and the time signature as fields; play / stop / record as bare glyphs */
+#top { background: var(--panel); box-shadow: none; border-bottom: 1px solid var(--line); }
+#top .b.ic, #top .grp .b, #top .grp .b:first-child, #top .grp .b:last-child, #top .readout, #top-l #rd-bpm, #top .perf, #top .seg .b {
+  background: color-mix(in srgb, var(--panel) 92%, #fff 8%); color: color-mix(in srgb, var(--text) 82%, var(--panel)); border: 0; border-radius: 2px; box-shadow: none; }
+#top .readout, #top-l #rd-bpm { height: var(--cb-h); padding: 0 9px; font: var(--fw-r) var(--fs-5)/1 var(--font); font-variant-numeric: tabular-nums; letter-spacing: .02em; min-width: 0; }
+#top-l #rd-bpm { min-width: 58px; }
+#top .lvf { white-space: pre; }
+#rd-pos2 { min-width: 84px; margin-right: 6px; }
+#top .tport .b { background: transparent !important; }
+#top .tport #btn-play.on { background: transparent !important; color: var(--play); }
+#top .tport #btn-rec { color: color-mix(in srgb, var(--text) 82%, var(--panel)); } #top .tport #btn-rec.on { background: transparent !important; color: var(--rec); }
+#top .tport #btn-metro.on, #top #btn-loop.on, #top .seg .b.on, #top #btn-browser.on { background: var(--lv-or, var(--accent)) !important; color: #1a1100 !important; }
+#top .grp.lvloop { display: flex; gap: 2px; margin-left: 6px; } #top .grp.lvloop .readout { min-width: 64px; }
+#top .grp.lvloop #btn-loop { width: 30px; min-width: 30px; }
+[data-w="s"] #top .grp.lvloop, [data-w="xs"] #top .grp.lvloop, [data-w="xs"] #rd-sig2, [data-w="xs"] #rd-pos2 { display: none; }
+#top .readout, #top-l #rd-bpm, [data-theme="light"] #top-l #rd-bpm { color: color-mix(in srgb, var(--text) 82%, var(--panel)); font-size: 13px; }
+#top .seg .b { font-weight: var(--fw-r); }

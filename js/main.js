@@ -41,12 +41,20 @@ const panes = {};
 
 // ------------------------------------------------------------------ transport + readouts
 function icons() {
-  for (const [id, n] of [['browser', 'panel'], ['play', 'play'], ['stop', 'stop'], ['rew', 'rew'], ['rec', 'rec'], ['metro', 'metro'], ['undo', 'undo'], ['redo', 'redo'], ['menu', 'menu']]) setIcon($('#btn-' + id), n);
+  for (const [id, n] of [['browser', 'panel'], ['play', 'play'], ['stop', 'stop'], ['rew', 'rew'], ['rec', 'rec'], ['metro', 'metro'], ['loop', 'loopic'], ['undo', 'undo'], ['redo', 'redo'], ['menu', 'menu']]) setIcon($('#btn-' + id), n);
 }
 function tapTempo() { const b = openTapChip(); return b; }
 function openTapChip() { const b = Tempo.tapPress(); if (b) toast(b.toFixed(1) + ' BPM', 900); return b; }
 function wireTransport() {
   $('#btn-play').onclick = () => P.togglePlay();
+  // Live's control bar fields: position (tap = back to the start of the bar under it... here: the Tempo window's position), loop start / length and the
+  // loop switch, the time signature (tap = Tempo window, where tempo / signature / tap live)
+  $('#btn-loop').onclick = () => P.setLoop({ on: !state.loop.on });
+  $('#rd-sig2').onclick = Tempo.openTempo;
+  const nudgeLoop = (e, key) => { const r = e.currentTarget.getBoundingClientRect(), L = state.loop, bar = P.barLenAt(L.start), mv = (d) => { if (key === 'start') { const s = Math.max(0, L.start + d * bar); P.setLoop({ start: s, end: s + (L.end - L.start) }); } else P.setLoop({ end: Math.max(L.start + bar, L.end + d * bar) }); };
+    menu([{ label: key === 'start' ? 'Awal loop +1 bar' : 'Panjang loop +1 bar', fn: () => mv(1) }, { label: key === 'start' ? 'Awal loop -1 bar' : 'Panjang loop -1 bar', fn: () => mv(-1) }, { label: 'Loop ke seleksi / klip terpilih', fn: () => { const c = P.selectedClip(); if (c) P.setLoop({ start: c.clip.start, end: c.clip.start + c.clip.len, on: true }); } }], r.left, r.bottom + 2); };
+  $('#rd-lst').onclick = (e) => nudgeLoop(e, 'start'); $('#rd-llen').onclick = (e) => nudgeLoop(e, 'len');
+  $('#rd-pos2').onclick = () => P.seekTo(0);
   $('#btn-stop').onclick = async () => { if (P.rec.on) { await toggleRec(); return; } if (!state.playing) P.seekTo(0); P.stop(); };
   $('#btn-rew').onclick = () => P.seekTo(0);
   $('#btn-rec').onclick = toggleRec;
@@ -259,10 +267,15 @@ async function runExport({ name, items, sp, o }) {
 }
 
 let lastPos = '', lastBpm = '';
+let lastLoopTxt = '';
 function readouts() {
   const p = Math.max(0, state.pos), bi = P.barAt(p), bar = bi + 1, bt = P.beatLenAt(p), off = p - P.barStart(bi), beat = Math.floor(off / bt) + 1, six = Math.floor((off % bt) / Math.max(60, bt / 4)) + 1;
   const s = `${bar}.${beat}.${six}`;
-  if (s !== lastPos) { $('#rd-pos').textContent = s; lastPos = s; }
+  if (s !== lastPos) { $('#rd-pos').textContent = s; $('#rd-pos2').textContent = s.split('.').join('. '); lastPos = s; }
+  { const L = state.loop, f = (t) => { const bi = P.barAt(t), bt = P.beatLenAt(t), off = t - P.barStart(bi); return `${bi + 1}. ${Math.floor(off / bt) + 1}. ${Math.floor((off % bt) / Math.max(60, bt / 4)) + 1}`; };
+    const len = L.end - L.start, bl = P.barLenAt(L.start), bt = P.beatLenAt(L.start), lt = `${Math.floor(len / bl)}. ${Math.floor((len % bl) / bt)}. ${Math.floor((len % bt) / Math.max(60, bt / 4))}`;   // Live: loop start as a position, length as bars. beats. sixteenths
+    const k = f(L.start) + '|' + lt + '|' + L.on + '|' + P.sigTextAt(Math.max(0, state.pos));
+    if (k !== lastLoopTxt) { lastLoopTxt = k; $('#rd-lst').textContent = f(L.start); $('#rd-llen').textContent = lt; $('#btn-loop').classList.toggle('on', !!L.on); $('#rd-sig2').textContent = P.sigTextAt(Math.max(0, state.pos)).replace('/', ' / '); } }
   const b = P.bpmAt(Math.max(0, state.pos)).toFixed(2);
   if (b !== lastBpm) { $('#rd-bpm').textContent = b; lastBpm = b; }
   { const pb = $('#btn-play'); if (pb.classList.contains('on') !== !!state.playing) { pb.classList.toggle('on', !!state.playing); setIcon(pb, state.playing ? 'pause' : 'play'); } }   // one button: play / pause
