@@ -818,3 +818,27 @@ Permintaan pemilik: SEMUA efek dan instrumen diganti dengan set stok Ableton Liv
 - Belum bisa dibuktikan tanpa render referensi FL Studio Mobile: "lebar" stereo. Mix Caest La Vie terukur side/mid sekitar -36 dB;
   modul FX dengan nilai default terbukti stereo (side/mid 0 dB untuk L/R independen), dan sample stereo tetap stereo setelah stretch.
   Perlu ekspor FLM dari proyek yang sama (master + per-track) untuk perbandingan objektif.
+
+## Importer FLM vs Honeydew, progres memuat, oversampling, alat FLM, tutorial interaktif (sesi 2026-11-16, lanjutan)
+- Importer FLM (js/import/flm.js + build.js), dibandingkan dengan Honeydew `drums.rs` / `audio_clips.rs` / `read.rs`:
+  - Pitch STR1 dibulatkan ke semitone utuh dan dibatasi ±24, rasio stretch dibatasi ×¼…×4 (`strSemis` / `strRatio`), seperti render FLM.
+    Sebelumnya 262 dari 1002 klip Caest dan 92 klip HIPDUT diputar dengan pitch pecahan (mis. -3.498 st, padahal FLM -3).
+  - Loop klip audio: offset konten ada di dalam loop (`ll` = loop, `lp` = offset, `lps` = koreksi Speed). Klip dengan offset + panjang >
+    loop kini membungkus di batas loop seperti FLM (sebelumnya terus memutar sample).
+  - Slot kit drum: rasio stretch berlaku kapan pun ≠ 1 (mode di file diabaikan, seperti Honeydew).
+  - Program library DirectWave (mis. "Keyboard/Grand Piano"): bila .dwp bernama sama ada di pustaka, dipakai (dimuat saat proyek dibuka);
+    jika tidak, tetap GM SoundFont pengganti.
+  - Sample Start / Length / ADSR slot klip audio belum diterapkan (0 klip memakainya di semua proyek pemilik); tetap dilaporkan.
+- Jendela progres memuat proyek (js/loadprog.js): setiap sample, render stretch/pitch, dan klip yang disesuaikan ke tempo / swing adalah satu
+  langkah; dipakai saat membuka proyek, demo, cadangan, sesi terakhir, dan impor. `bakeHooks.hold` menahan bake sampai proyek selesai dimuat.
+- Oversampling 4× (native/engine/os.h = js/engine/os.js, tap filter literal agar desktop = WASM bit demi bit): Amp, Overdrive, Pedal,
+  Drum Buss, Vinyl Distortion. Aliasing (relatif terhadap harmonik): Amp -20 → -87 dB, Pedal -17 → -76, Overdrive -18 → -49, Drum Buss -33 → -57.
+  Nada / dinamika tetap (selisih ≤ 0.2 dB). Tidak di-oversample: Roar dan FLM Waveshaper (konstanta per-sampel berubah di 4×), FLM
+  Distortion (dipertahankan seperti FLM; tanh/pow libm desktop vs WASM membuat golden -84 dB).
+- Alat alur FL Studio Mobile: "Nilai persis (Fine tune)" di menu tahan setiap kontrol (automate.js `fineTune`); DirectWave "Buat dari
+  sample (multi-sample)" = instrument builder FLM (js/tokenmap.js, port Honeydew token_map.rs: root / tuts / velocity / round robin dari
+  nama file). Tes: tools/flmtools-test.mjs.
+- Tutorial interaktif (js/tutorial.js): 5 bab, 45 langkah. Spotlight pada kontrol asli, kartu penjelasan, langkah "Coba" menunggu aksi
+  pengguna. Termasuk latihan membuat beat pertama. Dibuka dari Menu → Tutorial interaktif; ditawarkan sekali saat pertama kali dibuka
+  (tidak saat diuji otomatis). Overlay diletakkan tepat sebelum #layer agar menu / dialog tetap di atasnya. `T.tutorialRects()` memberi
+  posisi bagian arrangement (canvas). Tes: tools/tutorial-test.mjs (`--shots` → docs/redesign/tutorial/).

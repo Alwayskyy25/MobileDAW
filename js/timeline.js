@@ -1225,6 +1225,16 @@ function placeBar() {
 }
 function clearSel() { if (!msel.size) return; msel.clear(); marq = null; updateBar(); invalidate(); }
 // canvas coordinates of a tick on track row i (UI tests drive real touches with it)
+// page rectangles of parts of the arrangement (the interactive tutorial, js/tutorial.js, spotlights them): the ruler, the clip area, the header
+// column, the "+ Track" button, and track i's header parts (title, mute, solo, arm, volume, pan, sends)
+export function tutorialRects(i = 0) {
+  if (!canvas) return {};
+  const o = canvasOrigin(), at = (r) => (r ? { left: o.left + r.x, top: o.top + r.y, width: r.w, height: r.h } : null), LB = LANE_B(), nn = state.tracks.length + nX();
+  const out = { ruler: at({ x: 0, y: 0, w: CW, h: RULER }), clips: at({ x: 0, y: RULER, w: CW, h: Math.max(0, LB - RULER) }), header: at({ x: CW, y: RULER, w: HEAD, h: Math.max(0, LB - RULER) }) };
+  const ay = rowY(nn); if (ay < LB) out.addTrack = at({ x: CW + 6, y: ay + 8, w: HEAD - METW - 12, h: Math.min(28, rh(nn) - 16) });
+  if (state.tracks[i]) { const r = hdr(i); for (const k of ['title', 'mute', 'solo', 'arm', 'vol', 'pan', 'sa', 'sb']) if (r[k]) out[k] = at(r[k]); out.lane = at({ x: 0, y: r.y, w: CW, h: r.h }); }
+  return out;
+}
 export function probe(tick, i) { return { x: tx(tick), y: rowY(i) + rh(i) / 2, top: rowY(i) }; }
 export const timeSelection = () => (sel && sel.b > sel.a ? { a: sel.a, b: sel.b } : null);   // the ruler time selection (export: Selection)
 export const testState = () => ({ snap: SNAPS[cfg.snap][0], picked: msel.size, sel: sel ? { a: sel.a, b: sel.b } : null, dragging: !!drag });   // UI tests

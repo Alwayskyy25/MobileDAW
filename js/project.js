@@ -347,7 +347,7 @@ export function syncClips(i) {
       env.push(...ce);
       const es = c.dsample || c.sample;
       const segs = loopSegs(c);       // clip dragged longer than its audio: the audio repeats instead of leaving silence
-      segs.forEach((g, k) => { f.push(c.start + g.o, g.len, es.id, c.gain, (c.offset || 0) + g.s / PPQ * 60 / state.bpm, k === 0 ? c.fadeIn || 0 : 0, k === segs.length - 1 ? c.fadeOut || 0 : 0, c.pan || 0, e0, en); n++; });
+      segs.forEach((g, k) => { f.push(c.start + g.o, g.len, es.id, c.gain, (c.offset || 0) + g.s / PPQ * 60 / state.bpm * (c.lps || 1), k === 0 ? c.fadeIn || 0 : 0, k === segs.length - 1 ? c.fadeOut || 0 : 0, c.pan || 0, e0, en); n++; });
     }
     eng.trackClips(i, f, n, 10, env);
   } else {
@@ -874,7 +874,7 @@ export async function setZoneSample(i, k, path) {
   return s;
 }
 // a file of the library by its name: the folder given first, then every folder (Samples, FLM, Recordings, ...); null when none
-function findLibFile(name, dir) {
+export function findLibFile(name, dir) {
   if (!name || !eng.listDir) return null;
   const low = name.toLowerCase(), hit = (d) => { const r = eng.listDir(d); const it = r && (r.items || []).find((x) => !x.dir && x.name.toLowerCase() === low); return it ? d + '/' + it.name : null; };
   if (dir) { const f = hit(dir); if (f) return f; }
@@ -912,6 +912,20 @@ export async function loadDwpProgram(i, path) {
   HK.on = was;
   syncZones(i); emit('devices');
   return { zones: zones.length, missing, name: pname, dropped: Math.max(0, prog.zones.length - MAX_ZONES) };
+}
+// DirectWave "New from samples" (FLM's instrument builder, js/tokenmap.js): regions { path, root, keys, vels } -> the track's zones (16 at most,
+// in the order given). One undo step. Returns { zones, failed: [names], dropped }.
+export async function buildDwFromSamples(i, regions) {
+  const t = state.tracks[i]; if (!t || !t.inst || t.inst.type !== INST.FLM_DW) return { error: 'Pilih track DirectWave dulu.' };
+  const zones = [], failed = [];
+  for (const r of regions.slice(0, MAX_ZONES)) {
+    const s = await loadSampleObj(r.path); if (!s) { failed.push(r.path.split('/').pop()); continue; }
+    zones.push({ ...newZone(), sample: s, root: r.root, lo: r.keys[0], hi: r.keys[1], vlo: Math.max(1, r.vels[0]), vhi: Math.max(1, r.vels[1]) });
+  }
+  if (!zones.length) return { error: 'Tidak ada sample yang bisa dimuat.', failed };
+  if (HK.on) HK.add({ t: 'inst', s: t.id, v: { ...t.inst, params: { ...t.inst.params }, zones: (t.inst.zones || []).map((z) => ({ ...z })) } });
+  t.inst.zones = zones; syncZones(i); emit('devices');
+  return { zones: zones.length, failed, dropped: Math.max(0, regions.length - MAX_ZONES) };
 }
 export const PITCH_PARAM = { n: 'Pitch', min: -24, max: 24, def: 0, step: 1, fmt: 'int' };   // instrument param 90, handled by the engine for every instrument
 export function setBend(i, st) { const t = state.tracks[i]; if (!t || !t.inst) return; eng.bend(i, st); }
@@ -1624,16 +1638,22 @@ async function deserializeInner(text, onProgress) {
   for (const r of state.returns) r.devices = Array.isArray(r.devices) ? r.devices : [];
   for (const t of state.tracks) t.out = Number.isInteger(t.out) && t.out >= 0 && t.out < state.returns.length ? t.out : -1;   // projects from before routing existed: everything goes to the Master
   const missing = [];
-  const totalA = state.tracks.reduce((n, t) => n + (t.kind === 'audio' ? t.clips.length : 0), 0) || 1; let doneA = 0, lastP = 0;
-  const tick = () => { doneA++; const now = Date.now(); if (onProgress && now - lastP > 80) { lastP = now; onProgress(Math.min(0.98, doneA / totalA)); } };
+  // progress: every sample to decode / render is one step (audio clips, their stretch / pitch renders, instrument samples, SoundFonts,
+  // wavetables, DirectWave programs, drum pads); onProgress(fraction, label, done, total)
+  const isIn = (t) => t.inst && (t.inst.type === INST.SOUNDFONT || t.inst.type === 37 || (t.inst.type === INST.FLM_DW && t.inst.dwp));
+  const totalA = Math.max(1, state.tracks.reduce((n, t) => n + (t.kind === 'audio' ? (t.clips || []).length : 0) + (t.frozen ? 1 : 0) + (isIn(t) ? 1 : 0) + ((t.inst && t.inst.zones) || []).length + (t.kind === 'drum' && t.inst && Array.isArray(t.inst.pads) ? t.inst.pads.length : 0), 0));
+  let doneA = 0, lastP = 0, what = 'Memuat sample\u2026';
+  const say = (label) => { what = label; if (onProgress) { lastP = Date.now(); onProgress(Math.min(0.99, doneA / totalA), what, doneA, totalA); } };
+  const tick = () => { doneA++; const now = Date.now(); if (onProgress && now - lastP > 60) { lastP = now; onProgress(Math.min(0.99, doneA / totalA), what, doneA, totalA); } };
   for (const t of state.tracks) {
     if (t.kind !== 'audio') continue;
     t.clips = t.clips.filter((c) => c && c.sample && c.sample.path);   // a clip without a sample reference cannot be played
     for (const c of t.clips) {
+      say('Memuat sample klip: ' + (c.sample.path.split('/').pop() || ''));
       const s = await loadSampleObj(c.sample.path);
       if (s) {
         c.sample = s;
-        if (c.warp && (c.warp.ratio !== 1 || c.warp.rev || c.warp.pitch)) c.dsample = await deriveSample(s, c.warp);
+        if (c.warp && (c.warp.ratio !== 1 || c.warp.rev || c.warp.pitch)) { say('Merender stretch / pitch: ' + (c.name || s.name)); c.dsample = await deriveSample(s, c.warp); }
       } else missing.push(c.sample.path);
       tick();
     }
@@ -1642,27 +1662,36 @@ async function deserializeInner(text, onProgress) {
   frozenSmp.clear();
   for (const t of state.tracks) {                                  // frozen tracks: their audio from the library; missing = the track plays live again
     if (!t.frozen || !t.frozen.path) { delete t.frozen; continue; }
-    const s = await loadSampleObj(t.frozen.path); if (s) frozenSmp.set(t.id, s); else delete t.frozen;
+    what = 'Memuat audio track beku: ' + (t.name || ''); const s = await loadSampleObj(t.frozen.path); tick(); if (s) frozenSmp.set(t.id, s); else delete t.frozen;
   }
   const chains = [state.master, ...state.returns, ...state.tracks];
   for (let i = 0; i < state.tracks.length; i++) {
     const t = state.tracks[i];
+    if (isIn(t) && !(t.inst.type === INST.FLM_DW)) { say((t.inst.type === 37 ? 'Memuat wavetable: ' : 'Memuat SoundFont: ') + (t.name || '')); tick(); }
     if (t.inst && t.inst.type === INST.SOUNDFONT && t.inst.sf) { const r = await loadSoundFontFor(i, t.inst.sf.path, t.inst.sf.preset); if (r && r.error) missing.push(t.inst.sf.path); }
     if (t.inst && t.inst.type === 37) { t.inst.params[302] = t.inst.params[303] = -1; for (let o = 0; o < 2; o++) { const w = t.inst.wt && t.inst.wt[o]; if (!w) continue; const r = await loadMoistureTable(i, o, w.path); if (r && r.error) missing.push(w.path); } }   // Moisture wavetables: new sample ids each load
   }
   for (const t of state.tracks) {
     if (!t.inst || !t.inst.zones) continue;
     for (const z of t.inst.zones) {
-      if (!z.sample) continue;
+      tick(); if (!z.sample) continue;
+      what = 'Memuat sample instrumen: ' + (t.name || '');
       const sm = await loadSampleObj(z.sample.path);
       if (sm) z.sample = sm; else { missing.push(z.sample.path); z.sample = null; }
     }
+  }
+  for (let i = 0; i < state.tracks.length; i++) {                 // DirectWave with a library program (.dwp) still to load (an FLM import)
+    const t = state.tracks[i]; if (!t.inst || t.inst.type !== INST.FLM_DW || !t.inst.dwp || (t.inst.zones || []).some((z) => z.sample)) continue;
+    say('Memuat program DirectWave: ' + t.inst.dwp.split('/').pop()); tick();
+    const r = await loadDwpProgram(i, t.inst.dwp); if (r.error) missing.push(t.inst.dwp); else delete t.inst.dwp;
   }
   for (const t of state.tracks) {
     if (t.kind !== 'drum' || !t.inst) continue;
     if (!Array.isArray(t.inst.pads)) { delete t.inst.pads; continue; }
     t.inst.pads = t.inst.pads.filter((q) => q && Number.isFinite(q.pitch)).slice(0, MAX_PADS).map((q) => newPad(q));
+    what = 'Memuat pad drum: ' + (t.name || '');
     for (const q of t.inst.pads) {
+      tick();
       if (q.chain) {                                                          // Drum Rack chain: instrument (+ its sample) and effects
         const c = q.chain; c.devices = fixChain(c.devices).filter((d) => !DEVICES[d.type].hidden);
         for (const d of c.devices) { if (!Array.isArray(d.params)) d.params = []; fillParams(d, DEVICES); d.bypass = !!d.bypass; }
@@ -1672,7 +1701,7 @@ async function deserializeInner(text, onProgress) {
       }
       if (!q.sample) continue;
       const sm = q.sample.path ? await loadSampleObj(q.sample.path) : null;
-      if (sm) { q.sample = sm; if (q.warp && ((q.warp.ratio || 1) !== 1 || q.warp.pitch)) { const ds = await deriveSample(sm, q.warp); q.dsample = ds && ds !== sm ? ds : null; } flmPadTime(q); } else { if (q.sample.path) missing.push(q.sample.path); q.sample = null; if (q.kind < 0) q.mute = true; }
+      if (sm) { q.sample = sm; if (q.warp && ((q.warp.ratio || 1) !== 1 || q.warp.pitch)) { say('Merender stretch / pitch pad: ' + (q.name || sm.name)); const ds = await deriveSample(sm, q.warp); q.dsample = ds && ds !== sm ? ds : null; } flmPadTime(q); } else { if (q.sample.path) missing.push(q.sample.path); q.sample = null; if (q.kind < 0) q.mute = true; }
     }
   }
   let maxId = 0;
@@ -2064,22 +2093,27 @@ let bakeTimer = 0, baking = null, bakeAgain = false;
 export function scheduleBake(ms = 350) { clearTimeout(bakeTimer); bakeTimer = setTimeout(ensureBakes, ms); }
 export function ensureBakes() {
   clearTimeout(bakeTimer);
+  if (bakeHooks.hold) { scheduleBake(200); return Promise.resolve(); }
   if (baking) { bakeAgain = true; return baking; }
   baking = (async () => { try { do { bakeAgain = false; await bakeAll(); } while (bakeAgain); } catch (_) { /* a failed bake leaves the clip on the plain path */ } baking = null; })();
   return baking;
 }
+// bakeProgress(done, total): the clips still to warp onto the tempo map / swing grid (the loading window shows it after a project opens)
+export const bakeHooks = { progress: null, hold: false };   // hold: a project is loading (its bakes wait, then run under the loading window)
+export function bakesPending() { let n = 0; for (const t of state.tracks) if (t.kind === 'audio') for (const c of t.clips) { if (!bakeWanted(c)) continue; const b = bakes.get(c.id); if (!b || b.key !== bakeKey(c)) n++; } return n; }
 async function bakeAll() {
   const alive = new Set();
   for (const t of state.tracks) if (t.kind === 'audio') for (const c of t.clips) alive.add(c.id);
   for (const [id, b] of [...bakes]) if (!alive.has(id)) { bakes.delete(id); freeSlots.push(b.id); }
-  let changed = false;
+  let changed = false; const total = bakesPending(); let done = 0;
   for (let i = 0; i < state.tracks.length; i++) {
     const t = state.tracks[i]; if (t.kind !== 'audio') continue;
     for (const c of [...t.clips]) {
       if (!bakeWanted(c)) continue;
       const key = bakeKey(c), have = bakes.get(c.id);
       if (have && have.key === key) continue;
-      const r = await bakeClip(c);
+      if (bakeHooks.progress) bakeHooks.progress(done, total, c.name || (c.sample && c.sample.name) || '');
+      const r = await bakeClip(c); done++;
       if (r.error) { bakeError = r.error; continue; }
       if (bakeKey(c) !== key) { bakeAgain = true; continue; }      // edited while rendering: go round again
       let id = have ? have.id : freeSlots.pop();
@@ -2315,6 +2349,16 @@ export function startCcLearn(target, label) { learn.pending = { target, label };
 export function cancelCcLearn() { learn.pending = null; emit('learn'); }
 let _rt = 0;
 const scheduleRefresh = () => { if (!_rt) _rt = setTimeout(() => { _rt = 0; emit('devices'); emit('mix'); }, 90); };
+// the value a target holds now (Fine tune dialog prefill): track volume / pan / sends / width, a device or instrument parameter
+export function targetValue(target) {
+  const r = resolveTarget(target); if (!r) return null;
+  const t = tr(r.track);
+  switch (target.kind) {
+    case 0: return t.vol; case 1: return t.pan; case 2: case 3: return (t.send || [0, 0])[target.kind - 2]; case 7: return t.width ?? 1;
+    case 4: { const d = t.devices[r.dev]; return d ? d.params[target.param] : null; }
+    default: return t.inst ? instVal(t, target.param) : null;
+  }
+}
 export function applyTargetValue(target, v) {
   const r = resolveTarget(target);
   if (!r) return;

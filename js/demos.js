@@ -1,7 +1,7 @@
 // Demo songs. Two ready-made projects that use the built-in virtual instruments. The first time a demo is opened, the SoundFont (and any
 // samples) it needs are copied (once) from the app's own files into the library (/SoundFonts, /Samples/Demo); then the project opens.
 import { eng, backend } from './engine.js';
-import * as P from './project.js';
+import { openWithLoading } from './loadprog.js';
 
 const SF_PATH = '/SoundFonts/TimGM6mb.sf2', SF_URL = 'demos/SoundFonts/TimGM6mb.sf2';
 // Leftovers of the removed "Bombay Bass" demo: deleted from the library the next time a demo is opened.
@@ -33,5 +33,5 @@ export async function openDemo(d, onStep) {
   }
   const text = await (await fetch(d.file)).text();
   eng.writeText('/Projects/' + d.name.replace(/[^\w\- ]+/g, '') + '.mdaw', text);
-  return P.deserialize(text);
+  return openWithLoading(text, 'Membuka demo ' + d.name);
 }

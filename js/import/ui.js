@@ -45,7 +45,12 @@ export async function importDialog(after) {
       home: eng.home(),
       saveBytes: async (path, bytes) => { await eng.saveBytes(path, bytes.buffer.byteLength === bytes.byteLength ? bytes.buffer : bytes.slice().buffer); },
       writeText: async (path, text) => { eng.writeText(path, text); },
-      open: async (text, prog) => P.deserialize(text, prog),
+      open: async (text, prog) => {   // the project, then the clips warped onto its tempo map / swing grid (rendered now, with progress)
+        P.bakeHooks.hold = true; let miss; try { miss = await P.deserialize(text, prog); } finally { P.bakeHooks.hold = false; }
+        if (P.bakesPending()) { P.bakeHooks.progress = (d, t, name) => prog(t ? d / t : 1, 'Menyesuaikan klip ke tempo: ' + name, d, t); try { await P.ensureBakes(); } finally { P.bakeHooks.progress = null; } }
+        return miss;
+      },
+      findDwp: (lib) => P.findLibFile(lib.split('/').pop().replace(/\.dwp$/i, '') + '.dwp'),   // a DirectWave library program the owner copied into the library
       fxMode,
       ensureSoundFont: async (path) => { if (!eng.fileSize(path)) { const r = await fetch('demos/SoundFonts/' + path.split('/').pop()); if (r.ok) await eng.saveBytes(path, await r.arrayBuffer()); } },
     };

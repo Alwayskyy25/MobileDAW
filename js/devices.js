@@ -82,7 +82,41 @@ function zoneEditor(i, k) {
 const zonesMenu = (i, r) => { const t = state.tracks[i]; if (!t || !t.inst) return; const zs = t.inst.zones || [];
   menu([...zs.map((z, k) => ({ label: `Zona ${k + 1}: ${z.sample ? z.sample.name : '(kosong)'}`, fn: () => zoneEditor(i, k) })), { sep: true },
     { label: '+ Zona', dim: zs.length >= P.MAX_ZONES, fn: () => { const k = P.addZone(i); if (k !== null) zoneEditor(i, k); } },
-    t.inst.type === INST.FLM_DW ? { label: 'Muat WAV / MP3 / program DWP\u2026', fn: () => dwLoad(i) } : null].filter(Boolean), r.left, r.bottom + 1); };
+    t.inst.type === INST.FLM_DW ? { label: 'Muat WAV / MP3 / program DWP\u2026', fn: () => dwLoad(i) } : null,
+    t.inst.type === INST.FLM_DW ? { label: 'Buat dari sample (multi-sample)\u2026', fn: () => dwBuilder(i, r) } : null].filter(Boolean), r.left, r.bottom + 1); };
+// DirectWave "New from samples" (FL Studio Mobile's instrument builder; mapping js/tokenmap.js, Honeydew token_map.rs): several audio files
+// (from the device, or a folder of the library) become zones by their names: Piano_C4_v64.wav = root C4, the velocity layer up to 64
+async function dwBuilder(i, r) {
+  const pick = async (paths) => { const a = paths.filter((p) => /\.(wav|mp3|flac|ogg|aif+|m4a)$/i.test(p)); if (!a.length) { toast('Tidak ada file audio.', 2500); return; } dwBuilderDialog(i, a); };
+  const dirs = (eng.allDirs ? [...eng.allDirs('/Samples'), ...eng.allDirs('/FLM'), ...eng.allDirs('/Recordings')] : []).filter((d) => (eng.listDir(d).items || []).some((x) => !x.dir && /\.(wav|mp3|flac|ogg|aif+|m4a)$/i.test(x.name)));
+  menu([{ label: 'File dari perangkat\u2026', fn: async () => pick(await eng.importFiles('.wav,.mp3,.flac,.ogg,.aif,.aiff,.m4a')) },
+    ...(dirs.length ? [{ sep: true }, ...dirs.slice(0, 40).map((d) => ({ label: 'Folder ' + d.replace(/^\//, ''), fn: () => pick((eng.listDir(d).items || []).filter((x) => !x.dir).map((x) => d + '/' + x.name)) }))] : [])], r.left, r.bottom + 1);
+}
+async function dwBuilderDialog(i, paths) {
+  const TM = await import('./tokenmap.js');
+  const names = paths.map((p) => p.split('/').pop());
+  let sep = TM.separatorOf(names[0]), roles = TM.guess(TM.tokens(names[0], sep));
+  const box = h('div', { class: 'dwb' }), table = h('div', { class: 'dwb-t' });
+  const sel = (opts, val, on) => { const e = h('select', { class: 'dwb-s' }, ...opts.map(([v, l]) => { const o = h('option', { value: v }, l); if (v === val) o.selected = true; return o; })); e.onchange = () => on(e.value); return e; };
+  const draw = () => {
+    const toks = TM.tokens(names[0], sep);
+    while (roles.length < toks.length) roles.push('ignore');
+    const rolesRow = h('div', { class: 'dwb-roles' }, ...toks.map((t, k) => h('label', {}, h('span', {}, t || '\u2014'), sel(TM.ROLES.map((x) => [x, TM.ROLE_LABEL[x]]), roles[k], (v) => { roles[k] = v; draw(); }))));
+    const rg = TM.mapNames(names, sep, roles.slice(0, toks.length)); box.rg = rg;
+    table.replaceChildren(h('div', { class: 'dwb-h' }, h('span', {}, 'File'), h('span', {}, 'Root'), h('span', {}, 'Tuts'), h('span', {}, 'Vel')),
+      ...rg.map((x) => h('div', { class: 'dwb-r' + (x.flag ? ' bad' : '') }, h('span', {}, x.file), h('span', {}, noteName(x.root)), h('span', {}, noteName(x.keys[0]) + '\u2013' + noteName(x.keys[1])), h('span', {}, x.vels[0] + '\u2013' + x.vels[1] + (x.seq ? ' RR' + x.seq[0] + '/' + x.seq[1] : '')),
+        x.flag ? h('em', {}, x.flag.unparsed != null ? 'token ' + (x.flag.unparsed + 1) + ' tidak terbaca' : 'tumpang tindih') : null)));
+    box.replaceChildren(h('div', { class: 'dwb-top' }, h('span', {}, 'Pemisah'), sel([...TM.SEPARATORS.map((x) => [x, '\u201c' + x + '\u201d']), ['', '(tanpa)']], sep, (v) => { sep = v; roles = TM.guess(TM.tokens(names[0], sep)); draw(); }),
+      h('span', { class: 'dwb-n' }, names.length + ' file' + (names.length > P.MAX_ZONES ? ' (maks ' + P.MAX_ZONES + ' zona)' : ''))), rolesRow, table);
+  };
+  draw();
+  modal('Buat DirectWave dari sample', box, [{ label: 'Batal' }, { label: 'Buat', go: true, fn: async () => {
+    const rg = box.rg.map((x, k) => ({ ...x, path: paths[k] })).filter((x) => !(x.flag && x.flag.unparsed != null));
+    toast('Memuat sample\u2026', 6000);
+    const res = await P.buildDwFromSamples(i, rg);
+    toast(res.error || res.zones + ' zona dibuat' + (res.dropped ? ', ' + res.dropped + ' file lebih dari 16 dilewati' : '') + (res.failed.length ? ', ' + res.failed.length + ' gagal dimuat' : '') + '.', 4000);
+  } }]);
+}
 // DirectWave: a file from the device. A .dwp = a whole program (its zones replace the track's); WAV / MP3 = the sample of the first empty zone
 // (a new zone when every zone has one, the last zone's when 16 are full)
 async function dwLoad(i) {

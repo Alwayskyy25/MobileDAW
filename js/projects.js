@@ -4,6 +4,7 @@ import { h, modal, toast, ask } from './ui.js';
 import { eng } from './engine.js';
 import * as P from './project.js';
 import * as QS from './quicksave.js';
+import { openWithLoading } from './loadprog.js';
 import { prefs, savePrefs } from './prefs.js';
 import { flmUpgradable, upgradeFlmJson } from './import/fxmap.js';
 
@@ -28,13 +29,13 @@ export async function offerFlmUpgrade() {
   modal('Modul FL Studio Mobile', h('div', { class: 'xdlg' }, h('div', {}, `${n} modul FL Studio Mobile di proyek ini diimpor dengan versi lama (plugin pengganti atau placeholder).`),
     h('div', { class: 'hint' }, 'Pakai DSP FL Studio Mobile aslinya dengan nilai dari file? Bunyi modul itu berubah mengikuti FLM; otomasinya ikut dipindah. File proyek tidak berubah sampai disimpan.')),
     [{ label: 'Nanti' }, { label: 'Pakai DSP FLM', go: true, fn: async () => {
-      const r = upgradeFlmJson(json); await P.deserialize(JSON.stringify(json));
+      const r = upgradeFlmJson(json); await openWithLoading(JSON.stringify(json), 'Memasang DSP FL Studio Mobile');
       toast(`${r.devices} modul memakai DSP FL Studio Mobile` + (r.lanes ? `, ${r.lanes} lane otomasi dipindah` : '') + (r.dropped.length ? `; ${r.dropped.length} lane otomasi tidak bisa dipindah dan dihapus` : '') + '. Simpan untuk menyimpannya.', 5000);
     } }]);
 }
 export async function openProject(name) {
   try {
-    const miss = await P.deserialize(eng.readText(pathOf(name)));
+    const miss = await openWithLoading(eng.readText(pathOf(name)), 'Membuka ' + name);
     QS.markOpened(name); noteRecent(name);
     setTimeout(offerFlmUpgrade, 500);
     return { ok: true, miss };

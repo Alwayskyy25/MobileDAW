@@ -2,6 +2,7 @@
 // page is hidden or closed, like FL Studio Mobile. On the next start the project is restored exactly as it was.
 import { eng } from './engine.js';
 import * as P from './project.js';
+import { openWithLoading } from './loadprog.js';
 
 export const AUTOSAVE_NAME = '_autosave.mdaw';
 const dir = () => eng.home() + '/Projects';
@@ -25,7 +26,7 @@ export async function restore() {
   try {
     const txt = eng.readText(autosavePath());
     if (typeof txt !== 'string' || txt.length < 20) return false;
-    await P.deserialize(txt);
+    await openWithLoading(txt, 'Memulihkan sesi terakhir');
     last = txt;
     return true;
   } catch (e) { console.error('autosave restore', e); return false; }

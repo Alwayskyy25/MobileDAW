@@ -1,5 +1,6 @@
 // Effects of the web engine. Interface: setParam(i, v), process(L, R, n) in place, readOut(out) -> count, bypass flag.
 import { AutoFilter, Echo, Roar } from './fx2.js';
+import { Oversampled, osType, OS_K } from './os.js';
 import { Delay, FilterDelay, BeatRepeat, ChorusEnsemble, PhaserFlanger, AutoPan, Gate, GlueComp, ChannelEq, Erosion, Redux, VinylDist, DrumBuss, Tuner, EqEight, Spectrum } from './fx3.js';
 import { Amp, Cabinet, Overdrive, Pedal, DynTube, MultibandDyn, Resonators, Corpus, Vocoder, Shifter, GrainDelay, HybridReverb, Looper } from './fx4.js';
 import { SpectralTime, SpectralResonator } from './fx5.js';
@@ -636,4 +637,5 @@ const TYPES = [Utility, AutoFilter, Eq3, Saturator, Compressor, Limiter, Echo, R
 // FL Studio Mobile modules (type 100 + FLM id) exist in the C++ engine only (native/engine/hdfx.cpp): this engine keeps their place in the chain
 // (so the devices after them keep their indices) and passes the audio through unchanged
 class NativeOnlyFx { setParam() {} process() {} }
-export function makeDevice(type, sr, sc) { const C = TYPES[type]; return C ? new C(sr, sc) : type >= 100 && type < 200 ? new NativeOnlyFx() : null; }
+// nonlinear effects run 4x oversampled (os.js = native/engine/os.h): the inner effect is made at 4 x the rate
+export function makeDevice(type, sr, sc) { const C = TYPES[type]; if (C && osType(type)) return new Oversampled(new C(sr * OS_K, sc)); return C ? new C(sr, sc) : type >= 100 && type < 200 ? new NativeOnlyFx() : null; }

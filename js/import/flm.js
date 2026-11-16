@@ -92,7 +92,8 @@ export function parseFlm(buf, onProgress) {
       let pst = null;
       if (ps1 && ps1.n >= 17) pst = [u[ps1.a], f64(ps1.a + 1), f64(ps1.a + 9)];
       else if (psc && psc.n >= 17) { const pr = f64(psc.a + 9), sm = Math.round(12 * Math.log2(pr)); pst = [1, f64(psc.a + 1), pr > 0 && Number.isFinite(sm) ? sm : 0]; }
-      const pwarp = pst ? { ratio: pst[0] !== 0 && Number.isFinite(pst[1]) && pst[1] > 0 ? pst[1] : 1, pitch: Number.isFinite(pst[2]) ? pst[2] : 0, sync: pst[0] !== 0 } : null;
+      // a kit slot's mode is "ratio != 1" whatever the file holds (Honeydew read.rs kit(): stretch_mode = u8::from(ratio != 1.0))
+      const pwarp = pst ? { ratio: Number.isFinite(pst[1]) && pst[1] > 0 ? pst[1] : 1, pitch: Number.isFinite(pst[2]) ? pst[2] : 0, sync: Number.isFinite(pst[1]) && pst[1] > 0 && pst[1] !== 1 } : null;
       if (pm) for (let k = 0; k + 4 <= pm.n; k += 4) prm.push(f32(pm.a + k));
       // MAIN (Honeydew read.rs slot()): i32, f64 pad index, name[512], folder[512], u8 reverse, f64 beat offset, f32 offset control, u8 cut group
       // (0 none, 1..3 = A..C), u8 overlapping voices (Poly). PRMS: level, pan, speed (pitch), mute, solo, length, A, D, S, R, sample start.

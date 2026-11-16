@@ -103,6 +103,7 @@ function wireTransport() {
       { label: 'Nama proyek\u2026', fn: () => ask('Nama proyek', state.projectName, (v) => { if (v && v.trim()) state.projectName = v.trim(); }) },
       { sep: true },
       { label: 'Pengaturan\u2026', fn: openSettings },
+      { label: 'Tutorial interaktif\u2026', fn: () => import('./tutorial.js').then((m) => m.tutorialMenu()) },
       ...(isStandalone() ? [] : [{ label: 'Layar penuh', fn: toggleFullscreen }]),
     ], r.right - 200, r.bottom + 2);
   };
@@ -552,6 +553,7 @@ function boot() {
   });
   requestAnimationFrame(loop);
   window.__dawBooted = true;
+  setTimeout(() => import('./tutorial.js').then((m) => m.offerTutorial()).catch(() => {}), 1500);   // first start: offer the interactive tutorial
 }
 // First start: ask once for a place to keep MobileDAW/ (samples, exports, presets...). The system picker needs a tap, so this is a dialog with a button.
 // When the folder was chosen earlier but the browser asks for write access again, the first tap re-confirms it.

@@ -61,7 +61,7 @@ export async function importProject(fileName, buf, io, onProgress = () => {}) {
   // FL Studio Mobile samples go to FLM/<project>/<their folders> (e.g. FLM/My Song/My Samples/...); other formats to Samples/Imports/<project>
   const root = (io.home || '') + (kind === 'flm' ? '/FLM/' : '/Samples/Imports/') + name;
   const relName = (e) => (projDir && e.startsWith(projDir + '/') ? e.slice(projDir.length + 1) : e);
-  const { json, files, report } = buildMdaw(M, { root, resolve, relName });
+  const { json, files, report } = buildMdaw(M, { root, resolve, relName, findDwp: io.findDwp });
   json.name = name;
   // 3b. FL Studio Mobile modules -> the same module on FLM's own DSP (C++, exact values, always); other modules MDAW does not have -> stock
   //     plugins where the sound is kept (io.fxMode 'map' | 'all'; 'none' = only the exact FLM modules)
@@ -84,7 +84,7 @@ export async function importProject(fileName, buf, io, onProgress = () => {}) {
   onProgress(0.7, 'Menyimpan proyek MDAW…'); await yieldUI();
   await io.writeText(path, text);
   onProgress(0.72, 'Memuat sample dan klip…'); await yieldUI();
-  const missingOnOpen = await io.open(text, (f) => onProgress(0.72 + 0.28 * f, 'Memuat sample dan klip…'));
+  const missingOnOpen = await io.open(text, (f, label, done, total) => onProgress(0.72 + 0.28 * f, (label || 'Memuat sample dan klip\u2026') + (total ? ' (' + done + '/' + total + ')' : '')));
   onProgress(1, 'Selesai');
   return { name, path, kind, app: M.app, report, fx: fx && describe(fx), missingOnOpen: missingOnOpen || [] };
 }

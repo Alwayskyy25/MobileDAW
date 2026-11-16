@@ -74,6 +74,10 @@ const r = await page.evaluate(async ({ dwp, str, w2, mp3 }) => {
   const s1 = await P.setZoneSample(i, 0, '/Samples/one.wav'); out.wav = !!s1;
   if (mp3) { const k = P.addZone(i); const s2 = await P.setZoneSample(i, k, '/Samples/tone.mp3'); out.mp3 = s2 ? s2.duration : 0; }
   const miss = await P.loadDwpProgram(i, '/Samples/one.wav'); out.notProg = miss.error;
+  // an imported FLM project whose DirectWave names a library program: the .dwp loads when the project opens
+  const o = JSON.parse(P.serialize()); o.tracks[i].inst = { type: 30, params: {}, zones: [], dwp: '/Samples/Progs/Test Piano.dwp' };
+  const missing = await P.deserialize(JSON.stringify(o)); const ti = P.state.tracks[i].inst;
+  out.onOpen = { zones: (ti.zones || []).filter((z) => z.sample).length, left: ti.dwp || null, missing: missing.length };
   return out;
 }, { dwp: [...dwp], str: [...wav(1000, 220)], w2: [...wav(2000, 330, 2)], mp3: mp3 ? [...mp3] : null });
 if (r.err) console.log('loadDwpProgram:', r.err);
@@ -86,5 +90,6 @@ ok(r.undone, 'undo brings the previous zones back');
 ok(r.wav, 'a WAV into a DirectWave zone');
 ok(r.mp3 > 0.9, `an MP3 into a DirectWave zone (${r.mp3 && r.mp3.toFixed(2)} s)`);
 ok(/dwp/.test(r.notProg || ''), 'a WAV given as a program is refused with a message');
+ok(r.onOpen.zones === 3 && !r.onOpen.left && !r.onOpen.missing, 'a project naming a library .dwp loads its zones when it opens: ' + JSON.stringify(r.onOpen));
 await br.close(); server.close();
 console.log(bad ? `\n${bad} FAILED` : '\ndwp-test: all passed'); process.exit(bad ? 1 : 0);

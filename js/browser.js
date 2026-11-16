@@ -601,7 +601,7 @@ function tabProjects(list) {
     for (const f of backups) {
       const full = dir + '/' + f.name;
       list.append(row(f.name.replace(QS.BACKUP_PREFIX, '').replace(/\.mdaw$/i, '') + ' (cadangan)', async () => {
-        try { const miss = await P.deserialize(eng.readText(full)); closeBrowser(); toast('Cadangan dibuka.' + (miss.length ? ' ' + miss.length + ' file sample/SoundFont tidak ditemukan.' : '') + ' Simpan cepat untuk memulihkannya.', 3500); }
+        try { const { openWithLoading } = await import('./loadprog.js'); const miss = await openWithLoading(eng.readText(full), 'Membuka cadangan'); closeBrowser(); toast('Cadangan dibuka.' + (miss.length ? ' ' + miss.length + ' file sample/SoundFont tidak ditemukan.' : '') + ' Simpan cepat untuk memulihkannya.', 3500); }
         catch (e) { toast('Cadangan tidak bisa dibaca.', 3500); }
       }, kb(f.size), '', WEB ? (rect) => fileMenu(full, rect) : null));
     }

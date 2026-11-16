@@ -1,5 +1,6 @@
 // Registry of ported instruments and effects. Grows one entry at a time as ports pass their golden tests.
 #include "units.h"
+#include "os.h"
 #include "instruments.h"
 #include "inst_live.h"
 #include "poli.h"
@@ -46,7 +47,13 @@ Instrument* makeInstrument(int type, double sr, Bank* bank) {
     default: return nullptr;
   }
 }
+static Device* makeDeviceAt(int type, double sr, float* sidechain);
+// nonlinear effects run 4x oversampled (os.h): the inner effect is made at 4 x the rate
 Device* makeDevice(int type, double sr, float* sidechain) {
+  if (osType(type)) { Device* d = makeDeviceAt(type, sr * OS_K, sidechain); return d ? new Oversampled(d) : nullptr; }
+  return makeDeviceAt(type, sr, sidechain);
+}
+static Device* makeDeviceAt(int type, double sr, float* sidechain) {
   if (type >= HDFX_BASE && type < HDFX_BASE + 100) return makeHdFx(type - HDFX_BASE, sr);   // FL Studio Mobile modules (hdfx.cpp)
   switch (type) {
     case 10: return new Autoduck(sr, sidechain); case 14: return new Stereolizer(sr); case 15: return new Spacer(sr);

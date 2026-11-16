@@ -318,4 +318,29 @@ if (process.env.FLM_ZIP && fs.existsSync(process.env.FLM_ZIP)) {
   const b = bm(m, { root: '/L', has: () => false }); await FX.migrateJson(b.json, 'map'); const tr = b.json.tracks.find((t) => t.name === 'Lay'), ir = tr && tr.inst;
   ok(ir && ir.type === 12 && ir.chains.length === 2 && ir.chains[0].inst.type === 33 && ir.chains[1].inst.type === 32 && ir.params[132] === 2 && ir.chains[0].devices.length === 1 && !ir.chains[0].devices[0].missing && tr.devices.length === 1,
     'FLM layering builds an Instrument Rack: SuperSaw + MiniSynth chains, the chain effect converted to its FLM module (' + (ir && ir.chains ? ir.chains.map((c) => (c.inst && c.inst.type) + ':' + c.devices.map((d) => d.type).join('/')).join(' ') : '') + ')'); }
+// FLM audio clips as Honeydew renders and plays them: STR1 pitch rounded to whole semitones (+-24), time ratio clamped x1/4..x4; the content
+// offset lives inside the loop (wraps at the loop length back to source time 0), so a clip whose offset + length passes its loop loops even
+// when it is shorter than the loop; Speed scales the first hit's source offset (lps)
+{
+  const ac = (o) => ({ pos: 0, len: 4, cycle: 4, offset: 0, sample: '/S/a.wav', name: 'a', gain: 0.8531, pan: 0.5, pitch: 0, stretch: 1, stretchOn: false, events: [], ...o });
+  const MA = { app: 'FL Studio Mobile', name: 'A', bpm: 120, channels: [{ kind: 'master', name: 'MASTER', number: 0, gain: 1, pan: 0, sends: [], tracks: [], pads: [], modules: [] },
+    { kind: 'track', name: 'Aud', number: 1, gain: 1, pan: 0, sends: [], pads: [], modules: [], tracks: [{ kind: 'audio', clips: [
+      ac({ pitch: 4.161, stretchOn: true, stretch: 1.25 }), ac({ pos: 4, pitch: -3.498 }), ac({ pos: 8, pitch: -30, stretchOn: true, stretch: 9 }),
+      ac({ pos: 12, len: 3, cycle: 4, offset: 2 }), ac({ pos: 16, len: 2, cycle: 4, offset: 1 }), ac({ pos: 20, len: 3, cycle: 4, offset: 2, repitch: 12 })] }] }] };
+  const BA = buildMdaw(MA, { root: '/S', has: () => true }).json, cs = BA.tracks.find((t) => t.name === 'Aud').clips;
+  ok(cs[0].warp.pitch === 4 && cs[0].warp.ratio === 1.25 && cs[1].warp.pitch === -3 && cs[2].warp.pitch === -24 && cs[2].warp.ratio === 4,
+    'STR1 pitch rounded as FLM renders it (4.161 -> 4, -3.498 -> -3, -30 -> -24), ratio clamped (9 -> 4)');
+  ok(cs[3].ll === 4 * 960 && cs[3].lp === 2 * 960 && cs[3].offset === 0 && !cs[4].ll && Math.abs(cs[4].offset - 0.5) < 1e-9,
+    'offset 2 + length 3 > loop 4: loops inside the clip from content beat 2 (wraps after 2 beats); offset 1 + length 2 fits: plain offset 0.5 s');
+  ok(cs[5].ll === 4 * 960 && cs[5].lp === 2 * 960 && Math.abs(cs[5].lps - 0.5) < 1e-9, 'Speed +12 st: the first hit\'s source offset halves in the Speed-folded render');
+}
+// a DirectWave library program the owner copied into the MobileDAW library: DirectWave with that .dwp (loaded when the project opens),
+// not the General MIDI stand-in
+{
+  const MD = { app: 'FL Studio Mobile', name: 'D', bpm: 120, channels: [{ kind: 'master', name: 'MASTER', number: 0, gain: 1, pan: 0, sends: [], tracks: [], pads: [], modules: [] },
+    { kind: 'track', name: 'Piano', number: 1, gain: 1, pan: 0, sends: [], pads: [], modules: [], instrument: { kind: 'directwave', name: 'DirectWave', library: 'DirectWave Samples/Keyboard/Grand Piano.dwp' }, tracks: [] }] };
+  const withLib = buildMdaw(MD, { root: '/S', has: () => true, findDwp: (lib) => (/Grand Piano/.test(lib) ? '/Samples/Progs/Grand Piano.dwp' : null) }).json.tracks[0].inst;
+  const without = buildMdaw(MD, { root: '/S', has: () => true }).json.tracks[0].inst;
+  ok(withLib && withLib.type === 30 && withLib.dwp === '/Samples/Progs/Grand Piano.dwp' && without && without.type === 6, 'DirectWave library program: the .dwp from the library when there is one (' + (withLib && withLib.type) + '), else the GM SoundFont (' + (without && without.type) + ')');
+}
 console.log(bad ? `\n${bad} FAILED` : '\nimport-test: all passed'); process.exit(bad ? 1 : 0);

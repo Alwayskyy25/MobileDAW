@@ -1927,3 +1927,47 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .m2x-glob { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; } .m2x-glob > .m2x-p:first-child { grid-column: 1 / -1; }
 .m2x-btn { height: 26px; padding: 0 12px; background: #2f3843; border: 1px solid var(--m2-ln); border-radius: 2px; color: #e6eef7 !important; }
 .m2x-btn.prim { background: #1f5f7d; } .m2x-note { color: var(--m2-dim); font-weight: 500; line-height: 1.4; margin: 4px 2px; }
+
+/* project loading window (js/loadprog.js): Live-style flat panel, thin progress bar */
+.ldp { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .45); }
+.ldp-box { width: min(420px, 86vw); background: var(--panel, #2a2a2a); border: 1px solid var(--line, #1b1b1b); border-radius: 2px; padding: 14px 16px 12px; box-shadow: 0 8px 28px rgba(0, 0, 0, .45); color: var(--text, #ddd); font-size: 12px; }
+.ldp-t { font-weight: 600; font-size: 13px; margin-bottom: 10px; }
+.ldp-row { display: flex; gap: 10px; align-items: baseline; }
+.ldp-l { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim, #9a9a9a); }
+.ldp-p { font-variant-numeric: tabular-nums; }
+.ldp-bar { height: 4px; margin: 7px 0 6px; background: var(--bg, #1e1e1e); border: 1px solid var(--line, #1b1b1b); }
+.ldp-bar i { display: block; height: 100%; width: 0; background: var(--accent, #ffad56); transition: width .12s linear; }
+.ldp-c { color: var(--dim, #9a9a9a); font-variant-numeric: tabular-nums; font-size: 11px; min-height: 13px; }
+
+/* DirectWave "Buat dari sample" (js/devices.js dwBuilderDialog) */
+.dwb { display: flex; flex-direction: column; gap: 8px; min-width: min(560px, 86vw); font-size: 12px; }
+.dwb-top { display: flex; align-items: center; gap: 8px; }
+.dwb-n { margin-left: auto; color: var(--dim); }
+.dwb-s { height: 26px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 1px; font: inherit; }
+.dwb-roles { display: flex; flex-wrap: wrap; gap: 6px; }
+.dwb-roles label { display: flex; flex-direction: column; gap: 3px; padding: 5px; background: var(--bg); border: 1px solid var(--line); }
+.dwb-roles label > span { font-weight: 600; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dwb-t { max-height: 40vh; overflow: auto; border: 1px solid var(--line); }
+.dwb-h, .dwb-r { display: grid; grid-template-columns: minmax(0, 1fr) 48px 82px 86px; gap: 6px; padding: 3px 6px; align-items: center; }
+.dwb-h { position: sticky; top: 0; background: var(--panel); color: var(--dim); }
+.dwb-r > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dwb-r em { grid-column: 1 / -1; color: #e05a4f; font-style: normal; font-size: 11px; }
+.dwb-r.bad { opacity: .75; }
+
+/* interactive tutorial (js/tutorial.js): four blockers dim the screen around the spotlit control, which stays usable */
+.tut { position: fixed; inset: 0; z-index: 95; pointer-events: none; }
+.tut-blk { position: fixed; background: rgba(0, 0, 0, .55); pointer-events: auto; }
+.tut-ring { position: fixed; border: 2px solid var(--accent, #ffad56); border-radius: 3px; box-shadow: 0 0 0 3px rgba(255, 173, 86, .25); pointer-events: none; transition: left .15s, top .15s, width .15s, height .15s; }
+.tut-card { position: fixed; pointer-events: auto; background: var(--panel, #2a2a2a); color: var(--text, #ddd); border: 1px solid var(--line, #111); border-radius: 3px; padding: 10px 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); font-size: 12.5px; line-height: 1.45; }
+.tut-card h4 { margin: 2px 0 4px; font-size: 14px; }
+.tut-card p { margin: 0 0 6px; }
+.tut-ch { font-size: 10.5px; color: var(--dim, #999); text-transform: uppercase; letter-spacing: .04em; }
+.tut-try { margin: 4px 0 8px; padding: 5px 8px; background: rgba(255, 173, 86, .14); border-left: 3px solid var(--accent, #ffad56); font-weight: 600; }
+.tut-card.ok .tut-try { background: rgba(90, 200, 120, .18); border-left-color: #5ac878; }
+.tut-acts { display: flex; gap: 6px; align-items: center; }
+.tut-acts .b { height: 28px; padding: 0 10px; }
+.tut-acts .b[disabled] { opacity: .45; }
+.tut-list { display: flex; flex-direction: column; gap: 6px; min-width: min(380px, 80vw); }
+.tut-list .b { height: 34px; text-align: left; padding: 0 10px; }
+.tut-offer { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 96; display: flex; gap: 8px; align-items: center; background: var(--panel, #2a2a2a); color: var(--text, #ddd); border: 1px solid var(--line, #111); border-radius: 3px; padding: 6px 8px 6px 12px; box-shadow: 0 6px 20px rgba(0, 0, 0, .45); font-size: 12px; }
+.tut-offer .b { height: 28px; padding: 0 10px; }

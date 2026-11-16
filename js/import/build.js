@@ -116,6 +116,10 @@ function presetFor(type, name) {
 }
 const PPQ = 960, VMAX = 1.4, DEF_VOL = 0.85, MAX_FX = 8, MAX_TRACKS = 64, MAX_PADS = 16;
 const PALETTE = ['#1fbccf', '#e3c000', '#f07200', '#f02ec8', '#0b9fdb', '#8d5de0', '#a3df00', '#b8573c'];
+// Honeydew drums.rs factors(): the STR1 render clamps the time ratio to x1/4 .. x4 and plays the pitch rounded to whole semitones (+-24):
+// a stored 4.161 st sounds as +4, -3.498 as -3 (FL Studio Mobile's knob stores the fraction, its render does not use it)
+export const strRatio = (r) => (Number.isFinite(r) && r > 0 ? Math.min(4, Math.max(0.25, r)) : 1);
+export const strSemis = (st) => (Number.isFinite(st) ? Math.min(24, Math.max(-24, Math.round(st))) : 0);
 const T = (beats) => { const t = beats * PPQ, r = Math.round(t); return Math.abs(t - r) < 1e-6 ? r : Math.round(t * 1024) / 1024; };   // exact ticks: FLM's 1/128 beat = 7.5 ticks (half ticks kept)
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const hex = (n) => n.toString(16).padStart(2, '0');
@@ -205,6 +209,10 @@ export function buildMdaw(M, opts) {
       note('DirectWave (' + zones.length + ' zona' + (lost.length ? ', ' + lost.length + ' sample hilang' : '') + ')', lost.length === zones.length ? 'missing' : 'exact');
       return { type: 30, params: dwParams, pitch: 0, zones, from: { app: M.app, name: I.name, preset: I.preset || '', layers: layers.map((L) => ({ sample: L.sample, root: L.root, params: (L.params || []).slice() })) }, ...(lost.length ? { missing: { name: I.name || 'DirectWave', library: '', sample: lost.join(', ') } } : {}) };
     }
+    // a library program (built into FL Studio Mobile, never in the archive): its .dwp from the MobileDAW library when the owner has copied it
+    // there (same file name), loaded with all its zones when the project opens (project.js loadDwpProgram); else the General MIDI stand-in
+    const dwpPath = I.library && opts.findDwp ? opts.findDwp(I.library) : null;
+    if (dwpPath) { note('DirectWave: program "' + I.library.replace(/^.*\//, '') + '" dari pustaka (' + dwpPath + ')', 'exact'); return { type: 30, params: {}, pitch: 0, zones: [], dwp: dwpPath, from: { app: M.app, name: I.name, preset: I.preset || '', library: I.library } }; }
     const gm = I.library ? gmFor(I.library) : null;
     if (gm) { needSf = true; note('SoundFont GM: ' + gm.name + ' (pengganti program library yang tidak ada di arsip)', 'substitute'); return { type: 6, params: { 0: 0.8 }, pitch: 0, sf: { path: GM_SF, preset: gm.program }, sub: { from: I.name, library: gm.label, gm: gm.name } }; }
     note(I.kind === 'unknown' ? I.name + ' belum dikenal: DirectWave kosong (pattern tetap)' : 'DirectWave tanpa sample (pattern tetap)', 'missing');
@@ -307,7 +315,7 @@ export function buildMdaw(M, opts) {
         const pads = (ch.pads || []).slice(0, MAX_PADS).map((q, k2) => {
           const f = q.path ? sample(q.path, q.name) : null;
           return { pitch: 36 + k2, name: (q.name || 'Pad ' + (k2 + 1)).slice(0, 14), kind: -1, sample: f && !f.missing ? { path: f.path, name: f.path.split('/').pop() } : null, gain: clamp(20 * Math.log10(Math.max(1e-4, q.gain ?? 1)), -60, 12), pan: clamp(q.pan || 0, -1, 1), pit: clamp(q.pitch || 0, -24, 24), dec: 1, start: 0, end: 1, rev: false, ...padEnv(q.env), mute: !!(f && f.missing) || !!q.mute, solo: !!q.solo, rev: !!q.reverse, cut: clamp(q.cut | 0, 0, 3), poly: q.poly !== false,
-            ...(q.startSec ? { flmSt: q.startSec } : {}), ...(q.length > 0 ? { flmLen: q.length } : {}), ...(q.warp && f && !f.missing ? { warp: { ratio: q.warp.ratio, pitch: q.warp.pitch, bpm: out.bpm } } : {}) };   // FLM slot STR1: stretch (SYNC) / pitch shift rendered into the pad's sample   // FLM Sample Start (s) / Length (fraction): resolved against the sample's duration when it loads (project.js)
+            ...(q.startSec ? { flmSt: q.startSec } : {}), ...(q.length > 0 ? { flmLen: q.length } : {}), ...(q.warp && f && !f.missing ? { warp: { ratio: strRatio(q.warp.ratio), pitch: strSemis(q.warp.pitch), bpm: out.bpm } } : {}) };   // FLM slot STR1: stretch (SYNC) / pitch shift rendered into the pad's sample   // FLM Sample Start (s) / Length (fraction): resolved against the sample's duration when it loads (project.js)
         });
         t.inst = { type: 3, params: {}, pads: pads.length ? pads : undefined };
         const map = pads.length ? (p) => (p >= 0 && p < pads.length ? pads[p].pitch : -1) : (p) => 36 + p;
@@ -320,9 +328,15 @@ export function buildMdaw(M, opts) {
       } else {
         for (const cl of st.clips) {
           if (!cl.sample) continue;
-          const f = sample(cl.sample, cl.name), ratio = cl.stretch > 0 ? cl.stretch : 1, nm = cl.name || (cl.sample.split('/').pop() || '').replace(/\.[^.]+$/, '');
-          const c = { id: uid(), start: Math.max(0, T(cl.pos)), len: Math.max(1, T(cl.len)), sample: { path: f.path, name: f.path.split('/').pop() }, gain: clamp(cl.gain ?? 1, 0, 8), name: f.missing ? '⚠ ' + nm + ' (sample tidak ada)' : nm, offset: Math.max(0, (cl.offset || 0) * spb) };
-          const st = cl.pitch || 0, rp = cl.repitch || 0, rev = !!cl.reverse;     // exact (FLM stores f64 semitones / an f32 knob)
+          const f = sample(cl.sample, cl.name), ratio = cl.stretch > 0 ? strRatio(cl.stretch) : 1, nm = cl.name || (cl.sample.split('/').pop() || '').replace(/\.[^.]+$/, '');
+          const st = strSemis(cl.pitch || 0), rp = cl.repitch || 0, rev = !!cl.reverse, spd = Math.pow(2, -rp / 12);   // pitch as FLM renders it (whole semitones)
+          const c = { id: uid(), start: Math.max(0, T(cl.pos)), len: Math.max(1, T(cl.len)), sample: { path: f.path, name: f.path.split('/').pop() }, gain: clamp(cl.gain ?? 1, 0, 8), name: f.missing ? '⚠ ' + nm + ' (sample tidak ada)' : nm, offset: 0 };
+          // content loop (Honeydew audio_clips.rs): the clip starts at content beat `offset` of its loop L and wraps at L back to source time 0
+          // (offset counts inside the loop, once mod L), a repetition every L beats after that. As MobileDAW's loop: ll = L, lp = the offset.
+          // The offset is source time of the STR1 render, not scaled by Speed: in the Speed-folded render it is offset x 2^(-rp/12) (lps).
+          { const offB = Math.max(0, cl.offset || 0), cycB = cl.cycle || 0, lenB = cl.len || 0;
+            if (!f.missing && cycB > 0 && offB % cycB + lenB > cycB + 1 / PPQ) { c.ll = T(cycB); const ph = T(offB % cycB); if (ph > 0) c.lp = ph; if (rp && ph > 0) c.lps = spd; }
+            else c.offset = offB * spb * spd; }
           // Honeydew: the STR1 render (time ratio with SYNC on, semitones always), then Speed resamples it: length x 2^(-rp/12), pitch + rp.
           // Speed alone = plain resampling (repitch); with a stretch or a pitch shift both fold into one independent warp (same length, same pitch).
           if (!f.missing && rp && Math.abs(ratio - 1) <= 1e-12 && !st) c.warp = { beats: 0, ratio: Math.pow(2, -rp / 12), rev, pitch: 0, mode: 'repitch', bpm: out.bpm };
@@ -330,7 +344,6 @@ export function buildMdaw(M, opts) {
           if (!f.missing && cl.sync && !rp && Math.abs(ratio - 1) > 1e-12) { c.srcBpm = Math.round(ratio * out.bpm * 100) / 100; c.warpAuto = true; c.swing = 0; }   // FLM SYNC: the clip follows later tempo changes (song/tempo.rs scales the ratio by old / new)
           if (rev) prec.clipRev = (prec.clipRev || 0) + 1;
           if (st || rp) report.pitched = (report.pitched || 0) + 1;
-          const cyc = T(cl.cycle || 0); if (!f.missing && cyc > 0 && cyc < c.len - 1) c.ll = cyc;   // the loop repeats inside a longer clip
           if (cl.muted || cl.slotMute) c.muted = true;                              // the clip's own mute, or its slot's Mute param
           if (cl.slotTrim) prec.clipTrim = (prec.clipTrim || 0) + 1;
           if (Math.abs(cl.pan || 0) > 1e-6) { c.pan = clamp(cl.pan, -1, 1); prec.clipPan = (prec.clipPan || 0) + 1; }   // the clip's own pan, as in FL Studio Mobile (balance on top of the track pan)
