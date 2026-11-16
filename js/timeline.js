@@ -120,9 +120,24 @@ function laneBox(i, c) {
 }
 function laneAt(i, y) { const t = state.tracks[i], n = subN(t); if (!n) return null; const k = Math.floor((y - rowY(i) - rhMain(i)) / SUBH()); return k >= 0 && k < n ? P.subsOf(t)[k].id : null; }
 function subHdr(i, k) { const y = rowY(i) + rhMain(i) + k * SUBH(), h = SUBH(), q = Math.min(16, h - 8), R = CW + HEAD - METW - 6; return { y, h, mute: { x: R - 22, y: y + (h - q) / 2, w: 22, h: q } }; }   // t.hx = own height as a factor of the zoomed row height (drag the header's bottom edge)
-const rh = (i) => { const n = state.tracks.length; if (i >= n) return i >= n + nX() ? ADD_H : XROW_H; const t = state.tracks[i], a = fh.size ? fh.get(t.id) : undefined; return a !== undefined ? a : rowTarget(t); };
-function rowY(i) { let y = RULER - view.y0; for (let k = 0; k < i; k++) y += rh(k); return y; }
-function rowAt(y) { let a = RULER - view.y0; const n = state.tracks.length + nX(); for (let i = 0; i <= n; i++) { const e = a + rh(i); if (y < e) return i; a = e; } return n + 1; }
+// Live 12: under the tracks the "Drop Files and Devices Here" area stretches over the free room and the Master / effect-track rows sit at the
+// bottom of the lanes (no empty band below them). On screen: tracks, then the "+" row (index nn), then the Master / FX rows (indices n .. nn-1).
+const tracksH = () => { let y = 0; for (let k = 0; k < state.tracks.length; k++) y += rh(k); return y; };
+const addH = () => Math.max(ADD_H, Math.floor(LANE_B() - RULER - tracksH() - nX() * XROW_H));
+const rh = (i) => { const n = state.tracks.length; if (i >= n) return i >= n + nX() ? (i === n + nX() ? addH() : ADD_H) : XROW_H; const t = state.tracks[i], a = fh.size ? fh.get(t.id) : undefined; return a !== undefined ? a : rowTarget(t); };
+function rowY(i) {
+  const n = state.tracks.length, nn = n + nX(); let y = RULER - view.y0;
+  if (i <= n) { for (let k = 0; k < i; k++) y += rh(k); return i === n ? y + addH() : y; }
+  y += tracksH(); if (i === nn) return y;
+  return i < nn ? y + addH() + (i - n) * XROW_H : y + addH() + nX() * XROW_H;
+}
+function visRows() {                                    // rows on screen: visible tracks, then the Master / FX rows and the "+" row (not in index order on screen)
+  const n = state.tracks.length, nn = n + nX(), LB = LANE_B(), out = [], b = rowAt(LB);
+  for (let i = Math.max(0, rowAt(RULER)); i < n && i <= b; i++) out.push(i);
+  for (let i = n; i <= nn; i++) { const y = rowY(i); if (y < LB && y + rh(i) > RULER) out.push(i); }
+  return out;
+}
+function rowAt(y) { let a = RULER - view.y0; const n = state.tracks.length, nn = n + nX(); for (const i of [...Array(n).keys(), nn, ...Array.from({ length: nX() }, (_, k) => n + k)]) { const e = a + rh(i); if (y < e) return i; a = e; } return nn + 1; }
 const contentH = () => { let y = 0; for (let i = 0; i <= state.tracks.length + nX(); i++) y += rh(i); return y; };
 // Header layout of one track. FULL look: left = coloured column (the name only), right = wide grey mixer column (activator, S, arm, automation /
 // volume, pan / Send A, B / output). Controls only appear when the row is tall enough, so nothing can overlap. COMPACT look: name block + activator.
@@ -346,14 +361,14 @@ function draw() {
     ctx.fillStyle = C('#141416'); ctx.fillRect(0, y + h - 1, CW, 1);                     // Live 12 (refs/live12-official): a thin dark line between tracks
   }
   const xl = [];                                                                       // captions of the Master / effect lanes, drawn after the grid
-  for (let i = Math.max(n, rowAt(RULER)); i < nn && i <= rowAt(LB); i++) {             // Master / effect track rows: no clips, they only mix
+  for (const i of visRows()) { if (i < n || i >= nn) continue;                          // Master / effect track rows: no clips, they only mix
     const y = rowY(i), h = rh(i), x = xInfo(i);
     ctx.fillStyle = state.sel.track === x.strip ? C('#2f2f33') : C('#252527'); ctx.fillRect(0, y, CW, h);   // theme background first, so the tint below is a real transparent wash in dark AND light themes
      ctx.fillStyle = C('#141415'); ctx.fillRect(0, y + h - 1, CW, 1);
     const src = x.master ? state.tracks.filter((q) => q.kind !== 'auto' && !q.mute).length : state.tracks.filter((q) => q.out === x.k && !q.mute).length;
     xl.push({ y, h, t: `${src} track aktif → ${x.name}` });
   }
-  const gy1 = Math.min(LB, rowY(nn));                                                   // grid only over the rows, not over the "+" row and the empty space below
+  const gy1 = Math.min(LB, RULER - view.y0 + contentH());                               // Live 12: the grid runs on through the drop area and the Master / FX rows
   // grid (Live 12): flat lines in the theme's ink at four strengths - every labelled bar (the ruler's step) > bar > beat > subdivision - so a
   // zoomed-out arrangement is not striped with bright bar lines; every other labelled group a shade darker. Grid Line Intensity scales them.
   const barPx = BAR * view.ppt; let kb = 1; while (barPx * kb < 34) kb *= 2;                     // the same step as the ruler's bar numbers
@@ -554,7 +569,7 @@ function meterKey() {                        // changes whenever a visible bar w
 function drawMeters() {                      // Live: a slim stereo meter along the right edge of every track header, same scale as the mixer
   const mx = CW + HEAD - METW + 1, nn = state.tracks.length + nX();
   octx.save(); octx.beginPath(); octx.rect(CW, RULER, HEAD, LANE_B() - RULER); octx.clip();
-  for (let i = Math.max(0, rowAt(RULER)); i <= Math.min(nn - 1, rowAt(LANE_B())); i++) {
+  for (const i of visRows()) { if (i >= nn) continue;
     const s = stripOfRow(i); if (s < 0) continue;
     const hm = i < state.tracks.length && full() ? hdr(i).hm : null;
     if (hm) {                                                                     // folded row: the same meter lying flat (left = silence), L over R
@@ -665,8 +680,8 @@ function drawHeads() {
   ctx.save(); ctx.beginPath(); ctx.rect(hx, RULER, HEAD, LB - RULER); ctx.clip();
   const nn = n + nX(), lanes = new Set();
   for (const q of state.tracks) if (q.kind === 'auto' && q.target) lanes.add(q.target.strip);
-  for (let i = Math.max(0, rowAt(RULER)); i <= Math.min(nn, rowAt(LB)); i++) {
-    const y = rowY(i), h = i < n ? rhMain(i) : rh(i);
+  for (const i of visRows()) {
+    const y = rowY(i), h = i < n ? rhMain(i) : rh(i); if (y >= LB || y + h <= RULER) continue;
     if (i < n && subN(state.tracks[i])) drawSubHeads(i);
     if (i === nn) {                                                                          // "+" row: one wide button
       const r = { x: hx + 6, y: y + 8, w: HEAD - METW - 12, h: Math.min(28, h - 16) };
@@ -916,7 +931,7 @@ function hit(x, y) {
   if (Math.abs(x - CW) <= 4) return { type: 'headw' };                                         // the header column's left edge: drag = its width
   if (x >= CW) {
     const n0 = state.tracks.length;
-    if (i === n0 + nX()) return { type: 'add' };
+    if (i === n0 + nX()) return y - rowY(i) < 8 + 28 + 6 ? { type: 'add' } : { type: 'none' };   // the "+ Track" button at the top of the (stretched) drop area
     if (i < 0 || i > n0 + nX()) return { type: 'none' };
     if (i >= n0) { const xi = xInfo(i); return { type: 'xhead', x: xi, mute: !xi.master && inRect(xhdr(i).act, x, y, 3) }; }
     if (subN(state.tracks[i]) && y >= rowY(i) + rhMain(i)) { const id = laneAt(i, y), k = P.subsOf(state.tracks[i]).findIndex((s) => s.id === id); if (k >= 0) return { type: 'subhead', i, id, mute: inRect(subHdr(i, k).mute, x, y, 4) }; }
@@ -1377,7 +1392,7 @@ export function sigDialog(bar) {
 let drag = null;
 const CLIP_EDITS = new Set(['move', 'resize', 'resizeL', 'stretch', 'gmove', 'gresize', 'fadeIn', 'fadeOut']);   // drags that took a checkpoint
 // the arrangement's grid menu as Live's (Snap to Grid, Adaptive Grid widths, Fixed Grid, Narrow / Widen, Triplet Grid, zoom to fit)
-function fitHeight() { const avail = LANE_B() - RULER - ADD_H - nX() * XROW_H, used = contentH() - ADD_H - nX() * XROW_H; if (used > 0) { for (const tr of state.tracks) animRow(tr); view.rowH = clamp(view.rowH * avail / used, 30, ROW_MAX); view.y0 = 0; clampView(); invalidate(); } }
+function fitHeight() { const avail = LANE_B() - RULER - ADD_H - nX() * XROW_H, used = tracksH(); if (used > 0) { for (const tr of state.tracks) animRow(tr); view.rowH = clamp(view.rowH * avail / used, 30, ROW_MAX); view.y0 = 0; clampView(); invalidate(); } }
 function gridMenu() {
   const set = (k) => { cfg.snap = k; invalidate(); }, fi = FIXED.findIndex(([k]) => k === cfg.snap);
   const step = (d) => { const i = fi >= 0 ? fi : FIXED.findIndex(([k]) => SNAPS[k][1] <= (snapTicks() || BAR)); const j = clamp((i < 0 ? 3 : i) + d, 0, FIXED.length - 1); set(FIXED[j][0]); };

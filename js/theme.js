@@ -16,17 +16,20 @@ const LIB = {
   medc:     { name: 'Dark Neutral Medium Contrast', base: 'dark', a: 10, b: 0.98 },
   // Live 12's default dark theme (refs/live12-official 01-03): the greys a little lighter and cool - lanes about #2c2e35, panels #23252a
   // Live 12's light theme (refs/live12-official 04): cool greys - lanes / ruler / header #a1a5ae, the alternate bands #989ca5
-  live12light: { name: 'Light (Live 12)', base: 'light', a: -33, b: 1.0, tint: [0, 4, 13] },
-  live12:   { name: 'Dark (Live 12)', base: 'dark', a: 10, b: 0.96, tint: [-2, 0, 12] },   // lanes / ruler #323440 as sampled from refs/live12-official/02
+  live12light: { name: 'Light (Live 12)', base: 'light', a: -33, b: 1.0, tint: [0, 4, 13], over: { '--line': '#5c5f68', '--sep': '#6e717a' } },
+  live12:   { name: 'Dark (Live 12)', base: 'dark', a: 10, b: 0.96, tint: [-2, 0, 12], over: { '--tb-bg': '#282a33', '--tb-fld': '#333540' } },   // lanes / ruler #323440 as sampled from refs/live12-official/02
   lightmc:  { name: 'Light Neutral Medium Contrast', base: 'light', a: -26, b: 1.04 },
   lightlc:  { name: 'Light Neutral Low Contrast', base: 'light', a: -8, b: 0.86 },
   midlight: { name: 'Mid Light',                base: 'light', a: -42, b: 1.0 },
   lighthc:  { name: 'Light Neutral High Contrast', base: 'light', a: -14, b: 1.1 },
   // the device panels of the owner's Ableton Live screenshots, colours measured in them: title bar #a5a5a5, body #878787, dark display #282828,
   // button face #a8a8a8 with a #515151 border, black text, orange #fdb443; the other greys follow the light theme shifted down to that body
-  ableton:  { name: 'Light (Ableton Live)',  base: 'light', a: -66, b: 1.0, over: {
-    '--lv-title': '#a5a5a5', '--lv-body': '#878787', '--lv-well': '#282828', '--lv-ctl': '#a8a8a8', '--lv-ctl2': '#b8b8b8', '--lv-ink': '#0f0f0f', '--lv-dim': '#2e2e2e', '--lv-edge': '#515151',
-    '--lv-trk': '#4e4e4e', '--lv-div': '#6a6a6a', '--lv-arc': '#62cffa', '--lv-or': '#fdb443', '--lv-orink': '#1a1100', '--dim': '#2e2e2e', '--text': '#0f0f0f' } },
+  // Light = Live 12's light theme, every value sampled from the owner's reference (refs/live12-official/04): window frame and control bar #7d818d,
+  // panels / lanes / ruler / device bodies #a1a5ae, the alternate bands #989ca5, device title bars #bbbbc5, displays #21252e, menus #dedfe3
+  ableton:  { name: 'Light (Ableton Live)',  base: 'light', a: -33, b: 1.0, tint: [0, 4, 13], over: {
+    '--lv-title': '#bbbbc5', '--lv-body': '#a1a5ae', '--lv-well': '#21252e', '--lv-ctl': '#b9bcc5', '--lv-ctl2': '#c6c9d1', '--lv-ink': '#0f1014', '--lv-dim': '#2e3038', '--lv-edge': '#7d818d',
+    '--lv-trk': '#4e525c', '--lv-div': '#7d818d', '--lv-arc': '#05c9d9', '--lv-or': '#fdb443', '--lv-orink': '#1a1100', '--dim': '#2e3038', '--text': '#0f1014',
+    '--menu': '#dedfe3', '--tb-bg': '#7d818d', '--tb-fld': '#a1a5ae', '--line': '#5c5f68', '--sep': '#6e717a' } },
 };
 const grey = (hex) => { const h = hex.slice(1, 7), [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); return Math.max(r, g, b) - Math.min(r, g, b) < 14 ? (r + g + b) / 3 : -1; };
 for (const [id, t] of Object.entries(LIB)) {

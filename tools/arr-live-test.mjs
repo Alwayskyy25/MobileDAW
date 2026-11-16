@@ -54,7 +54,7 @@ await page.screenshot({ path: path.join(out, 'arr-fit.png') });
   await ev(() => { document.querySelector('#btn-play').click(); document.querySelector('#btn-metro').click(); }); await page.waitForTimeout(300);
   ok(on[0].on && on[1].on && on[0].bg !== on[1].bg, `Play lit (${on[0].bg}) and metronome lit (${on[1].bg}) while playing`); }
 // Automation Mode: off hides the automation lanes, on brings them back; Waveform Vertical Zoom steps through its levels
-{ const lanes = () => ev(async () => { const T = await import('./js/timeline.js'), P = await import('./js/project.js'); const i = P.state.tracks.findIndex((t) => t.kind === 'auto'); return i < 0 ? null : T.probe(0, i + 1).top - T.probe(0, i).top; });
+{ const lanes = () => ev(async () => { const T = await import('./js/timeline.js'), P = await import('./js/project.js'); const i = P.state.tracks.findIndex((t) => t.kind === 'auto'); if (i < 0) return null; const q = T.probe(0, i); return 2 * (q.y - q.top); });   // the row's own height (the Master row now sits at the bottom)
   await ev(async () => { const P = await import('./js/project.js'); P.addAutoTrack({ kind: 6, strip: 'master', param: 0, def: P.TEMPO_DEF }, 'Tempo'); P.emit('all'); });
   await page.waitForTimeout(400); const h0 = await lanes();
   if (h0 == null) console.log('     (no automation lane could be made from the test: Automation Mode checked by its switch only)');
@@ -117,7 +117,7 @@ for (const th of ['dark', 'light', 'midlight', 'live', 'lightlc', 'medc']) { awa
     P.state.tracks[0].clips.push({ id: 880001, start: 2 * P.BAR, len: 4 * P.BAR, name: '', sample: smp, offset: 0, gain: 1 });
     T.view.x0 = 0; T.view.ppt = (document.querySelector('#arr canvas').getBoundingClientRect().width - T.headWidth()) / (12 * P.BAR); P.selectTrack(0); P.selectClip(0, 880001); P.emit('all'); });
   const clip = () => ev(async () => { const P = await import('./js/project.js'); const c = P.state.tracks[0].clips[0]; return { s: c.start / P.BAR, l: c.len / P.BAR, o: c.offset }; });
-  const pos = (bar, dy) => ev(async ([bar, dy]) => { const T = await import('./js/timeline.js'), P = await import('./js/project.js'); const q = T.probe(bar * P.BAR, 0), b = T.probe(0, 1); return { x: q.x, y: dy === 'mid' ? (q.top + b.top) / 2 : dy === 'below' ? b.top + 9 : q.top }; }, [bar, dy]);
+  const pos = (bar, dy) => ev(async ([bar, dy]) => { const T = await import('./js/timeline.js'), P = await import('./js/project.js'); const q = T.probe(bar * P.BAR, 0), b = { top: q.top + 2 * (q.y - q.top) }; return { x: q.x, y: dy === 'mid' ? (q.top + b.top) / 2 : dy === 'below' ? b.top + 9 : q.top }; }, [bar, dy]);
   const g = await geo(), K4 = bx.width / g.w;
   const dragBy = async (p, dxBars, hold) => { const step = (await pos(1, 'mid')).x - (await pos(0, 'mid')).x; await page.mouse.move(bx.x + p.x * K4, bx.y + p.y * K4); await page.mouse.down(); await page.waitForTimeout(60);
     await page.mouse.move(bx.x + (p.x + dxBars * step) * K4, bx.y + p.y * K4, { steps: 8 }); const mid = await clip(); if (!hold) { await page.mouse.up(); await page.waitForTimeout(400); } return mid; };
