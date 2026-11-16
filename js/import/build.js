@@ -293,7 +293,7 @@ export function buildMdaw(M, opts) {
         const pads = (ch.pads || []).slice(0, MAX_PADS).map((q, k2) => {
           const f = q.path ? sample(q.path, q.name) : null;
           return { pitch: 36 + k2, name: (q.name || 'Pad ' + (k2 + 1)).slice(0, 14), kind: -1, sample: f && !f.missing ? { path: f.path, name: f.path.split('/').pop() } : null, gain: clamp(20 * Math.log10(Math.max(1e-4, q.gain ?? 1)), -60, 12), pan: clamp(q.pan || 0, -1, 1), pit: clamp(q.pitch || 0, -24, 24), dec: 1, start: 0, end: 1, rev: false, ...padEnv(q.env), mute: !!(f && f.missing) || !!q.mute, solo: !!q.solo, rev: !!q.reverse, cut: clamp(q.cut | 0, 0, 3), poly: q.poly !== false,
-            ...(q.startSec ? { flmSt: q.startSec } : {}), ...(q.length > 0 ? { flmLen: q.length } : {}) };   // FLM Sample Start (s) / Length (fraction): resolved against the sample's duration when it loads (project.js)
+            ...(q.startSec ? { flmSt: q.startSec } : {}), ...(q.length > 0 ? { flmLen: q.length } : {}), ...(q.warp && f && !f.missing ? { warp: { ratio: q.warp.ratio, pitch: q.warp.pitch, bpm: out.bpm } } : {}) };   // FLM slot STR1: stretch (SYNC) / pitch shift rendered into the pad's sample   // FLM Sample Start (s) / Length (fraction): resolved against the sample's duration when it loads (project.js)
         });
         t.inst = { type: 3, params: {}, pads: pads.length ? pads : undefined };
         const map = pads.length ? (p) => (p >= 0 && p < pads.length ? pads[p].pitch : -1) : (p) => 36 + p;
@@ -309,8 +309,11 @@ export function buildMdaw(M, opts) {
           const f = sample(cl.sample, cl.name), ratio = cl.stretch > 0 ? cl.stretch : 1, nm = cl.name || (cl.sample.split('/').pop() || '').replace(/\.[^.]+$/, '');
           const c = { id: uid(), start: Math.max(0, T(cl.pos)), len: Math.max(1, T(cl.len)), sample: { path: f.path, name: f.path.split('/').pop() }, gain: clamp(cl.gain ?? 1, 0, 8), name: f.missing ? '⚠ ' + nm + ' (sample tidak ada)' : nm, offset: Math.max(0, (cl.offset || 0) * spb) };
           const st = cl.pitch || 0, rp = cl.repitch || 0, rev = !!cl.reverse;     // exact (FLM stores f64 semitones / an f32 knob)
-          if (!f.missing && rp) c.warp = { beats: 0, ratio: Math.pow(2, -rp / 12), rev, pitch: 0, mode: 'repitch', bpm: out.bpm };   // stretch off: pitch by resampling (speed follows)
-          else if (!f.missing && (Math.abs(ratio - 1) > 1e-12 || st || rev)) c.warp = { beats: 0, ratio, rev, pitch: st, bpm: out.bpm };   // stretch on: time and pitch independent
+          // Honeydew: the STR1 render (time ratio with SYNC on, semitones always), then Speed resamples it: length x 2^(-rp/12), pitch + rp.
+          // Speed alone = plain resampling (repitch); with a stretch or a pitch shift both fold into one independent warp (same length, same pitch).
+          if (!f.missing && rp && Math.abs(ratio - 1) <= 1e-12 && !st) c.warp = { beats: 0, ratio: Math.pow(2, -rp / 12), rev, pitch: 0, mode: 'repitch', bpm: out.bpm };
+          else if (!f.missing && (Math.abs(ratio - 1) > 1e-12 || st || rp || rev)) c.warp = { beats: 0, ratio: ratio * Math.pow(2, -rp / 12), rev, pitch: st + rp, bpm: out.bpm };
+          if (!f.missing && cl.sync && !rp && Math.abs(ratio - 1) > 1e-12) { c.srcBpm = Math.round(ratio * out.bpm * 100) / 100; c.warpAuto = true; c.swing = 0; }   // FLM SYNC: the clip follows later tempo changes (song/tempo.rs scales the ratio by old / new)
           if (rev) prec.clipRev = (prec.clipRev || 0) + 1;
           if (st || rp) report.pitched = (report.pitched || 0) + 1;
           const cyc = T(cl.cycle || 0); if (!f.missing && cyc > 0 && cyc < c.len - 1) c.ll = cyc;   // the loop repeats inside a longer clip

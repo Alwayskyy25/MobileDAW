@@ -924,7 +924,7 @@ export function padsOf(i) {
 // known (Honeydew drums.rs): a later start -> pad Start, a negative start (silence before the hit, up to 0.5 s) -> pad Shift, Length -> Hold
 // (the gate, then the release). The resolved values stay in the project; the FLM fields go.
 function flmPadTime(q) {
-  const D = q.sample && q.sample.duration;
+  const D = (q.dsample || q.sample) && (q.dsample || q.sample).duration;
   if (!(D > 0) || (q.flmSt == null && q.flmLen == null)) return;
   const st = +q.flmSt || 0;
   if (st > 0) q.start = Math.min(0.999, st / D); else if (st < 0) q.shift = Math.min(0.25, (q.shift || 0) - st);
@@ -936,7 +936,7 @@ function sendPad(i, k) {
   const ps = padsOf(i), q = ps[k], b = 200 + k * 16, solo = padSolo(ps);
   if (!q) { eng.instParam(i, b + 11, -1); eng.instParam(i, b, -1); return; }
   eng.instParam(i, k * 3, q.gain); eng.instParam(i, k * 3 + 1, q.pit); eng.instParam(i, k * 3 + 2, q.dec);
-  eng.instParam(i, b, q.sample ? q.sample.id : -1); eng.instParam(i, b + 1, q.kind); eng.instParam(i, b + 2, q.pan);
+  eng.instParam(i, b, q.sample ? (q.dsample || q.sample).id : -1);   // an FLM pad's stretch / pitch render (q.warp) plays in place of its file eng.instParam(i, b + 1, q.kind); eng.instParam(i, b + 2, q.pan);
   eng.instParam(i, b + 3, q.start); eng.instParam(i, b + 4, q.end); eng.instParam(i, b + 5, q.rev ? 1 : 0);
   eng.instParam(i, b + 6, q.a); eng.instParam(i, b + 7, q.d); eng.instParam(i, b + 8, q.s); eng.instParam(i, b + 9, q.r);
   eng.instParam(i, b + 10, q.mute || (solo && !q.solo) ? 1 : 0); eng.instParam(i, b + 11, q.pitch);
@@ -1038,7 +1038,7 @@ export async function setPadSample(i, k, path) {
   const q = padsOf(i)[k]; if (!q) return { error: 'Pad tidak ada.' };
   const s = await loadSampleObj(path);
   if (!s) return { error: 'Sample tidak bisa dimuat (format atau file terlalu panjang).' };
-  q.sample = s; q.name = cleanName(s.name); q.start = 0; q.end = 1;
+  q.sample = s; q.name = cleanName(s.name); q.start = 0; q.end = 1; delete q.warp; delete q.dsample;
   sendPad(i, k); emit('devices');
   return { k };
 }
@@ -1046,7 +1046,7 @@ export function resetPadSound(i, k) {           // back to the built-in synth so
   const q = padsOf(i)[k]; if (!q || !q.sample) return false;
   const k0 = DRUM_PADS.findIndex((d) => d.pitch === q.pitch);
   if (k0 < 0) return false;
-  q.sample = null; q.kind = k0; q.name = DRUM_PADS[k0].name;
+  q.sample = null; q.kind = k0; q.name = DRUM_PADS[k0].name; delete q.warp; delete q.dsample;
   sendPad(i, k); emit('devices');
   return true;
 }
@@ -1631,7 +1631,7 @@ async function deserializeInner(text, onProgress) {
       }
       if (!q.sample) continue;
       const sm = q.sample.path ? await loadSampleObj(q.sample.path) : null;
-      if (sm) { q.sample = sm; flmPadTime(q); } else { if (q.sample.path) missing.push(q.sample.path); q.sample = null; if (q.kind < 0) q.mute = true; }
+      if (sm) { q.sample = sm; if (q.warp && ((q.warp.ratio || 1) !== 1 || q.warp.pitch)) { const ds = await deriveSample(sm, q.warp); q.dsample = ds && ds !== sm ? ds : null; } flmPadTime(q); } else { if (q.sample.path) missing.push(q.sample.path); q.sample = null; if (q.kind < 0) q.mute = true; }
     }
   }
   let maxId = 0;

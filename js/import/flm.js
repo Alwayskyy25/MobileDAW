@@ -85,14 +85,19 @@ export function parseFlm(buf, onProgress) {
     }
     const rs = one(ks, 'RSMP');
     if (rs) for (const s of kids(rs).filter((x) => x.tag === 'SMPl')) {
-      const sk = kids(s), pm = one(sk, 'PRMS'), prm = [];
+      const sk = kids(s), pm = one(sk, 'PRMS'), prm = [], ps1 = one(sk, 'STR1'), psc = one(sk, 'STRC');
+      // the slot's STR1 / STRC as an audio clip's (Honeydew read.rs slot(), sample_cache.rs str1()): the ratio with SYNC on, the semitones always
+      let pst = null;
+      if (ps1 && ps1.n >= 17) pst = [u[ps1.a], f64(ps1.a + 1), f64(ps1.a + 9)];
+      else if (psc && psc.n >= 17) { const pr = f64(psc.a + 9), sm = Math.round(12 * Math.log2(pr)); pst = [1, f64(psc.a + 1), pr > 0 && Number.isFinite(sm) ? sm : 0]; }
+      const pwarp = pst ? { ratio: pst[0] !== 0 && Number.isFinite(pst[1]) && pst[1] > 0 ? pst[1] : 1, pitch: Number.isFinite(pst[2]) ? pst[2] : 0, sync: pst[0] !== 0 } : null;
       if (pm) for (let k = 0; k + 4 <= pm.n; k += 4) prm.push(f32(pm.a + k));
       // MAIN (Honeydew read.rs slot()): i32, f64 pad index, name[512], folder[512], u8 reverse, f64 beat offset, f32 offset control, u8 cut group
       // (0 none, 1..3 = A..C), u8 overlapping voices (Poly). PRMS: level, pan, speed (pitch), mute, solo, length, A, D, S, R, sample start.
       const mn = one(sk, 'MAIN'), M0 = mn && mn.n >= 1051 ? mn.a : -1;
       const ln = one(sk, 'LINk'), link = ln && ln.n >= 4 ? { id: u32(ln.a), outBus: ln.n >= 8 ? i32(ln.a + 4) : -1, key: ln.n >= 10 ? u16(ln.a + 8) : 0xffff, send: ln.n >= 14 ? i32(ln.a + 10) : -1 } : null;   // LINk: slot id, output bus, MIDI key, send target channel
       out.pads.push({ path: path1(one(sk, 'PTH1')), vol: prm[0] ?? LVL0, pan: prm[1] ?? 0.5, pitch: prm[2] ?? 0.5, params: prm, index: M0 >= 0 ? f64(M0 + 4) : out.pads.length,
-        reverse: M0 >= 0 && u[M0 + 1036] !== 0, offset: M0 >= 0 ? f64(M0 + 1037) : 0, cut: M0 >= 0 ? Math.min(3, u[M0 + 1049]) : 0, poly: M0 >= 0 ? u[M0 + 1050] !== 0 : true, mute: (prm[3] || 0) > 0.5, solo: (prm[4] || 0) > 0.5, link });
+        reverse: M0 >= 0 && u[M0 + 1036] !== 0, offset: M0 >= 0 ? f64(M0 + 1037) : 0, cut: M0 >= 0 ? Math.min(3, u[M0 + 1049]) : 0, poly: M0 >= 0 ? u[M0 + 1050] !== 0 : true, mute: (prm[3] || 0) > 0.5, solo: (prm[4] || 0) > 0.5, link, ...(pwarp && (Math.abs(pwarp.ratio - 1) > 1e-12 || pwarp.pitch) ? { warp: pwarp } : {}) });
     }
     out.pads.sort((a, b) => a.index - b.index);           // a slot plays on the pad its MAIN pad index names (not in file order)
     return out;
@@ -111,9 +116,13 @@ export function parseFlm(buf, onProgress) {
       clip.name = main ? str(main.a + 12, 256) : '';
       if (main && main.n >= 1037 && u[main.a + 1036] !== 0) clip.reverse = true;   // slot MAIN as a pad's (Honeydew read.rs slot()): u8 reverse @1036
       const s1 = one(sk, 'STR1');
-      if (stc && stc.n >= 9) { clip.stretchOn = u[stc.a] === 1; clip.stretch = f64(stc.a + 1); if (stc.n >= 17 && clip.stretchOn) clip.pitch = 12 * Math.log2(Math.max(1e-6, f64(stc.a + 9))); }
-      if (s1 && s1.n >= 17 && u[s1.a] === 1) clip.pitch = f64(s1.a + 9);              // semitones while stretching (time and pitch independent)
-      if (pm && pm.n >= 8) { clip.gain = f32(pm.a); clip.pan = f32(pm.a + 4); clip.params = []; for (let k = 0; k + 4 <= pm.n; k += 4) clip.params.push(f32(pm.a + k)); if (!clip.stretchOn && pm.n >= 12) clip.repitch = Math.trunc(Math.fround(48 * f32(pm.a + 8) - 24)); }   // FLM: whole semitones, trunc(fma32(48, v, -24)) (48 v - 24 is exact in f64)   // stretch off: the pitch knob resamples
+      // Honeydew read.rs slot(): STR1 (u8 mode, f64 ratio, f64 semitones) wins whole; STRC alone forces mode 1 and rounds its pitch ratio to
+      // semitones. sample_cache.rs str1(): the ratio applies only with the mode (SYNC) on, the semitones always (a pitch shift, length kept).
+      let st = null;
+      if (s1 && s1.n >= 17) st = [u[s1.a], f64(s1.a + 1), f64(s1.a + 9)];
+      else if (stc && stc.n >= 17) { const pr = f64(stc.a + 9), sm = Math.round(12 * Math.log2(pr)); st = [1, f64(stc.a + 1), pr > 0 && Number.isFinite(sm) ? sm : 0]; }
+      if (st) { clip.stretchOn = st[0] !== 0; clip.stretch = Number.isFinite(st[1]) && st[1] > 0 ? st[1] : 1; clip.pitch = Number.isFinite(st[2]) ? st[2] : 0; }
+      if (pm && pm.n >= 8) { clip.gain = f32(pm.a); clip.pan = f32(pm.a + 4); clip.params = []; for (let k = 0; k + 4 <= pm.n; k += 4) clip.params.push(f32(pm.a + k)); if (pm.n >= 12) clip.repitch = Math.trunc(Math.fround(48 * f32(pm.a + 8) - 24)); }   // Speed resamples on top of the stretch render, SYNC on or off (Honeydew audio_clips.rs source_beats)   // FLM: whole semitones, trunc(fma32(48, v, -24)) (48 v - 24 is exact in f64)   // stretch off: the pitch knob resamples
     }
     return clip;
   };
@@ -202,7 +211,7 @@ export function flmToModel(P) {
     } else if (unk) { c.instrument = { kind: 'unknown', name: 'Instrumen FLM #' + unk.type, preset: unk.preset && unk.preset !== 'Default' ? unk.preset : '', params: unk.params, enabled: unk.enabled, flmType: unk.type };
     } else if (syn) { const k = synthOf(syn); c.instrument = { kind: k.kind, name: k.name, preset: syn.preset && syn.preset !== 'Default' ? syn.preset : '', params: syn.params, enabled: syn.enabled, flmType: syn.type, ...(syn.gms ? { gms: syn.gms } : {}), ...(k.kind === 'soundfont' ? { library: syn.presetPath } : {}), ...(syn.loop ? { loop: syn.loop } : {}), ...(syn.sens != null ? { sens: syn.sens } : {}), ...(syn.keys ? { keys: syn.keys } : {}) }; }
     c.pads = ch.pads.map((q, k) => ({ path: q.path, name: (q.path.split('/').pop() || 'Pad ' + (k + 1)).replace(/\.[^.]+$/, ''), gain: flmGain(q.vol), pan: q.pan * 2 - 1, pitch: Math.trunc(Math.fround(q.pitch * 48 - 24)), env: q.params.length >= 10 ? { a: q.params[6], d: q.params[7], s: q.params[8], r: q.params[9] } : null, reverse: !!q.reverse, cut: q.cut | 0, poly: q.poly !== false, mute: !!q.mute, solo: !!q.solo, offset: Number.isFinite(q.offset) ? q.offset : 0,
-      startSec: q.params.length >= 11 ? Math.sign(2 * q.params[10] - 1) * 0.5 * (2 * q.params[10] - 1) ** 2 : 0, length: q.params[5] > 0 ? q.params[5] : 0, send: q.link ? q.link.send : -1 }));
+      startSec: q.params.length >= 11 ? Math.sign(2 * q.params[10] - 1) * 0.5 * (2 * q.params[10] - 1) ** 2 : 0, length: q.params[5] > 0 ? q.params[5] : 0, send: q.link ? q.link.send : -1, ...(q.warp ? { warp: q.warp } : {}) }));
     // Honeydew drums.rs: Speed = trunc(48 v - 24) whole semitones (f32); Sample Start = +-0.5 u^2 s, u = 2 v - 1 (later start, or silence
     // before the hit when negative); Length > 0 = the gate at that fraction of the sample, then the release; LINk send = the pad plays into
     // that effect channel instead of its own (past the channel's rack and fader)
@@ -216,7 +225,7 @@ export function flmToModel(P) {
       }
       for (const x of t.clips) {
         const cl = { pos: x.pos, len: x.len, cycle: x.cycle, offset: x.offset, srcLen: x.srcLen, muted: x.muted };
-        if (t.kind === 'audio') Object.assign(cl, { sample: x.sample, name: x.name, pitch: x.pitch || 0, repitch: x.repitch || 0, stretch: x.stretchOn !== false && x.stretch > 0.01 ? x.stretch : 1, gain: flmGain(x.gain ?? LVL0), pan: x.pan != null ? x.pan * 2 - 1 : 0,
+        if (t.kind === 'audio') Object.assign(cl, { sample: x.sample, name: x.name, pitch: x.pitch || 0, repitch: x.repitch || 0, stretch: x.stretchOn && x.stretch > 0.01 ? x.stretch : 1, sync: !!x.stretchOn, gain: flmGain(x.gain ?? LVL0), pan: x.pan != null ? x.pan * 2 - 1 : 0,
           ...clipEnvs(x.events), ...(x.reverse ? { reverse: true } : {}),
           ...(x.params && x.params.length >= 5 && x.params[3] > 0.5 ? { slotMute: true } : {}),
           ...(x.params && x.params.length >= 11 && (x.params[5] > 0 || Math.abs(x.params[10] - 0.5) > 1e-6) ? { slotTrim: [x.params[5], x.params[10]] } : {}),
