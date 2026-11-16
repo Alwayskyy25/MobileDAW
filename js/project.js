@@ -2061,10 +2061,13 @@ function syncSoundFont(i) {
   if (!t || !t.inst || t.inst.type !== INST.SOUNDFONT || !t.inst.sf || t.inst.sf.id === undefined) return;
   eng.instParam(i, 100, t.inst.sf.id); eng.instParam(i, 1, t.inst.sf.preset || 0);
 }
+const t0Flm = (i) => { const sf = state.tracks[i] && state.tracks[i].inst && state.tracks[i].inst.sf; const v = sf && sf.flmPatch; return Number.isInteger(v) ? v : null; };
 async function loadSoundFontFor(i, path, preset = 0) {
   const r = await eng.loadSoundFont(path);
   if (!r || r.error) return r || { error: 'SoundFont tidak bisa dimuat' };
   const t = state.tracks[i];
+  const fp = t0Flm(i);   // an FLM import: the SF2D patch is a file-order index, MobileDAW lists the presets by bank / program
+  if (fp != null && Array.isArray(r.order)) { const k = r.order.indexOf(fp); if (k >= 0) preset = k; }
   t.inst.sf = { path, id: r.id, preset: Math.min(preset, r.presets.length - 1), presets: r.presets };
   syncSoundFont(i);
   return r;

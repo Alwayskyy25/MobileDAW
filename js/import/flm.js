@@ -61,7 +61,7 @@ export function parseFlm(buf, onProgress) {
     const rh = one(ks, 'RHED'); if (rh && rh.n >= 16) { out.busId = i32(rh.a + 8); out.outBus = i32(rh.a + 12); }   // RHED (Honeydew read.rs): i32, last instance id, this channel's send bus id, its output bus (legacy routing)
     const rp = one(ks, 'RPRM');                              // f32 x 6: level, pan, mute (0 / 1), solo?, 0.5, ?  (the FLM manual's channel has Activate (mute) then Solo; index 3 is a Solo candidate, 0 in every known project, not applied)
     if (rp && rp.n >= 8) { out.vol = f32(rp.a); out.pan = f32(rp.a + 4); out.rprm = []; for (let k = 0; k + 4 <= rp.n; k += 4) out.rprm.push(f32(rp.a + k)); if (rp.n >= 12) out.mute = f32(rp.a + 8) > 0.5; if (rp.n >= 16) out.solo = f32(rp.a + 12) > 0.5; }
-    for (const m of ks.filter((x) => x.tag === 'RMOd')) {
+    for (const m of ks.filter((x) => x.tag === 'RMOd' || x.tag === 'RMOD')) {   // RMOD = the legacy module chunk (Honeydew read.rs)
       const mk = kids(m), type = i32(m.a), id = u32(m.a + 4);
       const prst = one(mk, 'PRST'), prms = one(mk, 'PRMS'), desc = one(mk, 'DESC'), cstm = one(mk, 'CSTM'), smpr = one(mk, 'SMPR');
       const pr = prst && prst.n > 8 ? str(prst.a + 4, Math.min(prst.n - 4, u32(prst.a))) : '';
@@ -72,6 +72,8 @@ export function parseFlm(buf, onProgress) {
       const a1 = one(mk, 'ADD1');                         // ADD1 (Honeydew read.rs): u8 minimized, i8 key low, i8 key high: the keys the instrument hears
       if (a1 && a1.n >= 3) { let lo = dv.getInt8(a1.a + 1), hi = dv.getInt8(a1.a + 2); if (lo > hi) [lo, hi] = [hi, lo]; lo = Math.max(0, lo); hi = Math.max(lo, hi); if (lo > 0 || hi < 127) mod.keys = [lo, hi]; }
       if (smpr && smpr.n >= 12) { mod.wetPan = f32(smpr.a); mod.level = f32(smpr.a + 4); mod.postGain = f32(smpr.a + 8); mod.pan = 0; }   // SMPR = Wet Pan, Mix, Post Gain (FLM Rack "Mix options"); Mix -> module level, Wet Pan / Post Gain default 0.5 in known projects
+      if (cstm && type === 52) for (const z of kids(cstm)) if (z.tag === 'SF2D' && z.n >= 4) {   // SoundFont Player (Honeydew sf2d.rs): vstr32 path, i32 patch (file-order index)
+        const L = Math.min(z.n - 4, u32(z.a)), pth = clean(raw(z.a + 4, L)); if (pth) mod.sf2 = { path: pth, patch: z.n >= 8 + L ? i32(z.a + 4 + L) : 0 }; break; }
       if (cstm && type === 25 && cstm.n >= 12) mod.notes = Array.from({ length: 12 }, (_, k) => u[cstm.a + k] !== 0);   // Pitcher CSTM (Honeydew cstm.rs): u8 note enables C..B
       if (cstm && type === 2 && cstm.n >= 8) mod.gms = { waveA: u32(cstm.a), waveB: u32(cstm.a + 4), pb: cstm.n >= 12 ? f32(cstm.a + 8) : 1 / 3, mwAmount: cstm.n >= 16 ? f32(cstm.a + 12) : 0.5, mwDest: cstm.n >= 20 ? f32(cstm.a + 16) : 1 };   // GMSynth CSTM (Honeydew cstm.rs): u32 shape A / B, f32 PB RANGE, MW AMOUNT, MW DEST
       else if (cstm) for (const z of kids(cstm)) {                 // DirectWave: the sample of its zone (user folder) or a library program (built-in content)
@@ -84,7 +86,7 @@ export function parseFlm(buf, onProgress) {
       out.modules.push(mod);
     }
     const rs = one(ks, 'RSMP');
-    if (rs) for (const s of kids(rs).filter((x) => x.tag === 'SMPl')) {
+    if (rs) for (const s of kids(rs).filter((x) => x.tag === 'SMPl' || x.tag === 'SMPL')) {
       const sk = kids(s), pm = one(sk, 'PRMS'), prm = [], ps1 = one(sk, 'STR1'), psc = one(sk, 'STRC');
       // the slot's STR1 / STRC as an audio clip's (Honeydew read.rs slot(), sample_cache.rs str1()): the ratio with SYNC on, the semitones always
       let pst = null;
@@ -106,9 +108,9 @@ export function parseFlm(buf, onProgress) {
     const pos = u32(c.a), ck = kids(c), h = one(ck, 'CLHd');
     if (!h || h.n < 36) return null;
     const clip = { pos: pos / 128, len: f64(h.a), cycle: f64(h.a + 8), offset: f64(h.a + 16), id: i32(h.a + 24), srcLen: f64(h.a + 28), muted: h.n > 36 && u[h.a + 36] === 1, events: [] };
-    if (!(clip.len > 0)) { clip.len = clip.cycle > 0 ? clip.cycle : clip.srcLen > 0 ? clip.srcLen : 4; clip.lenFromCycle = true; }   // never resized: one cycle long
-    const e = one(ck, 'EVN2');
-    if (e && e.n >= 2) { const rs = u16(e.a); if (rs >= 20) for (let p = e.a + 2; p + rs <= e.a + e.n; p += rs) clip.events.push({ t: u32(p) / 128, len: f64(p + 4), pitch: u16(p + 12), vel8: dv.getUint8(p + 14), pan8: dv.getUint8(p + 15), vel: u16(p + 16), value: u16(p + 16), repeat: dv.getInt8(p + 18), slide: u[p + 19] !== 0, flags: u16(p + 18) }); }
+    if (!(clip.len > 0)) { clip.len = clip.srcLen > 0 ? clip.srcLen : clip.cycle > 0 ? clip.cycle : 4; clip.lenFromCycle = true; }   // never resized (Honeydew lane.rs visible_ticks): the source length, else the loop length
+    const e = one(ck, 'EVN2') || (() => { const v = one(ck, 'EVNT'); return v ? { a: v.a - 2, n: v.n + 2, legacy: true } : null; })();   // EVNT (legacy): no record size, 20-byte records
+    if (e && e.n >= 2) { const rs = e.legacy ? 20 : u16(e.a); if (rs >= 20) for (let p = e.a + 2; p + rs <= e.a + e.n; p += rs) clip.events.push({ t: u32(p) / 128, len: f64(p + 4), pitch: Math.max(0, Math.min(255, dv.getInt16(p + 12, true))),   /* Honeydew decode_events: i16 key, clamped (notes 0..127, pads 0..255) */ vel8: dv.getUint8(p + 14), pan8: dv.getUint8(p + 15), vel: u16(p + 16), value: u16(p + 16), repeat: dv.getInt8(p + 18), slide: u[p + 19] !== 0, flags: u16(p + 18) }); }
     const sm = one(ck, 'CLSm');
     if (sm) {
       const sk = kids(sm), stc = one(sk, 'STRC'), pm = one(sk, 'PRMS'), main = one(sk, 'MAIN');
@@ -214,7 +216,7 @@ export function flmToModel(P) {
       if (!c.instrument.layers.length && !c.instrument.library && dw[0].sample) c.instrument.layers.push({ sample: dw[0].sample, root: dw[0].root ?? DW_ROOT0, params: dw[0].params, level: dw[0].level ?? 1, pan: dw[0].pan || 0 });
     } else if (unk) { c.instrument = { kind: 'unknown', name: 'Instrumen FLM #' + unk.type, preset: unk.preset && unk.preset !== 'Default' ? unk.preset : '', params: unk.params, enabled: unk.enabled, flmType: unk.type };
     } else if (syn) {
-      const instOf = (m) => { const k = synthOf(m); return { kind: k.kind, name: k.name, preset: m.preset && m.preset !== 'Default' ? m.preset : '', params: m.params, enabled: m.enabled, flmType: m.type, ...(m.gms ? { gms: m.gms } : {}), ...(k.kind === 'soundfont' ? { library: m.presetPath } : {}), ...(m.loop ? { loop: m.loop } : {}), ...(m.sens != null ? { sens: m.sens } : {}), ...(m.keys ? { keys: m.keys } : {}) }; };
+      const instOf = (m) => { const k = synthOf(m); return { kind: k.kind, name: k.name, preset: m.preset && m.preset !== 'Default' ? m.preset : '', params: m.params, enabled: m.enabled, flmType: m.type, ...(m.gms ? { gms: m.gms } : {}), ...(k.kind === 'soundfont' ? { library: m.presetPath, ...(m.sf2 ? { sf2: m.sf2 } : {}) } : {}), ...(m.loop ? { loop: m.loop } : {}), ...(m.sens != null ? { sens: m.sens } : {}), ...(m.keys ? { keys: m.keys } : {}) }; };
       c.instrument = instOf(syn);
       if (syns.length > 1) {   // chain k = instrument k + every effect between it and the last instrument (the sum of layers 1..j passes the effects after layer j)
         const at = syns.map((m) => ch.modules.indexOf(m)), last = at[at.length - 1];

@@ -464,7 +464,7 @@ export function createWebBackend() {
         st.node.port.postMessage({ c: 'sf', id, sf });
         if (nat.mirror) nat.sink.soundFont(id, sf);
       }
-      return { id, presets: st.sfs[id].presets.map((p) => p.name) };
+      return { id, presets: st.sfs[id].presets.map((p) => p.name), order: st.sfs[id].presets.map((p) => p.file) };
     } catch (e) { return { error: e.message || String(e) }; }
   };
 

@@ -90,7 +90,7 @@ export function parseSf2(buf, maxSamples = 80e6) {
         });
       }
     }
-    if (zones.length) presets.push({ name: phdr[p].name || 'Preset ' + (p + 1), bank: phdr[p].bank, program: phdr[p].program, zones });
+    if (zones.length) presets.push({ name: phdr[p].name || 'Preset ' + (p + 1), bank: phdr[p].bank, program: phdr[p].program, zones, file: p });   // file = index in file order (FL Studio Mobile's SF2D patch)
   }
   if (!presets.length) throw new Error('SoundFont tidak punya preset yang bisa dimainkan');
   presets.sort((a, b) => a.bank - b.bank || a.program - b.program);

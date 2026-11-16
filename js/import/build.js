@@ -151,6 +151,10 @@ export function buildMdaw(M, opts) {
   const instrumentOf = (I, trackName) => {
     I = I || { kind: 'unknown', name: 'Instrumen' };
     const note = (to, how) => report.instruments.push({ track: trackName, from: I.name + (I.library ? ' "' + I.library.replace(/^.*?Samples\//, '').replace(/\.\w+$/, '') + '"' : I.preset ? ' "' + I.preset + '"' : ''), to, how });
+    if (I.kind === 'soundfont' && I.sf2 && I.sf2.path) {   // FLM SoundFont Player: its own .sf2 (SF2D) and patch (file-order index, resolved when the SoundFont loads)
+      const f = sample(I.sf2.path);
+      if (!f.missing) { note('SoundFont Player: ' + f.path.split('/').pop() + ' patch #' + (I.sf2.patch + 1), 'exact'); return { type: 6, params: { 0: 0.8 }, pitch: 0, sf: { path: f.path, preset: 0, flmPatch: I.sf2.patch }, from: { app: M.app, name: I.name, preset: I.preset || '' } }; }
+    }
     if (SYNTH_TYPE[I.kind]) {
       const type = SYNTH_TYPE[I.kind], pr = presetFor(type, I.preset);
       const dflt = !pr && !(I.preset && I.preset !== 'Default');                  // FLM's own default patch: the stem-calibrated equivalent

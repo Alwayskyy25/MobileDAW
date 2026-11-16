@@ -41,7 +41,8 @@ function flmFile() {
     rack(0x100, 0.853, [], [ck('RSMP', asc('10MS'), u32(2), ck('PADS', new Uint8Array(22)), ck('SMPl', asc('20LS'), ck('PTH1', pth('My Samples/kick.wav')), ck('PRMS', f32s(0.853, 0.5, 0.539, 1, 0, 0, 0.095, 0.381, 0, 0.222, 0.5))), ck('SMPl', asc('20LS'), ck('PTH1', pth('My Samples/hilang.wav')), ck('PRMS', f32s(0.5, 0.5, 0.5))))]),
     rack(0x100, 0.853, [mod(99, 6, [1, 0.3], 'Presets/GMS Presets/Bass/Growl Bass.flmpst')]), rack(0x100, 0.853, [mod(98, 7, [1], 'Presets/MiniSynth/Bass/Retro Bass.flmpst')]),
     rack(0x100, 0.853, [mod(97, 8, [1], 'Presets/SuperSaw/EDM Lead.flmpst')]), rack(0x100, 0.853, [mod(1, 9, [1], 'Keyboard/Grand Piano.dwp', [ck('CSTM', asc('10WD'), ck('PATh', u32(46), asc('@R@\0DirectWave Samples/Keyboard/Grand Piano.dwp')))])]),
-    rack(0x100, 0.853, [mod(7, 10, [1, 0.5], 'Effect Presets/SuperSaw Chorus.flmpst')], [], 1));
+    rack(0x100, 0.853, [mod(7, 10, [1, 0.5], 'Effect Presets/SuperSaw Chorus.flmpst')], [], 1),
+    rack(0x100, 0.853, [mod(52, 11, [1, 0.5], 'Resources/SoundFonts/Default.sf2', [ck('CSTM', ck('SF2D', u32(27), asc('@L@\0My SoundFonts/piano.sf2'), i32(5)))])]));
   parts.push(chnl(0, 'MASTER', 0, 0, ck('TRKH', desc(1)), ck('TRKH', desc(1, 0, 0, 'Level'), clip(0, clhd(8, 8, 0), ck('ZOOM', new Uint8Array(32)), evn([{ t: 0, p: 1, v: 20000 }, { t: 4, p: 1, v: 60000 }])))),
     chnl(0x100, 'Vokal', 2.5, 1, ck('TRKH', desc(2), clip(4, clhd(8, 1024, 1, 7.5), ck('ZOOM', new Uint8Array(32)), clsm('My Tracks/vokal.wav', 0.8), evn([])), clip(16, clhd(8, 4, 0, 4), ck('ZOOM', new Uint8Array(32)), clsm('My Tracks/tidakada.wav', 1), evn([])),
       clip(28, clhd(0, 4, 0, 4), ck('ZOOM', new Uint8Array(32)), clsm('My Tracks/vokal.wav', 1.25, 5), evn([])), clip(36, clhd(4, 4, 0, 4), ck('ZOOM', new Uint8Array(32)), clsm('My Tracks/vokal.wav', 1, -4, 0), evn([]))),
@@ -49,7 +50,7 @@ function flmFile() {
     chnl(0x100, 'Lead', 2.0, 2, ck('TRKH', desc(0), clip(8, clhd(12, 4, 2), ck('ZOOM', new Uint8Array(32)), evn([{ t: 0, len: 0.5, p: 60 }, { t: 1, len: 0.5, p: 64, vel: 255, pan: 0 }, { t: 3 + 1 / 128, len: 1, p: 67, vel: 102 }]))),
       ck('TRKH', desc(1, 4, 1, 'Gain : FX Leveller'), clip(0, clhd(4, 4, 0), ck('ZOOM', new Uint8Array(32)), evn([{ t: 0, p: 2, v: 100 }])))),
     chnl(0x100, 'Drum', 3, 3, ck('TRKH', desc(3), clip(0, clhd(16, 4, 0), ck('ZOOM', new Uint8Array(32)), evn([{ t: 0, len: 0.125, p: 0 }, { t: 1, len: 0.125, p: 1 }, { t: 2, len: 0.125, p: 0 }])))),
-    ...['GmsT', 'MiniT', 'SawT', 'Piano', 'EqOnly'].map((n, k) => chnl(0x100, n, 4 + k, 4 + k, ck('TRKH', desc(0), clip(0, clhd(4, 4, 0), ck('ZOOM', new Uint8Array(32)), evn([{ t: 0, len: 1, p: 60 }]))))));
+    ...['GmsT', 'MiniT', 'SawT', 'Piano', 'EqOnly', 'SfT'].map((n, k) => chnl(0x100, n, 4 + k, 4 + k, ck('TRKH', desc(0), clip(0, clhd(4, 4, 0), ck('ZOOM', new Uint8Array(32)), evn([{ t: 0, len: 1, p: 60 }]))))));
   return cat(...parts);
 }
 const flm = flmFile();
@@ -63,7 +64,7 @@ ok(!ch('GmsT').modules.length && ch('Lead').modules.map((m) => m.name).join() ==
 ok(ch('Vokal').modules.map((m) => m.name).join() === 'Graphic EQ,Autoduck' && ch('Vokal').modules[1].enabled === false, 'FLM modules in rack order, names from the module table, bypass from param 0');
 { const { LVL0, flmGain } = await import('../js/import/flm.js'); const db = 20 * Math.log10(ch('Vokal').gain); ok(Math.abs(db - (66 * Math.pow(Math.fround(0.6), 0.6) - 60)) < 1e-6 && Math.abs(db + 11.42) < 0.01 && flmGain(LVL0) === 1 && Math.abs(20 * Math.log10(flmGain(1)) - 6) < 1e-6 && Math.abs(ch('Vokal').pan - (-0.5)) < 1e-6, 'FLM channel level by FLM\'s Level law (dB = 66 v^0.6 - 60: 0.6 -> -11.42 dB, 0.8531 -> 0 dB, 1 -> +6 dB) and pan'); }
 ok(ch('Lead').modules.some((m) => m.name === 'Leveller'), 'Leveller (type 20) named from the module table');
-const have = new Set(['My Tracks/vokal.wav', 'My Samples/lead.wav', 'My Samples/lead2.wav', 'My Samples/kick.wav']);
+const have = new Set(['My Tracks/vokal.wav', 'My Samples/lead.wav', 'My Samples/lead2.wav', 'My Samples/kick.wav', 'My SoundFonts/piano.sf2']);
 const B = buildMdaw(M, { root: '/Samples/Imports/T', has: (p) => have.has(p) });
 const tr = (n) => B.json.tracks.find((t) => t.name === n);
 const voc = tr('Vokal'), lead = tr('Lead'), drum = tr('Drum');
@@ -119,7 +120,7 @@ ok(auto && auto.target.strip === voc.id && auto.clips[0].pts.length === 2 && aut
   ok(ln && dv && dv.type === 120 && ln.target.param === 1 && ln.clips[0].pts[0].v === ln.clips[0].pts[0].v && Math.abs(ln.clips[0].pts[0].v) < 0.01, 'Leveller "Gain" automation -> the FLM Leveller module (120) Gain lane, the FLM value unchanged');
   const J2 = structuredClone(B.json); J2.tracks.forEach((t) => t.devices.forEach((x) => { if (x.missing && x.missing.name === 'Leveller') { x.missing.name = 'Efek FLM #99'; x.missing.flmType = 99; } })); await FXa.migrateJson(J2, 'map'); const R2 = { skipped: [], tracks: 9 }; FXa.resolveFlmAutomation(J2, R2);
   ok(!J2.tracks.some((t) => t.flmAuto) && R2.skipped.some((s) => /FX Leveller/.test(s)), 'automation of a plugin that stays a placeholder is removed and reported, not dropped silently'); }
-ok(B.report.samplesMissing.includes('My Tracks/tidakada.wav') && B.report.samplesMissing.includes('My Samples/hilang.wav') && B.report.samplesFound === 4, 'report: samples found / missing');
+ok(B.report.samplesMissing.includes('My Tracks/tidakada.wav') && B.report.samplesMissing.includes('My Samples/hilang.wav') && B.report.samplesFound === 5, 'report: samples found / missing (4 samples + the SoundFont)');
 
 // ---------- 2nd owner project layout: SuperSaw (23) / SoundFont (52) / 3x Osc (39), Tape Stop (42) with "Toggle Play" automation
 {
@@ -303,6 +304,9 @@ if (process.env.FLM_ZIP && fs.existsSync(process.env.FLM_ZIP)) {
   ok(mm[0].pads[0].pitch === 3 && mm[1].pads[0].pitch === -3 && mm[0].pads[0].startSec === 0.125 && mm[1].pads[0].startSec === -0.125 && mm[0].pads[0].length === 0.3 && mm[0].pads[0].send === 4,
     'FLM slot Speed truncated to whole semitones (+3.5 -> 3, -3.5 -> -3), Sample Start = +-0.5 u^2 s, Length and LINk send read');
 }
+{ const sf = B.json.tracks.find((t) => t.name === 'SfT'), mi = ch('SfT').instrument;
+  ok(mi && mi.sf2 && mi.sf2.path === 'My SoundFonts/piano.sf2' && mi.sf2.patch === 5 && sf && sf.inst.type === 6 && sf.inst.sf.flmPatch === 5 && /piano\.sf2$/.test(sf.inst.sf.path),
+    'FLM SoundFont Player: SF2D read (its own .sf2 + patch #6 in file order), imported as SoundFont with that file, not a GM substitute (' + JSON.stringify(sf && sf.inst.sf) + ')'); }
 // FLM layering: a channel with SuperSaw, an effect, MiniSynth, an effect -> an Instrument Rack (chain 1 = SuperSaw + the first effect,
 // chain 2 = MiniSynth), the effect after the last instrument stays on the track; the effects inside the chains become FLM modules
 { const { flmToModel: f2m } = await import('../js/import/flm.js'), { buildMdaw: bm } = await import('../js/import/build.js'), FX = await import('../js/import/fxmap.js');
