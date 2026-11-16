@@ -20,7 +20,7 @@ const shell = (saved) => {
   window.__nat = { cmds: [], active: [], started: 0 };
   const any = new Proxy({}, { get: (t, k) => (k === 'then' ? undefined : async () => ({})) });
   const NativeEngine = {
-    start: async ({ sr }) => { window.__nat.started++; return { sr, inst: Array.from({ length: 40 }, (_, i) => i).filter((i) => i !== 7), dev: Array.from({ length: 64 }, (_, i) => i) }; },
+    start: async ({ sr }) => { window.__nat.started++; return { sr, inst: Array.from({ length: 40 }, (_, i) => i).filter((i) => i !== 29), dev: Array.from({ length: 64 }, (_, i) => i) }; },
     cmd: async ({ text }) => { window.__nat.cmds.push(...text.split('\n')); return {}; },
     setActive: async ({ on }) => { window.__nat.active.push(on); return {}; },
     sampleBegin: async () => ({}), sampleData: async () => ({}), sampleEnd: async () => ({}), watch: async () => ({}), stats: async () => ({}),
@@ -41,7 +41,7 @@ async function run(saved) {
     await new Promise((r2) => setTimeout(r2, 300));
     P.play(); await new Promise((r2) => setTimeout(r2, 200)); P.stop(); await new Promise((r2) => setTimeout(r2, 300));
     const sent = window.__nat.cmds.slice(n0), dw = sent.some((l) => /^trackInst \d+ 30$/.test(l)), played = sent.includes('play');
-    P.setInstrument(i, 7); await new Promise((r2) => setTimeout(r2, 400));     // an instrument the (fake) native engine does not have
+    P.setInstrument(i, 29); await new Promise((r2) => setTimeout(r2, 400));     // an instrument the (fake) native engine does not have
     const info1 = eng.engineInfo();
     return { info0, info1, dw, played, pref: prefs.engine, toasts: [...document.querySelectorAll('.toast')].map((t) => t.textContent) };
   });
@@ -52,7 +52,7 @@ const fresh = await run(null), old = await run(JSON.stringify({ v: 7, engine: 'w
 ok(fresh.info0.want === 'native' && fresh.info0.active === 'native' && fresh.pref === 'native', `fresh install: the native C++ engine is chosen and plays (${JSON.stringify(fresh.info0)})`);
 ok(old.info0.active === 'native' && old.pref === 'native', 'preferences saved before v8 (engine web) move to the native engine once');
 ok(fresh.dw && fresh.played, 'the project reaches the native engine (DirectWave track, play)');
-ok(fresh.info1.active === 'web' && fresh.info1.blocker && fresh.info1.blocker.inst === 7, 'an instrument the native engine lacks: the WebView engine plays instead (' + JSON.stringify(fresh.info1.blocker) + ')');
+ok(fresh.info1.active === 'web' && fresh.info1.blocker && fresh.info1.blocker.inst === 29, 'an instrument the native engine lacks: the WebView engine plays instead (' + JSON.stringify(fresh.info1.blocker) + ')');
 ok(!fresh.toasts.some((t) => /Native/.test(t)), 'no toast for the default engine at start');
 ok(!fresh.errs.length && !old.errs.length, 'no page errors' + (fresh.errs[0] ? ': ' + fresh.errs[0] : ''));
 await b.close(); server.close();

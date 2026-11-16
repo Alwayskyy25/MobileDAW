@@ -1197,7 +1197,7 @@ export function setModMap(i, di, m) { const d = tr(i).devices[di]; d.map = m || 
 // (chain c at 4c: volume, pan, activator, solo; 32 chain count; 33.. macros; 105 chain selector; 106 + 2c chain zones; Instrument Rack also
 // 122 + 2c key zones, 138 + 2c velocity zones); macroMap[m] = { c: chain id, id: device id | 'inst', k } is written into the hidden macro
 // map parameters (41 + 8m) by fixMacros. Every structural change is one undo step (a snapshot of the rack).
-export const RACK = 51, IRACK = 12, RACK_MAX_CH = 8, IRACK_INSTS = [32, 33, 31, 34, 36, 7, 8, 13, 14, 15, 16, 17, 25, 26, 27];   // layering: FL Studio Mobile MiniSynth / SuperSaw / GMS / Transistor Bass / 3x Osc, Moisture, Osphere and the Live synths (no sample needed)
+export const RACK = 51, IRACK = 12, RACK_MAX_CH = 8, IRACK_INSTS = [32, 33, 31, 34, 36, 37, 13, 14, 15, 16, 17, 25, 26, 27];   // layering: FL Studio Mobile MiniSynth / SuperSaw / GMS / Transistor Bass / 3x Osc, Moisture, Osphere and the Live synths (no sample needed)
 const IRB = 100;
 const RDEF = (di) => (di < 0 ? IRACK_DEF : DEVICES[RACK]);
 function R(i, di) {

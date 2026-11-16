@@ -15,11 +15,21 @@ function render(type, p) {
   for (let b = 0; b < Math.ceil(4 * SR / B); b++) { e.render(L, R, B); for (let i = 0; i < B; i++) { const a = Math.abs(L[i]), c = Math.abs(R[i]); if (!Number.isFinite(a + c)) nan = true; pk = Math.max(pk, a, c); ss += L[i] * L[i]; n++; } }
   return { pk, rms: Math.sqrt(ss / n), nan };
 }
-for (const t of [7, 8, 31, 32, 33]) {   // 31 .. 33: FL Studio Mobile GMS / MiniSynth / SuperSaw with the classic presets moved over (the classic types are gone)
+// Moisture (37) is C++ only: its presets render through the WebAssembly build of the engine
+const { loadWasmEngine } = await import('./wasm-engine.mjs'), { encode } = await import('../js/engine/cmdtext.js');
+async function renderWasm(t, p) {
+  const w = await loadWasmEngine(SR), def = D.INSTRUMENTS[t], L0 = [encode('trackInst', [0, t])];
+  def.params.forEach((q, k) => L0.push(encode('instParam', [0, k, p[k] ?? q.def])));
+  w.cmd(L0.join('\n')); for (const n of [48, 52, 55, 60]) w.cmd(encode('preview', [0, n, 0.8, 1]));
+  const L = new Float32Array(B), R = new Float32Array(B); let pk = 0, nan = false;
+  for (let b = 0; b < Math.ceil(2.5 * SR / B); b++) { w.render(L, R, B); for (let i = 0; i < B; i++) { if (!Number.isFinite(L[i] + R[i])) nan = true; pk = Math.max(pk, Math.abs(L[i]), Math.abs(R[i])); } }
+  return { pk, nan };
+}
+for (const t of [37, 31, 32, 33]) {   // 37: Moisture with the Moisture Klasik / Osphere presets moved over; 31 .. 33: FL Studio Mobile GMS / MiniSynth / SuperSaw with the classic presets moved over (the classic types are gone)
   const def = D.INSTRUMENTS[t], L = D.PRESETS[t], names = new Set(L.map((x) => x.name));
   ok(L.length >= 100, `${def.name}: ${L.length} presets`); ok(names.size === L.length, `${def.name}: duplicate names`);
   for (const pr of L) for (const [k, v] of Object.entries(pr.p)) { const q = def.params[k]; ok(q && v >= q.min && v <= q.max && (!q.step || Math.abs(v / q.step - Math.round(v / q.step)) < 1e-9), `${def.name} / ${pr.name}: param ${k} = ${v}`); }
-  const res = L.map((pr) => ({ pr, ...render(t, pr.p) }));
+  const res = []; for (const pr of L) res.push({ pr, ...(def.native ? await renderWasm(t, pr.p) : render(t, pr.p)) });
   const hand = res.slice(0).filter((r) => !/ (Deep|Bright|Soft|Tight)( II)*$/.test(r.pr.name)), ref = Math.max(...res.filter((r, i) => i < 0 || true).map((r) => 0), ...hand.map((r) => r.pk));
   let lo = 1e9, hi = 0;
   for (const r of res) {

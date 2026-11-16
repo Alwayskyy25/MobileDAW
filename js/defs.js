@@ -13,7 +13,7 @@ import { flmText, menuItem } from './fxlaw.js';
 // (app/src/main/cpp/instruments.h and devices.h).
 export const INST = { FLM_3OSC: 36, FLM_SLICER: 35, FLM_DW: 30, FLM_GMS: 31, FLM_MINI: 32, FLM_SAW: 33, MINISYNTH: 1, SUPERSAW: 2, DRUM: 3, DIRECTWAVE: 4, GMS: 5, SOUNDFONT: 6, MOISTURE: 7, OSPHERE: 8, KEYSTONE: 9, SAMPLER: 10, WAVETABLE: 11, SIMPLER: 18, IMPULSE: 28, GRANULATOR: 29 };
 // Instruments a synth/sampler track can switch between (drums have their own track type).
-export const INST_LIST = [30, 31, 32, 33, 34, 35, 36, 37, 18, 17, 16, 15, 14, 13, 11, 10, 28, 29, 25, 26, 27, 19, 20, 21, 22, 23, 24, 6, 7, 8, 9, 12];   // FLM instruments first; the classic Mini Synth / SuperSaw / DirectWave / GMS are replaced by them
+export const INST_LIST = [30, 31, 32, 33, 34, 35, 36, 37, 18, 17, 16, 15, 14, 13, 11, 10, 28, 29, 25, 26, 27, 19, 20, 21, 22, 23, 24, 6, 12];   // FLM instruments first; the classic Mini Synth / SuperSaw / DirectWave / GMS are replaced by them
 
 export const INSTRUMENTS = {
   1: { name: 'Mini Synth', params: [
@@ -1198,14 +1198,14 @@ export function migrateFlmInst(inst, from = 1) {
 }
 
 // classic engine -> FL Studio Mobile instrument (the classic ones are no longer offered; old projects are converted when they open)
-export const CLASSIC_TO_FLM = { 1: 32, 2: 33, 5: 31, 4: 30 };
+export const CLASSIC_TO_FLM = { 1: 32, 2: 33, 5: 31, 4: 30, 9: 30, 7: 37, 8: 37 };   // 7 Moisture Klasik / 8 Osphere -> Moisture (37), 9 Keystone -> DirectWave (owner 2026-11-16: removed)
 const CLASSIC_CONV = {}, CLASSIC_IDX = {};
 // inst = { type, params, zones, ... } of a classic engine -> the same object converted in place (type, params); false when not classic
 export function migrateClassicInst(inst) {
   const to = inst && CLASSIC_TO_FLM[inst.type];
-  if (!to || !CLASSIC_CONV[to]) return false;
+  if (!to || !(to === 37 ? CLASSIC_CONV.toMoist : CLASSIC_CONV[to])) return false;
   const from = inst.type, old = inst.params || {};
-  inst.params = CLASSIC_IDX.fn(to, CLASSIC_CONV[to](old, INSTRUMENTS[from].params));
+  inst.params = to === 37 ? CLASSIC_CONV.toMoist(from, old) : CLASSIC_IDX.fn(to, CLASSIC_CONV[to](old, from === 9 ? INSTRUMENTS[4].params : INSTRUMENTS[from].params));
   inst.type = to; inst.classic = { type: from, params: old };                  // the original values stay with the instrument
   return true;
 }
@@ -1217,7 +1217,7 @@ export function migrateClassicInst(inst) {
 // FLM GMS counterpart (arp presets play their notes held).
 {
   const cutK = (hz) => Math.round(Math.max(0, Math.min(100, 100 * Math.log(Math.max(20, hz) / 20) / Math.log(1000))) * 10) / 10;
-  const r3 = (x) => Math.round(x * 1000) / 1000, cl = (v, a, b) => Math.max(a, Math.min(b, v)), dB = (x) => Math.round(20 * Math.log10(Math.max(1e-4, x)) * 10) / 10;
+  const M2_ENV_SUS = 38, r3 = (x) => Math.round(x * 1000) / 1000, cl = (v, a, b) => Math.max(a, Math.min(b, v)), dB = (x) => Math.round(20 * Math.log10(Math.max(1e-4, x)) * 10) / 10;
   const idx = (type, n) => INSTRUMENTS[type].params.findIndex((q) => q.n === n);
   const conv = CLASSIC_CONV;
   Object.assign(conv, {
@@ -1247,9 +1247,39 @@ export function migrateClassicInst(inst) {
       return { Level: cl(dB(g(0) / 0.8), -60, 6), Attack: r3(cl(g(1), 0.001, 10)), Decay: 1, Sustain: 1, Release: g(6) > 0.5 ? 10 : r3(cl(g(2), 0.001, 10)), Cutoff: g(3) >= 17999 ? 100 : cutK(g(3)), Filter: 1, Pitch: cl(Math.round(g(4)), -24, 24) };
     },
   });
+  // Moisture Klasik (7) / Osphere (8) -> Moisture (37): values in Moisture's normalized laws (moist2.cpp): time 32 v^5 s, cutoff 8 * 2756.25^v Hz,
+  // level v^2, LFO free rate 2^(13 v - 6) Hz; the old envelope amount / LFO depth become matrix routes (Env 1 -> cutoff, LFO 1 -> WT pos)
+  const tV = (sec) => cl(Math.pow(Math.max(0, sec) / 32, 0.2), 0, 1), fV = (hz) => cl(Math.log(Math.max(8, hz) / 8) / Math.log(2756.25), 0, 1), gV = (g) => cl(Math.sqrt(Math.max(0, g)), 0, 1);
+  const hzV = (hz) => cl((Math.log2(Math.max(0.016, hz)) + 6) / 13, 0, 1), qV = (q) => cl((2 - 1 / Math.max(0.5, q)) / 1.97, 0, 1), octV = (o) => cl((o + 4) / 8, 0, 1);
+  conv.toMoist = (from, old) => {
+    const d = INSTRUMENTS[from].params, g = (k) => old[k] ?? d[k].def, P = {};
+    const route = (slot, src, dst, amt) => { P[332 + 2 * slot] = src; P[333 + 2 * slot] = dst; P[180 + 2 * slot] = cl(0.5 + amt / 2, 0, 1); P[181 + 2 * slot] = 1; };
+    P[300] = 0; P[301] = 0; P[216] = 1; P[M2_ENV_SUS] = 1;
+    if (from === 7) {   // Pos A, Pos B, B Level, B Oct, Sub, Unison, Detune, Filter, Cutoff, Reso, Env Amt, A, D, S, R, LFO Rate, LFO Depth, Gain
+      P[11] = cl(g(0), 0, 1); P[24] = cl(g(1), 0, 1); P[14] = gV(g(2)); P[213] = g(2) > 0 ? 1 : 0; P[16] = octV(g(3)); P[33] = gV(g(4)); P[215] = g(4) > 0 ? 1 : 0;
+      P[6] = cl(g(5) / 16, 0, 1); P[7] = cl(Math.sqrt(g(6) / 50), 0, 1); P[44] = [5, 9, 12][Math.round(g(7))] / 95; P[45] = fV(g(8)); P[46] = qV(g(9));
+      P[35] = tV(g(11)); P[37] = tV(g(12)); P[38] = cl(g(13), 0, 1); P[39] = tV(g(14)); P[0] = gV(g(17) / 0.45);
+      if (g(10)) route(0, 1, 45, g(10) * 0.6);
+      if (g(16) > 0) { P[316] = 0; P[61] = hzV(g(15)); route(1, 4, 11, g(16) * 0.5); }
+    } else {           // Osphere: L1 Wave / Level / Oct / Fine, L2 Wave / Level / Oct / Detune, Air, Cutoff, Reso, Attack, Release, Chorus, Ch Mix, Motion, Mot Rate, Gain
+      const pos = (w) => [2 / 3, 1, 1 / 3, 0][Math.round(w)] ?? 0;                    // saw, square, triangle, sine on Basic Shapes (sine -> tri -> saw -> square)
+      P[11] = pos(g(0)); P[1] = gV(g(1)); P[3] = octV(g(2)); P[5] = cl((g(3) + 100) / 200, 0, 1);
+      P[24] = pos(g(4)); P[14] = gV(g(5)); P[213] = g(5) > 0 ? 1 : 0; P[16] = octV(g(6)); P[18] = cl((-g(7) + 100) / 200, 0, 1);
+      if (g(8) > 0) { P[214] = 1; P[27] = gV(g(8) * 0.6); P[28] = 0.8; }
+      P[45] = fV(g(9)); P[46] = qV(g(10)); P[44] = 5 / 95; P[35] = tV(g(11)); P[37] = 0.5; P[38] = 1; P[39] = tV(g(12)); P[0] = gV(g(17) / 0.4);
+      if (g(13) > 0) { P[157] = 1; P[116] = cl(g(14), 0, 1); P[121] = cl(g(13), 0, 1); }
+      if (g(15) > 0) { P[316] = 0; P[61] = hzV(g(16)); route(0, 4, 11, g(15) * 0.4); route(1, 4, 24, -g(15) * 0.4); }
+    }
+    return P;
+  };
   CLASSIC_IDX.fn = (to, vals) => { const p = {}; for (const [n, v] of Object.entries(vals)) { const k = idx(to, n); if (k < 0) throw new Error('preset conv ' + n); const q = INSTRUMENTS[to].params[k]; p[k] = Math.max(q.min, Math.min(q.max, q.step ? Math.round(v / q.step) * q.step : v)); } return to === 32 ? miniToFlmKnobs(p) : to === 31 ? gmsToFlmKnobs(p) : p; };   // MiniSynth: the conversions are written in the old engine's units
-  for (const [to, from] of [[32, 1], [33, 2], [31, 5], [30, 4]]) {
-    const dF = INSTRUMENTS[from].params, out = PRESETS[to] || [], names = new Set(out.map((x) => x.name));
+  for (const from of [7, 8]) {   // the Moisture Klasik / Osphere presets become Moisture (37) presets
+    const out = PRESETS[37] = PRESETS[37] || [], names = new Set(out.map((x) => x.name));
+    for (const pr of PRESETS[from] || []) { let name = pr.name; if (names.has(name)) name += from === 8 ? ' (Osphere)' : ' (Klasik)'; names.add(name); out.push({ cat: pr.cat, name, p: conv.toMoist(from, pr.p || {}), from: { type: from, name: pr.name } }); }
+  }
+  { const out = PRESETS[37] || [], order = []; for (const x of out) if (!order.includes(x.cat)) order.push(x.cat); PRESETS[37] = order.flatMap((c) => out.filter((x) => x.cat === c)); }
+  for (const [to, from] of [[32, 1], [33, 2], [31, 5], [30, 4], [30, 9]]) {
+    const dF = from === 9 ? INSTRUMENTS[4].params : INSTRUMENTS[from].params, out = PRESETS[to] || [], names = new Set(out.map((x) => x.name));
     for (const pr of PRESETS[from] || []) {
       const p = CLASSIC_IDX.fn(to, conv[to](pr.p || {}, dF));
       let name = pr.name; if (names.has(name)) name += ' (Klasik)'; names.add(name);
