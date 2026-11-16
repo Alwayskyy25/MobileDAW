@@ -18,7 +18,7 @@ import * as IMP from './import/ui.js';
 const DL = isNativeApp() ? 'Simpan ke Documents & bagikan' : 'Unduh ke perangkat';   // Android app: Documents/MobileDAW + share sheet
 const { state } = P;
 
-const AUDIO = /\.(wav|mp3|ogg|oga|flac|m4a|aac|opus|webm)$/i, SF2 = /\.sf2$/i;
+const AUDIO = /\.(wav|mp3|ogg|oga|flac|m4a|aac|opus|webm)$/i, SF2 = /\.sf2$/i, DWP = /\.dwp$/i;
 const WEB = backend === 'web';
 let aside, tab = 'instr', path = (WEB && prefs.browserPath) || null, pending = null, home = null;
 let pinned = prefs.browserPin !== false;        // pinned: tapping the arrangement does not close the drawer
@@ -270,6 +270,16 @@ async function addSample0(file) {
   if (!c) return toast('Sample tidak bisa dimuat (format atau file terlalu panjang).');
   pending = null; toast('Klip ditambahkan di track ' + (t.name || (i + 1)) + '.');   // the drawer and its folder stay as they are
 }
+// a DirectWave program (.dwp): onto the DirectWave track asked for (a zone pick) or the selected one
+async function useDwp(file) {
+  const i = pending && pending.track != null ? pending.track : state.sel.track, t = state.tracks[i];
+  if (!t || !t.inst || t.inst.type !== 30) return toast('Program .dwp untuk DirectWave: pilih track DirectWave dulu.', 3500);
+  toast('Memuat program DirectWave\u2026', 6000);
+  const r = await P.loadDwpProgram(i, file);
+  if (r.error) return toast(r.error, 5000);
+  pending = null; closeBrowser();
+  toast(`Program "${r.name}": ${r.zones} zona` + (r.missing.length ? `, ${r.missing.length} sample tidak ditemukan` : '') + (r.dropped ? `, ${r.dropped} zona lebih dari 16 dilewati` : '') + '.', 4000);
+}
 async function useSoundFont(file) {
   const i = pending && pending.sf ? pending.track : state.sel.track, t = state.tracks[i];
   if (!t || !t.inst || t.inst.type !== 6) return toast('Pilih track synth dengan instrumen SoundFont dulu.');
@@ -504,13 +514,13 @@ function tabFiles(list, headEl) {
     for (const it of items) {
       const full = path + '/' + it.name;
       if (it.dir) { n++; out.push(row(it.name, () => { path = full; picked.clear(); render(); }, it.count != null ? it.count + ' file' : '', 'dir', (rect) => dirMenu(full, rect))); continue; }
-      const isAudio = AUDIO.test(it.name), isSf = SF2.test(it.name), isJson = /\.json$/i.test(it.name);
-      if (!isAudio && !isSf && !(isPreset && isJson)) continue;
+      const isAudio = AUDIO.test(it.name), isSf = SF2.test(it.name), isDwp = DWP.test(it.name), isJson = /\.json$/i.test(it.name);
+      if (!isAudio && !isSf && !isDwp && !(isPreset && isJson)) continue;
       n++;
       if (isPreset) out.push(row(it.name.replace(/\.json$/i, ''), () => { const r = PR.applyPresetFile(full, state.sel.track); toast(r.error || r.msg, r.error ? 4000 : 2200); }, kb(it.size), '', (rect) => fileMenu(full, rect)));
       else if (selMode) { const r = row((picked.has(full) ? '\u2611 ' : '\u2610 ') + it.name, () => { if (picked.has(full)) picked.delete(full); else picked.add(full); render(); }, kb(it.size), picked.has(full) ? 'on' : ''); out.push(r); }
       else {
-        const r = row(it.name, () => (isSf ? useSoundFont(full) : addSample(full)), kb(it.size), 'frow' + (pvPath === full ? ' sel' : ''), (rect) => fileMenu2(full, rect), isAudio && !pending ? sampleDrag(full) : null);
+        const r = row(it.name, () => (isSf ? useSoundFont(full) : isDwp ? useDwp(full) : addSample(full)), kb(it.size), 'frow' + (pvPath === full ? ' sel' : ''), (rect) => fileMenu2(full, rect), isAudio && !pending ? sampleDrag(full) : null);
         r.dataset.p = full;
         if (isAudio) {
           const b = h('button', { class: 'pv' + (pvPlaying && pvPath === full ? ' on' : ''), 'aria-label': 'Putar preview', 'data-p': full });

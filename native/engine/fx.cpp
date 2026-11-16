@@ -147,13 +147,13 @@ void Compressor::process(float* L, float* R, int n) {
 
 // ---------------------------------------------------------------------------------------------- Limiter
 Limiter::Limiter(double r) : sr(r) {
-  ceil = dbToLin(-0.3); La = (int)jsMax(8, jsRound(sr * 0.0015)); W = La + 1;
-  dL = new double[La](); dR = new double[La](); qv = new double[W + 1](); qt = new double[W + 1](); ma = new double[W]; for (int k = 0; k < W; k++) ma[k] = 1; ms = W;
+  ceil = dbToLin(-0.3); La = (int)jsMax(8, jsRound(sr * 0.0015)); W = La + 1; Wq = W + (int)jsRound(sr * 0.012);   // fx.js: the minimum holds 12 ms after a peak
+  dL = new double[La](); dR = new double[La](); qv = new double[Wq + 1](); qt = new double[Wq + 1](); ma = new double[W]; for (int k = 0; k < W; k++) ma[k] = 1; ms = W;
   upd();
 }
 void Limiter::setParam(int i, double v) { if (i == 0) ceil = dbToLin(v); else if (i == 1) { rel = v; upd(); } else if (i == 2) in = dbToLin(v); }
 void Limiter::process(float* L, float* R, int n) {
-  double cl = ceil, inG = in, rl = 1 - rC; int Q = W + 1;
+  double cl = ceil, inG = in, rl = 1 - rC; int Q = Wq + 1;
   double gg = g, pi = pin, po = pout, tt = t, s_ = ms; int p_ = dp, h_ = qh, n_ = qn, m_ = mp;
   for (int i = 0; i < n; i++) {
     double l = L[i] * inG, r = R[i] * inG, a = l < 0 ? -l : l, b = r < 0 ? -r : r, pk = a > b ? a : b;
@@ -161,7 +161,7 @@ void Limiter::process(float* L, float* R, int n) {
     double need = pk > cl ? cl / pk : 1;
     while (n_ > 0 && qv[(h_ + n_ - 1) % Q] >= need) n_--;
     qv[(h_ + n_) % Q] = need; qt[(h_ + n_) % Q] = tt; n_++;
-    while (qt[h_] <= tt - W) { h_ = (h_ + 1) % Q; n_--; }
+    while (qt[h_] <= tt - Wq) { h_ = (h_ + 1) % Q; n_--; }
     double mn = qv[h_];
     s_ += mn - ma[m_]; ma[m_] = mn; if (++m_ >= W) m_ = 0;
     double s = s_ / W;

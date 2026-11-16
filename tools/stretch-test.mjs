@@ -93,6 +93,26 @@ for (const mode of ['beats', 'tones']) {
   const o = A.pitchBuffers(sine, sine, 7, mode), hz = peakHz(o.l, Math.floor(o.l.length / 2) - 8192), want = 440 * Math.pow(2, 7 / 12);
   ok(Math.abs(o.l.length - n) < 64 && Math.abs(hz - want) < 1.5, `${mode} pitch +7 st: ${hz.toFixed(2)} Hz (${want.toFixed(2)}), length ${o.l.length} (${n})`);
 }
+// 8. pitch shifting is band-limited (both algorithms): +7 st of 18 kHz would land at 26.97 kHz, above Nyquist - it must vanish, not fold
+// back to 21.03 kHz (linear interpolation left it at -4 dB); -5 st of 12 kHz keeps its level (linear interpolation lost 1.8 dB)
+{ const gz = (x, a, b, f) => { const w = 2 * Math.PI * f / SR, c = 2 * Math.cos(w); let s1 = 0, s2 = 0; for (let i = a; i < b; i++) { const s0 = x[i] + c * s1 - s2; s2 = s1; s1 = s0; } return 2 * Math.sqrt(Math.max(0, s1 * s1 + s2 * s2 - c * s1 * s2)) / (b - a); };
+  const hf = (f) => Float32Array.from({ length: SR * 2 }, (_, i) => 0.5 * Math.sin(2 * Math.PI * f * i / SR)), db = (v) => 20 * Math.log10(v / 0.5 + 1e-12);
+  for (const mode of ['beats', 'tones']) {
+    const up = A.pitchBuffers(hf(18000), hf(18000), 7, mode).l, dn = A.pitchBuffers(hf(12000), hf(12000), -5, mode).l, al = db(gz(up, 8000, 56000, 48000 - 18000 * Math.pow(2, 7 / 12)));
+    let e = 0; for (let i = 8000; i < 56000; i++) e += dn[i] * dn[i]; const lv = 10 * Math.log10(2 * e / 48000 / 0.25);
+    ok(al < -60 && Math.abs(lv) < 0.5, `${mode} pitch is band-limited: +7 st of 18 kHz folds back at ${al.toFixed(1)} dB (< -60), -5 st of 12 kHz keeps ${lv.toFixed(2)} dB`);
+  }
+}
+// 9. beats keeps every attack where the map puts it, played once (a kick loop: 55 Hz body + click, one hit every 0.5 s), at ratios 0.8..1.25
+{ const P = SR / 2, hit = (i) => { const t = i / SR; return Math.exp(-t * 9) * Math.sin(2 * Math.PI * (55 + 120 * Math.exp(-t * 40)) * t) * 0.9 + (i < 96 ? 0.6 * (1 - i / 96) * Math.sin(2 * Math.PI * 3000 * t) : 0); };
+  const loop = Float32Array.from({ length: P * 8 }, (_, i) => hit(i % P)), src = A.findOnsets(loop);
+  for (const ratio of [0.8, 0.92, 1.08, 1.25]) {
+    const m = Math.round(loop.length * ratio), y = A.warpBuffers(loop, loop, [0, m], [0, loop.length], m, 'beats').l, on = A.findOnsets(y), want = src.map((o) => Math.round(o * ratio));
+    const err = Math.max(...want.map((w) => Math.min(...on.map((o) => Math.abs(o - w)))));
+    let pk = 0; for (const w of want) for (let i = w; i < w + 480; i++) pk = Math.max(pk, Math.abs(y[i]));
+    ok(on.length === src.length && err <= 2 && pk > 0.8, `beats x${ratio}: ${on.length} attacks (${src.length}), each within ${err} frames of its place, attack peak ${pk.toFixed(2)} (kept)`);
+  }
+}
 if (process.argv.includes('--table')) { console.log(''); for (const r of rows) console.log(r); }
 console.log(bad ? `\n${bad} FAILED` : '\nALL OK');
 process.exit(bad ? 1 : 0);

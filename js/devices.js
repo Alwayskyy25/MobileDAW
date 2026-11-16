@@ -81,7 +81,23 @@ function zoneEditor(i, k) {
 // DirectWave's display (flmpanels.js dwSample) asks for a zone: tap = pick / edit its sample, the Zona button = the zone list
 const zonesMenu = (i, r) => { const t = state.tracks[i]; if (!t || !t.inst) return; const zs = t.inst.zones || [];
   menu([...zs.map((z, k) => ({ label: `Zona ${k + 1}: ${z.sample ? z.sample.name : '(kosong)'}`, fn: () => zoneEditor(i, k) })), { sep: true },
-    { label: '+ Zona', dim: zs.length >= P.MAX_ZONES, fn: () => { const k = P.addZone(i); if (k !== null) zoneEditor(i, k); } }], r.left, r.bottom + 1); };
+    { label: '+ Zona', dim: zs.length >= P.MAX_ZONES, fn: () => { const k = P.addZone(i); if (k !== null) zoneEditor(i, k); } },
+    t.inst.type === INST.FLM_DW ? { label: 'Muat WAV / MP3 / program DWP\u2026', fn: () => dwLoad(i) } : null].filter(Boolean), r.left, r.bottom + 1); };
+// DirectWave: a file from the device. A .dwp = a whole program (its zones replace the track's); WAV / MP3 = the sample of the first empty zone
+// (a new zone when every zone has one, the last zone's when 16 are full)
+async function dwLoad(i) {
+  const f = await eng.importFiles('.wav,.mp3,.dwp'); if (!f.length) return;
+  const dwp = f.find((p) => /\.dwp$/i.test(p));
+  if (dwp) { toast('Memuat program DirectWave\u2026', 6000); const r = await P.loadDwpProgram(i, dwp); if (r.error) { toast(r.error, 5000); return; }
+    toast(`Program "${r.name}": ${r.zones} zona` + (r.missing.length ? `, ${r.missing.length} sample tidak ditemukan` : '') + '.', 4000); return; }
+  const t = state.tracks[i]; let ok = 0;
+  for (const p of f) {
+    const zs = t.inst.zones || []; let k = zs.findIndex((z) => !z.sample);
+    if (k < 0) k = P.addZone(i) ?? zs.length - 1;
+    if (await P.setZoneSample(i, k, p)) ok++;
+  }
+  toast(ok ? ok + ' sample dipasang ke DirectWave.' : 'Sample tidak bisa dimuat (format atau file terlalu panjang).', 3000);
+}
 // Moisture (37): load a wavetable into oscillator A / B, import a Serum preset (.fxp)
 document.addEventListener('mdaw-m2wt', async (e) => { const { i, osc } = e.detail; const f = await eng.importFiles('.wav'); if (!f.length) return;
   const r = await P.loadMoistureTable(i, osc, f[0]); toast(r.error || 'Wavetable ' + (osc ? 'B' : 'A') + ': ' + r.frames + ' frame dimuat.', r.error ? 4500 : 2200); });

@@ -873,6 +873,46 @@ export async function setZoneSample(i, k, path) {
   emit('devices');
   return s;
 }
+// a file of the library by its name: the folder given first, then every folder (Samples, FLM, Recordings, ...); null when none
+function findLibFile(name, dir) {
+  if (!name || !eng.listDir) return null;
+  const low = name.toLowerCase(), hit = (d) => { const r = eng.listDir(d); const it = r && (r.items || []).find((x) => !x.dir && x.name.toLowerCase() === low); return it ? d + '/' + it.name : null; };
+  if (dir) { const f = hit(dir); if (f) return f; }
+  for (const top of ['/Samples', '/FLM', '/Recordings', '/SoundFonts', '/Exports']) for (const d of (eng.allDirs ? eng.allDirs(top) : [top])) { const f = hit(d); if (f) return f; }
+  return null;
+}
+// a DirectWave program (.dwp, js/dwp.js) into DirectWave (30): its zones replace the track's (16 at most). Embedded audio is saved next to the
+// program as .wav / .flac (Samples/DirectWave/<program>/) so the project refers to plain files; a zone's file is looked up by name in the
+// .dwp's folder, then the whole library. Attack / Release from the program's last zone. Returns { zones, missing: [names], error }.
+export async function loadDwpProgram(i, path) {
+  const t = state.tracks[i]; if (!t || !t.inst || t.inst.type !== INST.FLM_DW) return { error: 'Pilih track DirectWave dulu.' };
+  const bytes = await eng.readBytes(path); if (!bytes) return { error: 'File .dwp tidak bisa dibaca.' };
+  const { parseDwp, toMdawZone, dwpAttackRelease } = await import('./dwp.js');
+  let prog; try { prog = parseDwp(bytes); } catch (e) { return { error: e.message }; }
+  if (!prog.zones.length) return { error: 'Program DirectWave ini tidak punya zona yang bisa dimainkan.' };
+  const dir = path.slice(0, path.lastIndexOf('/')), pname = path.split('/').pop().replace(/\.dwp$/i, '').replace(/[\\/:*?"<>|]+/g, '_') || 'program';
+  const zones = [], missing = [];
+  for (const [k, z] of prog.zones.slice(0, MAX_ZONES).entries()) {
+    let sp = null;
+    if (z.audio) {
+      sp = '/Samples/DirectWave/' + pname + '/' + String(k + 1).padStart(2, '0') + (z.file ? ' ' + z.file.replace(/\.[^.]*$/, '').replace(/[\\/:*?"<>|]+/g, '_') : '') + (z.audio.kind === 'flac' ? '.flac' : '.wav');
+      const data = z.audio.kind === 'flac' ? z.audio.bytes : new Uint8Array(encodeWav([z.audio.l], [z.audio.r], z.audio.l.length, z.audio.rate, 32, z.audio.r === z.audio.l ? 1 : 2));
+      try { await eng.saveBytes(sp, data); } catch (_) { sp = null; }
+    }
+    if (!sp && z.file) sp = findLibFile(z.file, dir);
+    const s = sp ? await loadSampleObj(sp) : null;
+    if (!s) { missing.push(z.file || 'zona ' + (k + 1)); continue; }
+    zones.push({ ...newZone(), ...toMdawZone(z), sample: s });
+  }
+  if (!zones.length) return { error: 'Sample program ini tidak ditemukan: ' + missing.slice(0, 4).join(', ') + (missing.length > 4 ? ', …' : '') + '. Salin sample-nya ke folder Samples lalu coba lagi.', missing };
+  if (HK.on) HK.add({ t: 'inst', s: t.id, v: { ...t.inst, params: { ...t.inst.params }, zones: (t.inst.zones || []).map((z) => ({ ...z })), from: t.inst.from } });
+  const was = HK.on; HK.on = false;
+  t.inst.zones = zones; t.inst.from = { ...(t.inst.from || {}), name: pname, preset: pname, dwp: path };
+  const ar = dwpAttackRelease(prog.zones); if (ar) { setInstParam(i, 2, ar.attack); setInstParam(i, 5, ar.release); }
+  HK.on = was;
+  syncZones(i); emit('devices');
+  return { zones: zones.length, missing, name: pname, dropped: Math.max(0, prog.zones.length - MAX_ZONES) };
+}
 export const PITCH_PARAM = { n: 'Pitch', min: -24, max: 24, def: 0, step: 1, fmt: 'int' };   // instrument param 90, handled by the engine for every instrument
 export function setBend(i, st) { const t = state.tracks[i]; if (!t || !t.inst) return; eng.bend(i, st); }
 // mod wheel position 0..1 per track (the keyboard's Mod wheel, MIDI CC1): live control, not saved with the project (as FLM)

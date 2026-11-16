@@ -87,7 +87,7 @@ class Limiter : public Device {
  public:
   explicit Limiter(double r);
   ~Limiter() override { delete[] dL; delete[] dR; delete[] qv; delete[] qt; delete[] ma; }
-  double sr, ceil, rel = 80, in = 1, g = 1, pin = 0, pout = 0, rC = 0, t = 0, ms = 0; int La, W, dp = 0, qh = 0, qn = 0, mp = 0;
+  double sr, ceil, rel = 80, in = 1, g = 1, pin = 0, pout = 0, rC = 0, t = 0, ms = 0; int La, W, Wq, dp = 0, qh = 0, qn = 0, mp = 0;
   double *dL, *dR, *qv, *qt, *ma;
   void upd() { rC = std::exp(-1 / (jsMax(1, rel) * 0.001 * sr)); }
   int lat() override { return La; }

@@ -155,9 +155,11 @@ class Limiter extends Fx {
   // without the instant gain jumps (and their distortion) of a zero-latency clamp. Release is a one-pole recovery. Latency: this.latency samples.
   constructor(sr) {
     super(sr); this.ceil = dbToLin(-0.3); this.rel = 80; this.in = 1; this.g = 1; this.pin = 0; this.pout = 0;
-    const La = this.latency = Math.max(8, Math.round(sr * 0.0015)), W = La + 1;
-    this.W = W; this.dL = new Float64Array(La); this.dR = new Float64Array(La); this.dp = 0;              // audio delay = look-ahead (La); the windows below span La + 1
-    this.qv = new Float64Array(W + 1); this.qt = new Float64Array(W + 1); this.qh = 0; this.qn = 0; this.t = 0;   // monotonic deque for the sliding minimum
+    // v2026-11: the minimum also holds 12 ms after a peak (Hd): a bass wave peaks every half cycle (11 ms at 45 Hz), so between its peaks
+    // the gain no longer recovers and ducks again - that ripple was the limiter's distortion on bass (THD 1.25 % on a 45 Hz tone 4 dB over)
+    const La = this.latency = Math.max(8, Math.round(sr * 0.0015)), W = La + 1, Wq = W + Math.round(sr * 0.012);
+    this.W = W; this.Wq = Wq; this.dL = new Float64Array(La); this.dR = new Float64Array(La); this.dp = 0;   // audio delay = look-ahead (La); the average spans La + 1
+    this.qv = new Float64Array(Wq + 1); this.qt = new Float64Array(Wq + 1); this.qh = 0; this.qn = 0; this.t = 0;   // monotonic deque for the sliding minimum (La + 1 + hold)
     this.ma = new Float64Array(W).fill(1); this.mp = 0; this.ms = W;                                                // moving average of the minima
     this.upd();
   }
@@ -165,15 +167,15 @@ class Limiter extends Fx {
   lat() { return this.latency; }   // PDC: the look-ahead delay line
   setParam(i, v) { if (i === 0) this.ceil = dbToLin(v); else if (i === 1) { this.rel = v; this.upd(); } else if (i === 2) this.in = dbToLin(v); }
   process(L, R, n) {
-    const ceil = this.ceil, inG = this.in, rel = 1 - this.rC, W = this.W, La = this.latency, dL = this.dL, dR = this.dR, qv = this.qv, qt = this.qt, ma = this.ma, Q = W + 1;
+    const ceil = this.ceil, inG = this.in, rel = 1 - this.rC, W = this.W, Wq = this.Wq, La = this.latency, dL = this.dL, dR = this.dR, qv = this.qv, qt = this.qt, ma = this.ma, Q = Wq + 1;
     let g = this.g, pin = this.pin, pout = this.pout, dp = this.dp, qh = this.qh, qn = this.qn, t = this.t, mp = this.mp, ms = this.ms;
     for (let i = 0; i < n; i++) {
       const l = L[i] * inG, r = R[i] * inG, a = l < 0 ? -l : l, b = r < 0 ? -r : r, pk = a > b ? a : b;
       if (pk > pin) pin = pk;
       const need = pk > ceil ? ceil / pk : 1;
-      while (qn > 0 && qv[(qh + qn - 1) % Q] >= need) qn--;                     // sliding minimum of 'need' over the last W samples
+      while (qn > 0 && qv[(qh + qn - 1) % Q] >= need) qn--;                     // sliding minimum of 'need' over the last Wq samples
       qv[(qh + qn) % Q] = need; qt[(qh + qn) % Q] = t; qn++;
-      while (qt[qh] <= t - W) { qh = (qh + 1) % Q; qn--; }
+      while (qt[qh] <= t - Wq) { qh = (qh + 1) % Q; qn--; }
       const mn = qv[qh];
       ms += mn - ma[mp]; ma[mp] = mn; if (++mp >= W) mp = 0;                     // moving average of the minima (attack ramp over the look-ahead)
       const s = ms / W;

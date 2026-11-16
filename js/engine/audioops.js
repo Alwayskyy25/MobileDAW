@@ -9,45 +9,28 @@ import { fft } from './dsp.js';
 import { Resampler } from './mp3.js';
 export function reverseBuffer(x) { const n = x.length, o = new Float32Array(n); for (let i = 0; i < n; i++) o[i] = x[n - 1 - i]; return o; }
 
-// ratio = output length / input length (1.5 = 50% longer). Returns { l, r }. Mono input (r === l) stays mono.
+// ratio = output length / input length (1.5 = 50% longer). Returns { l, r }. Mono input (r === l) stays mono. The 'beats' algorithm
+// (transient-preserving WSOLA, warpBuffers below) on a straight line.
 export function stretchBuffers(l, r, ratio) {
-  const len = l.length, mono = r === l, N = 2048, Hs = N >> 1, tol = 512, outLen = Math.max(N, Math.floor(len * ratio));
-  const ol = new Float32Array(outLen + N), or = mono ? ol : new Float32Array(outLen + N);
-  const win = new Float32Array(N); for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
-  const m = mono ? l : Float32Array.from(l, (v, i) => 0.5 * (v + r[i]));
-  const add = (pos, outPos, first) => {
-    for (let i = 0; i < N; i++) {
-      const w = first && i < Hs ? 1 : win[i], p = pos + i, v = p < len ? 1 : 0;
-      if (!v) continue;
-      ol[outPos + i] += l[p] * w; if (!mono) or[outPos + i] += r[p] * w;
-    }
-  };
-  let prev = 0; add(0, 0, true);
-  for (let k = 1; k * Hs < outLen; k++) {
-    const nominal = Math.round(k * Hs / ratio), target = prev + Hs;
-    let best = Math.min(Math.max(0, nominal), Math.max(0, len - N)), bestC = -Infinity;
-    if (target + N <= len) {
-      // normalised cross-correlation: loud passages must not win just for being loud (that smears transients)
-      let et = 1e-9; for (let i = 0; i < Hs; i += 4) et += m[target + i] * m[target + i];
-      const corr = (pos) => { let c = 0, e = 1e-9; for (let i = 0; i < Hs; i += 4) { const y = m[pos + i]; c += m[target + i] * y; e += y * y; } return c / Math.sqrt(e * et); };
-      for (let d = -tol; d <= tol; d += 4) { const pos = nominal + d; if (pos < 0 || pos + N > len) continue; const c = corr(pos); if (c > bestC) { bestC = c; best = pos; } }
-      const center = best;
-      for (let d = -3; d <= 3; d++) { const pos = center + d; if (pos < 0 || pos + N > len) continue; const c = corr(pos); if (c > bestC) { bestC = c; best = pos; } }
-    }
-    if (best >= len) break;
-    add(best, k * Hs, false);
-    prev = best;
-  }
-  return { l: ol.subarray(0, outLen), r: mono ? ol.subarray(0, outLen) : or.subarray(0, outLen) };
+  const len = l.length, outLen = Math.max(2048, Math.floor(len * ratio));
+  return warpBuffers(l, r, [0, outLen], [0, outLen / ratio], outLen, 'beats');
 }
 
 // Pitch shift that keeps the duration: stretch by the pitch factor, then resample back to the original length.
 // mode 'tones' stretches with the phase vocoder (and reads back with 4-point Hermite interpolation); otherwise WSOLA + linear (as before).
 export function pitchBuffers(l, r, semitones, mode = 'beats') {
   const f = Math.pow(2, semitones / 12), mono = r === l, pv = mode === 'tones', st = pv ? pvStretch(l, r, f) : stretchBuffers(l, r, f);
-  const resample = (x) => { const n = Math.floor(x.length / f), o = new Float32Array(n), last = x.length - 1; for (let i = 0; i < n; i++) { const p = i * f; if (pv) { o[i] = herm(x, p); continue; } const i0 = p | 0, fr = p - i0; o[i] = x[i0] + (x[i0 < last ? i0 + 1 : last] - x[i0]) * fr; } return o; };
+  // back to the original length with the band-limited resampler (64-tap Kaiser sinc): a pitch up removes what would pass Nyquist
+  // instead of folding it back (linear interpolation aliased a +7 st shift of 18 kHz at -4 dB and dulled the top octave)
+  const resample = (x) => bandResample(x, f, Math.floor(x.length / f));
   const L = resample(st.l);
   return { l: L, r: mono ? L : resample(st.r) };
+}
+// x read at speed f (f > 1 = faster / higher) into n frames, band-limited (js/engine/mp3.js Resampler, hq)
+export function bandResample(x, f, n) {
+  const rs = new Resampler(f, 1, true), y = rs.process(x), t = rs.process(new Float32Array(160)), o = new Float32Array(n);
+  o.set(y.subarray(0, n)); if (y.length < n) o.set(t.subarray(0, n - y.length), y.length);
+  return o;
 }
 
 // 4-point Hermite read of x at fractional position p (0 outside the buffer)
@@ -176,44 +159,101 @@ export function warpBuffers(l, r, xo, xs, n, mode = 'beats') {
     };
     return mode === 'tones' ? pvWarp(l, r, at, outLen) : repitchWarp(l, r, at, outLen);
   }
-  const len = l.length, mono = r === l, N = 2048, Hs = N >> 1, tol = 160, m0 = xo.length;
-  const outLen = Math.max(1, n | 0), ol = new Float32Array(outLen + N), or = mono ? ol : new Float32Array(outLen + N);
-  if (!m0 || len < 2) return { l: ol.subarray(0, outLen), r: mono ? ol.subarray(0, outLen) : or.subarray(0, outLen) };
-  const win = new Float32Array(N); for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
+  const len = l.length, mono = r === l, m0 = xo.length;
+  const outLen = Math.max(1, n | 0), ol = new Float32Array(outLen), or = mono ? ol : new Float32Array(outLen);
+  if (!m0 || len < 2) return { l: ol, r: or };
   const m = mono ? l : Float32Array.from(l, (v, i) => 0.5 * (v + r[i]));
   let qi = 0;
-  const srcAt = (p) => {                                   // piecewise-linear lookup, p only grows between calls
+  const srcAt = (p) => {                                   // piecewise-linear lookup (output frame -> source frame), p only grows between calls
     if (p <= xo[0]) return xs[0] + (p - xo[0]) * (m0 > 1 && xo[1] > xo[0] ? (xs[1] - xs[0]) / (xo[1] - xo[0]) : 1);
     while (qi < m0 - 2 && xo[qi + 1] < p) qi++;
     const a = qi, b = Math.min(m0 - 1, qi + 1), d = xo[b] - xo[a];
     if (d <= 0) return xs[b];
-    return xs[a] + (xs[b] - xs[a]) * (p - xo[a]) / d ;
+    return xs[a] + (xs[b] - xs[a]) * (p - xo[a]) / d;
   };
-  const add = (pos, outPos, first) => {
+  let qj = 0;
+  const outAt = (s) => {                                   // the inverse (source frame -> output frame), s only grows between calls
+    if (m0 < 2) return xo[0] + (s - xs[0]);
+    if (s <= xs[0]) return xo[0] + (s - xs[0]) * (xs[1] > xs[0] ? (xo[1] - xo[0]) / (xs[1] - xs[0]) : 1);
+    while (qj < m0 - 2 && xs[qj + 1] < s) qj++;
+    const a = qj, b = Math.min(m0 - 1, qj + 1), d = xs[b] - xs[a];
+    return d <= 0 ? xo[b] : xo[a] + (xo[b] - xo[a]) * (s - xs[a]) / d;
+  };
+  // segments: from each attack of the source to the next. Each starts with its attack exactly where the map puts it, played as recorded
+  // (no grain search, no crossfade over it), and is stretched to fill its span from the material before the next attack only: no attack
+  // is heard twice or moved, so drums keep their punch and their groove (the plain WSOLA before moved hits by up to 40 ms and doubled some)
+  const s0 = Math.max(0, Math.min(len - 1, Math.round(srcAt(0)))), s1 = Math.min(len, Math.round(srcAt(outLen)) + 1);
+  const bounds = [[0, s0]];
+  for (const o of findOnsets(m, s0, s1)) { const at = Math.round(outAt(o)); if (at > bounds[bounds.length - 1][0] + 64 && at < outLen - 64) bounds.push([at, o]); }
+  qi = 0;
+  for (let j = 0; j < bounds.length; j++) {
+    const [O, a] = bounds[j], O1 = j + 1 < bounds.length ? bounds[j + 1][0] : outLen, b = j + 1 < bounds.length ? bounds[j + 1][1] : len;
+    wsolaSeg(l, r, m, mono, a, b, srcAt, O, O1, outLen, ol, or, j > 0);
+  }
+  return { l: ol, r: or };
+}
+
+// one segment of the 'beats' warp: output [O, O1) from source [a, b) (b = the next attack, which this segment never reaches: the source
+// tapers to silence over the 64 frames before it). WSOLA (waveform-similarity overlap-add): 2048-point Hann grains, hop 1024, each grain
+// taken where it continues the previous one best (normalised cross-correlation over 512 frames at full resolution, so high frequencies
+// line up too) within 160 frames of where the map wants it. The first grain starts exactly at a, unwindowed in its first half. A segment
+// rings on for 128 frames after O1 under a linear fade (no click at the cut, mostly masked by the next attack); after the first, each
+// fades in over 16 frames.
+const SEG_TAIL = 128, SEG_IN = 16, TAPER = 64;
+function wsolaSeg(l, r, m, mono, a, b, srcAt, O, O1, outLen, ol, or, fadeIn) {
+  const N = 2048, Hs = N >> 1, tol = 160, C = 512, end = Math.min(outLen, O1 + SEG_TAIL), segLen = end - O;
+  if (segLen <= 0) return;
+  const win = HANN2048 || (HANN2048 = Float32Array.from({ length: N }, (_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N)));
+  const src = (p) => (p < a || p >= b ? 0 : p >= b - TAPER ? (b - p) / TAPER : 1);
+  const gain = (o) => (o < O + SEG_IN && fadeIn ? (o - O + 1) / (SEG_IN + 1) : o >= O1 ? 1 - (o - O1 + 1) / (SEG_TAIL + 1) : 1);
+  const add = (pos, k, first) => {
+    const outPos = O + k * Hs;
     for (let i = 0; i < N; i++) {
-      const p = pos + i; if (p < 0 || p >= len) continue;
-      const o = outPos + i; if (o >= outLen + N) break;
-      const w = first && i < Hs ? 1 : win[i];
+      const o = outPos + i; if (o >= end) break;
+      const p = pos + i, g = src(p); if (!g) continue;
+      const w = (first && i < Hs ? 1 : win[i]) * g * gain(o);
       ol[o] += l[p] * w; if (!mono) or[o] += r[p] * w;
     }
   };
-  let prev = Math.max(0, Math.round(srcAt(0)));
-  add(prev, 0, true);
-  for (let k = 1; k * Hs < outLen; k++) {
-    const nominal = Math.round(srcAt(k * Hs)), target = prev + Hs;
-    let best = Math.min(Math.max(0, nominal), Math.max(0, len - N)), bestC = -Infinity;
-    if (nominal >= len) break;
-    if (target + N <= len && nominal + N <= len + tol) {
-      let et = 1e-9; for (let i = 0; i < Hs; i += 4) et += m[target + i] * m[target + i];
-      const corr = (pos) => { let c = 0, e = 1e-9; for (let i = 0; i < Hs; i += 4) { const y = m[pos + i]; c += m[target + i] * y; e += y * y; } return c / Math.sqrt(e * et); };
-      for (let d = -tol; d <= tol; d += 2) { const pos = nominal + d; if (pos < 0 || pos + N > len) continue; const c = corr(pos); if (c > bestC) { bestC = c; best = pos; } }
+  let prev = a; add(a, 0, true);
+  for (let k = 1; k * Hs < segLen; k++) {
+    const nominal = Math.round(srcAt(O + k * Hs)), target = prev + Hs, hi = Math.max(a, b - N);
+    let best = Math.min(Math.max(a, nominal), hi), bestC = -Infinity;
+    if (target + C <= b && hi > a) {
+      let et = 1e-9; for (let i = 0; i < C; i++) et += m[target + i] * m[target + i];
+      const corr = (pos) => { let c = 0, e = 1e-9; for (let i = 0; i < C; i++) { const y = m[pos + i]; c += m[target + i] * y; e += y * y; } return c / Math.sqrt(e * et); };
+      for (let d = -tol; d <= tol; d += 2) { const pos = nominal + d; if (pos < a || pos > hi) continue; const c = corr(pos); if (c > bestC) { bestC = c; best = pos; } }
       const center = best;
-      for (let d = -3; d <= 3; d++) { const pos = center + d; if (pos < 0 || pos + N > len) continue; const c = corr(pos); if (c > bestC) { bestC = c; best = pos; } }
+      for (let d = -1; d <= 1; d += 2) { const pos = center + d; if (pos < a || pos > hi) continue; const c = corr(pos); if (c > bestC) { bestC = c; best = pos; } }
     }
-    add(best, k * Hs, false);
+    add(best, k, false);
     prev = best;
   }
-  return { l: ol.subarray(0, outLen), r: mono ? ol.subarray(0, outLen) : or.subarray(0, outLen) };
+}
+let HANN2048 = null;
+
+// Attacks of a (mid) signal between source frames s0 and s1: 256-frame steps of an onset function (energy of the first difference, i.e.
+// weighted to the highs, plus the plain energy), an attack where it jumps over twice its recent average and over a floor relative to the
+// loud parts of the file; at most one every 60 ms. Each is moved back to just before the waveform starts to rise, so the segment that
+// begins there holds the whole attack.
+export function findOnsets(m, s0 = 0, s1 = m.length) {
+  const H = 256, k0 = Math.floor(s0 / H), k1 = Math.floor(Math.min(s1, m.length) / H), n = Math.max(0, k1 - k0), e = new Float32Array(n), out = [];
+  if (n < 4) return out;
+  for (let k = 0; k < n; k++) { let d2 = 0, x2 = 0; const st = (k0 + k) * H; for (let i = st; i < st + H; i++) { const x = m[i], d = x - (i > 0 ? m[i - 1] : 0); d2 += d * d; x2 += x * x; } e[k] = Math.sqrt(d2 / H) * 2 + Math.sqrt(x2 / H); }
+  const sorted = Float32Array.from(e).sort(), loud = sorted[Math.floor(n * 0.9)] || 0, floor = Math.max(1e-4, loud * 0.08), gap = Math.round(0.06 * 48000 / H);
+  let last = -1e9;
+  for (let k = 3; k < n; k++) {
+    const avg = (e[k - 1] + e[k - 2] + e[k - 3]) / 3;
+    if (e[k] > floor && e[k] > avg * 2 + floor * 0.25 && k - last >= gap && e[k] >= (e[k + 1] || 0) * 0.6) {
+      // the attack inside frames k-1..k: the first frame where |x| passes a quarter of the peak that follows, minus a little
+      const st = (k0 + k - 1) * H, en = Math.min(m.length, (k0 + k + 2) * H); let pk = 0; for (let i = st; i < en; i++) pk = Math.max(pk, Math.abs(m[i]));
+      let at = st; while (at < en && Math.abs(m[at]) < pk * 0.25) at++;
+      at = Math.max(s0 + 1, at - 48);
+      if (!out.length || at - out[out.length - 1] > 512) out.push(at);
+      last = k;
+    }
+  }
+  return out;
 }
 // map = { n, segs: [{ o, n, xo, xs }] } -> one buffer of n frames made of warped segments (o = where the segment starts in the output)
 export function warpSegments(l, r, map, mode = 'beats') {

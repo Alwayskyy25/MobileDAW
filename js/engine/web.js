@@ -381,7 +381,10 @@ export function createWebBackend() {
     if (hit) { dcache.delete(path); dcache.set(path, hit); return hit; }
     const [bytes] = await Promise.all([lib.rawGet(path), me.start()]);   // read the file while the audio context boots
     if (!bytes) throw new Error('File tidak ditemukan: ' + path);
-    const buf = await st.ctx.decodeAudioData(bytes);                      // bytes is a fresh copy from IndexedDB / the folder: no slice needed
+    // decodeAudioData takes an ArrayBuffer only: a file saved by the app as a Uint8Array (an edited sample, a wavetable, DirectWave's
+    // embedded audio) comes back as one from IndexedDB, and failed to load when the project was opened again
+    const ab = bytes instanceof ArrayBuffer ? bytes : ArrayBuffer.isView(bytes) ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : bytes;
+    const buf = await st.ctx.decodeAudioData(ab);                      // bytes is a fresh copy from IndexedDB / the folder: no slice needed
     if (buf.length * 2 > 90e6) throw new Error('Audio terlalu panjang untuk dimuat ke RAM (maks sekitar 8 menit stereo).');
     const l = buf.getChannelData(0).slice(), r = buf.numberOfChannels > 1 ? buf.getChannelData(1).slice() : l;
     const d = { l, r, sr: buf.sampleRate, bytes: (l === r ? 1 : 2) * l.byteLength, pk: null, pyr: null };

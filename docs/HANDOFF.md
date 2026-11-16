@@ -795,3 +795,26 @@ Permintaan pemilik: SEMUA efek dan instrumen diganti dengan set stok Ableton Liv
   - Parameter 0..298 = urutan & normalisasi parameter VST Serum 1 (js/serumparams.js, dari catatan komunitas 0xdevalias), default = nilai init Serum (kecuali jumlah mod disimpan bipolar 0.5 = 0); 300.. milik Moisture (tabel, sample id, voices, mono/legato, bentuk/sync/mode LFO, rute).
   - .fxp (`js/serumfxp.js`): header VST2 CcnK/FPCh/XfsX, stream zlib 1 = blok parameter di 0x3460 (Serum 1.3x preset nyata: 248 nilai valid, sisanya NaN -> nilai awal), nama di 0x4970, nama file wavetable di 0x3C08 / 0x3E08; stream zlib 2 = frame osc A lalu B (2048 float), dipisah di lonjakan beda antar-frame terbesar (diverifikasi pada 3 preset ESW: 1+1, 256+1, 256+87). Routing modulasi TIDAK dibaca (belum terdokumentasi). Wavetable disimpan ke /Samples/Wavetables/<nama>.wav dan dimuat ulang saat proyek dibuka (`t.inst.wt`).
   - Tampilan: `js/moistview.js` (bukan gaya Live): bar atas (logo MOISTURE, halaman OSC/FX/MATRIX/GLOBAL, nama preset, MAIN), SUB / OSC A / OSC B / NOISE / FILTER, MACROS / ENV / LFO / VOICING. `def.floatOnly`: di rak hanya kartu "Tampilkan", panel selalu di jendela mengambang (1040x660). Moisture Klasik (7), Osphere (8), Keystone (9) DIHAPUS (pemilik 2026-11-16): tidak ada di menu; proyek lama dimigrasi saat dibuka (7, 8 -> Moisture 37 lewat `CLASSIC_CONV.toMoist`, nilai asli di `inst.classic`; 9 -> DirectWave 30, zona tetap); presetnya jadi 221 preset Moisture (presets-test merender lewat WASM). Tes: `tools/serum-fxp-test.mjs` (run-tests), golden `inst-moisture` (C++ desktop vs WASM).
+
+## Audit bug + kualitas mesin audio + DirectWave WAV/MP3/DWP (sesi 2026-11-16)
+- Audit: 26 tes di luar run-tests + engine-e2e / import-ui / ui-audit / ui-consist dijalankan; semua lulus. Bug yang ketemu saat
+  membuat tes DWP: `decode()` (js/engine/web.js) memberi Uint8Array ke `decodeAudioData` (hanya menerima ArrayBuffer). File yang
+  disimpan aplikasi sebagai Uint8Array (sample hasil edit gelombang, wavetable Moisture) gagal dimuat saat proyek dibuka lagi. Diperbaiki:
+  view dikonversi ke ArrayBuffer.
+- DirectWave (30): `js/dwp.js` = pembaca program .dwp (port struktur Honeydew `crates/audio/src/dwp.rs`: "DwPr", record tag/u64 len,
+  zona 0x1F4/0x1F6/0x1F7/0x1FD/0x205/0x206). `P.loadDwpProgram(i, path)`: zona menggantikan zona track (maks 16), audio tertanam disimpan
+  ke `/Samples/DirectWave/<program>/NN <nama>.wav|.flac`, file zona dicari menurut nama (folder .dwp dulu, lalu seluruh pustaka),
+  Attack/Release dari zona terakhir (hukum amp FLM), bisa di-undo. UI: browser menampilkan .dwp (ketuk = muat ke track DirectWave),
+  menu Zona punya "Muat WAV / MP3 / program DWP…". Belum: titik loop zona (mesin hddw meloop seluruh sample), gain zona selalu dipakai
+  (Honeydew hanya saat Loop). Tes: tools/dwp-test.mjs (parser + aplikasi + MP3 dari encoder aplikasi sendiri).
+- Stretch 'beats' (js/engine/audioops.js) ditulis ulang: WSOLA per segmen antar-attack (`findOnsets`): attack diputar persis di posisi
+  peta, tidak pernah dua kali; korelasi resolusi penuh (512 frame) — sebelumnya dicuplik tiap 4 sample sehingga nada tinggi (9 kHz)
+  saling meniadakan. Hasil ukur (stretch-test bagian 9): posisi attack meleset 0 frame (sebelumnya sampai ~2000 frame / 40 ms, ada
+  pukulan ganda). Pitch (beats & tones) kembali ke panjang asli dengan resampler sinc Kaiser 64-tap (`bandResample`) bukan interpolasi
+  linear: aliasing +7 st dari 18 kHz turun dari -4 dB ke -116 dB; -5 st dari 12 kHz tidak lagi turun 1.8 dB. Biaya: pitch 10 s stereo
+  ~0.9 s di desktop (sebelumnya 0.2 s), di worker.
+- Limiter master (fx.cpp + fx.js, sama persis untuk golden): minimum gain ditahan 12 ms setelah puncak. THD nada 45 Hz +4 dB di atas
+  full scale: 1.25 % -> 0.08 % (tools/limiter-test.mjs). Ceiling tetap -0.3 dB.
+- Belum bisa dibuktikan tanpa render referensi FL Studio Mobile: "lebar" stereo. Mix Caest La Vie terukur side/mid sekitar -36 dB;
+  modul FX dengan nilai default terbukti stereo (side/mid 0 dB untuk L/R independen), dan sample stereo tetap stereo setelah stretch.
+  Perlu ekspor FLM dari proyek yang sama (master + per-track) untuk perbandingan objektif.
