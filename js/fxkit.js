@@ -927,7 +927,9 @@ function rackPanel(k) {
     const name = h('button', { class: 'dv-name', onclick: (e) => instMenu(e.currentTarget.getBoundingClientRect(), (t) => P.rackSetChainInst(i, ci, t), ch.inst.type) }, h('span', {}, def.name), h('i', { class: 'tri', 'aria-hidden': 'true' }));
     const more = h('button', { class: 'dv-more', 'aria-label': 'Menu instrumen', onclick: (e) => { const r = e.currentTarget.getBoundingClientRect(); menu([{ label: 'Ganti instrumen…', fn: () => instMenu(r, (t) => P.rackSetChainInst(i, ci, t), ch.inst.type) }, { label: 'Hapus instrumen', fn: () => P.rackSetChainInst(i, ci, 0) }], r.left - 120, r.bottom); } }, '⋯');
     const syn = buildSynth({ type: ch.inst.type, t: { id: 'ir' + d.id + ':' + ch.id }, def, h, knob, fmt: fmtParam, fromNorm, toNorm, pitch: null, get, set: (kk, v) => P.rackInstParam(i, ci, kk, v), auto: () => {} });
-    return h('div', { class: 'card syn lk-rcard lk-rinst' }, h('h4', {}, h('i', { class: 'pdot' }), name, more), syn ? syn.el : null);
+    // instruments without a Live panel layout (FLM Transistor Bass / 3x Osc / GMS..., the Live synths): every visible parameter as a knob, so a layer is always editable
+    const grid = syn ? null : h('div', { class: 'kgrid lk-rgrid' }, ...def.params.map((p, kk) => (p.hidden || !p.n || p.n === '-' ? null : knob(p, () => get(kk), (v) => P.rackInstParam(i, ci, kk, v), fmtParam, C('#ffa722')))).filter(Boolean).slice(0, 48));
+    return h('div', { class: 'card syn lk-rcard lk-rinst' }, h('h4', {}, h('i', { class: 'pdot' }), name, more), syn ? syn.el : grid);
   }
   // zone editors: Key (0..127, note names) / Vel (1..127) / Chain (selector + zones). Drag a bar's edges or middle; Chain: drag the selector
   function zoneEditor() {

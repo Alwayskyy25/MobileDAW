@@ -147,6 +147,7 @@ export function buildMdaw(M, opts) {
   const zoneOf = (smp, root, L = {}) => ({ sample: smp, root: clamp(Math.round(root ?? 60) - dwPitchSt(L.params), 0, 127), lo: 0, hi: 127, vlo: 1, vhi: 127, tune: dwFineCt(L.params), loop: false, sus: 0, s0: 0, s1: 1, l0: 0, l1: 1, xf: 0, rev: false,
     vol: L.level != null && L.level > 0 && L.level !== 1 ? Math.max(-60, 20 * Math.log10(L.level)) : L.level === 0 ? -60 : 0, pan: clamp(L.pan || 0, -1, 1) });
   report.instruments = [];
+  const LAYER_OK = new Set([31, 32, 33, 34, 36, 7, 8, 13, 14, 15, 16, 17, 25, 26, 27]);   // synths without samples: they run inside an Instrument Rack chain
   const instrumentOf = (I, trackName) => {
     I = I || { kind: 'unknown', name: 'Instrumen' };
     const note = (to, how) => report.instruments.push({ track: trackName, from: I.name + (I.library ? ' "' + I.library.replace(/^.*?Samples\//, '').replace(/\.\w+$/, '') + '"' : I.preset ? ' "' + I.preset + '"' : ''), to, how });
@@ -287,6 +288,15 @@ export function buildMdaw(M, opts) {
       if (st.kind === 'notes') {
         t.kind = 'midi';
         t.inst = instrumentOf(ch.instrument, t.name);
+        if (ch.layers && ch.layers.length > 1) {   // FLM layering: an Instrument Rack, one chain per instrument (its effects inside the chain)
+          const chains = ch.layers.slice(0, 8).map((L) => { const x = instrumentOf(L.instrument, t.name); const ok = LAYER_OK.has(x.type);
+            if (!ok) report.skipped.push('Layer "' + L.instrument.name + '" di ' + t.name + ': instrumen ini belum bisa di dalam Instrument Rack');
+            return { id: uid(), name: L.instrument.name, devices: L.fx.slice(0, 8).map(placeholder), inst: ok ? { type: x.type, params: Array.isArray(x.params) ? x.params.slice() : { ...x.params } } : null }; });
+          if (ch.layers.length > 8) report.skipped.push(t.name + ': lebih dari 8 layer, sisanya dilewati');
+          const params = {}; params[100 + 32] = chains.length;
+          t.inst = { type: 12, params, chains, macroMap: [], pitch: 0, from: { app: M.app, name: 'Layer (' + chains.length + ' instrumen)' } };
+          report.layers = (report.layers || 0) + 1;
+        }
         for (const cl of st.clips) t.clips.push(patternClip(cl, notesOf(cl)));
       } else if (st.kind === 'drums') {
         t.kind = 'drum';

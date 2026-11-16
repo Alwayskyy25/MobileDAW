@@ -1865,3 +1865,5 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .card > h4 .dv-swap, .card > h4 .fw-pop, .card > h4 button.dv-more:not(.pw), .card > h4 .fold-b { width: 20px !important; min-width: 20px !important; height: 20px !important; border-radius: 50% !important;
   box-shadow: inset 0 0 0 1.25px var(--btn-bd, var(--lv-edge)) !important; font-size: 11px !important; line-height: 1 !important; }
 .card > h4 .dv-swap svg, .card > h4 .fw-pop svg, .card > h4 .fold-b svg { width: 11px; height: 11px; }
+/* Instrument Rack layer without a panel layout: a scrolling knob grid */
+.lk-rinst > .lk-rgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 4px 2px; padding: 6px; max-height: 230px; overflow-y: auto; min-width: 240px; }

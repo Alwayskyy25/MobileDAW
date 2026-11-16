@@ -1197,7 +1197,7 @@ export function setModMap(i, di, m) { const d = tr(i).devices[di]; d.map = m || 
 // (chain c at 4c: volume, pan, activator, solo; 32 chain count; 33.. macros; 105 chain selector; 106 + 2c chain zones; Instrument Rack also
 // 122 + 2c key zones, 138 + 2c velocity zones); macroMap[m] = { c: chain id, id: device id | 'inst', k } is written into the hidden macro
 // map parameters (41 + 8m) by fixMacros. Every structural change is one undo step (a snapshot of the rack).
-export const RACK = 51, IRACK = 12, RACK_MAX_CH = 8, IRACK_INSTS = [32, 33, 31, 7, 8];   // FL Studio Mobile MiniSynth / SuperSaw / GMS, Moisture, Osphere
+export const RACK = 51, IRACK = 12, RACK_MAX_CH = 8, IRACK_INSTS = [32, 33, 31, 34, 36, 7, 8, 13, 14, 15, 16, 17, 25, 26, 27];   // layering: FL Studio Mobile MiniSynth / SuperSaw / GMS / Transistor Bass / 3x Osc, Moisture, Osphere and the Live synths (no sample needed)
 const IRB = 100;
 const RDEF = (di) => (di < 0 ? IRACK_DEF : DEVICES[RACK]);
 function R(i, di) {
@@ -1258,7 +1258,7 @@ export function rackParam(i, di, c, j, k, v) { const o = R(i, di).o, x = o.chain
 export function rackBypass(i, di, c, j) { const ch = R(i, di).o.chains[c], x = ch && ch.devices[j]; if (!x) return; rackUndo(i, di); x.bypass = !x.bypass; eng.rackCmd(i, di, 3, c, j, x.bypass ? 1 : 0, 0); emit('devices'); }
 export function rackMapMacro(i, di, m, map) { const o = R(i, di).o; rackUndo(i, di); if (!o.macroMap) o.macroMap = []; o.macroMap[m] = map || null; fixMacros(i, di); emit('devices'); }
 // Instrument Rack: the chain's instrument (type 0 = remove) and its parameters
-export function rackSetChainInst(i, c, type) { const o = R(i, -1).o, ch = o.chains[c]; if (!ch) return; rackUndo(i, -1); ch.inst = type ? { type, params: {} } : null; if (type && /^Chain/.test(ch.name)) ch.name = INSTRUMENTS[type].name; sendChainInst(i, -1, c, ch.inst); fixMacros(i, -1); emit('devices'); }
+export function rackSetChainInst(i, c, type) { const o = R(i, -1).o, ch = o.chains[c]; if (!ch) return; rackUndo(i, -1); const was = ch.inst && INSTRUMENTS[ch.inst.type] ? INSTRUMENTS[ch.inst.type].name : null; ch.inst = type ? { type, params: {} } : null; if (type && (/^Chain/.test(ch.name) || ch.name === was)) ch.name = INSTRUMENTS[type].name; /* a chain still named after its instrument follows the swap */ sendChainInst(i, -1, c, ch.inst); fixMacros(i, -1); emit('devices'); }
 export function rackInstParam(i, c, k, v) { const ch = R(i, -1).o.chains[c]; if (!ch || !ch.inst) return; rackUndo(i, -1, 'ri' + stripOf(i) + '.' + ch.id + '.' + k); ch.inst.params[k] = v; eng.rackCmd(i, -1, 6, c, 0, k, v); }
 export const rackDef = RDEF;
 

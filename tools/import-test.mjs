@@ -303,4 +303,15 @@ if (process.env.FLM_ZIP && fs.existsSync(process.env.FLM_ZIP)) {
   ok(mm[0].pads[0].pitch === 3 && mm[1].pads[0].pitch === -3 && mm[0].pads[0].startSec === 0.125 && mm[1].pads[0].startSec === -0.125 && mm[0].pads[0].length === 0.3 && mm[0].pads[0].send === 4,
     'FLM slot Speed truncated to whole semitones (+3.5 -> 3, -3.5 -> -3), Sample Start = +-0.5 u^2 s, Length and LINk send read');
 }
+// FLM layering: a channel with SuperSaw, an effect, MiniSynth, an effect -> an Instrument Rack (chain 1 = SuperSaw + the first effect,
+// chain 2 = MiniSynth), the effect after the last instrument stays on the track; the effects inside the chains become FLM modules
+{ const { flmToModel: f2m } = await import('../js/import/flm.js'), { buildMdaw: bm } = await import('../js/import/build.js'), FX = await import('../js/import/fxmap.js');
+  const mod = (type, id, params) => ({ type, id, params, name: '', names: [], enabled: true, preset: 'Default', presetPath: '' });
+  const ch = { kind: 'track', name: 'Lay', vol: 0.8531, pan: 0.5, number: 1, hue: 0, order: 0, sends: [], pads: [], tracks: [{ kind: 'notes', clips: [{ pos: 0, len: 4, cycle: 4, offset: 0, events: [{ t: 0, len: 1, pitch: 60, vel8: 200, pan8: 127, vel: 0 }] }] }],
+    modules: [mod(23, 1, [1, ...Array(59).fill(0.5)]), mod(42, 2, [1, 0.073, 0, 0.333, 0.333, 1, 0.5, 0]), mod(0, 3, [1, ...Array(45).fill(0.5)]), mod(42, 4, [1, 0.2, 0, 0.333, 0.333, 1, 0.5, 0])] };
+  const m = f2m({ app: 'FL Studio Mobile', name: '', bpm: 120, sig: [4, 4], channels: [ch], warnings: [] }), c0 = m.channels[0];
+  ok(c0.layers && c0.layers.length === 2 && c0.layers[0].fx.length === 1 && c0.layers[1].fx.length === 0 && c0.modules.length === 1, 'FLM layering: two synths in one rack -> two layers, the effect between them in layer 1, the last effect on the track (' + (c0.layers ? c0.layers.map((L) => L.instrument.name + '+' + L.fx.length).join(', ') : 'none') + ')');
+  const b = bm(m, { root: '/L', has: () => false }); await FX.migrateJson(b.json, 'map'); const tr = b.json.tracks.find((t) => t.name === 'Lay'), ir = tr && tr.inst;
+  ok(ir && ir.type === 12 && ir.chains.length === 2 && ir.chains[0].inst.type === 33 && ir.chains[1].inst.type === 32 && ir.params[132] === 2 && ir.chains[0].devices.length === 1 && !ir.chains[0].devices[0].missing && tr.devices.length === 1,
+    'FLM layering builds an Instrument Rack: SuperSaw + MiniSynth chains, the chain effect converted to its FLM module (' + (ir && ir.chains ? ir.chains.map((c) => (c.inst && c.inst.type) + ':' + c.devices.map((d) => d.type).join('/')).join(' ') : '') + ')'); }
 console.log(bad ? `\n${bad} FAILED` : '\nimport-test: all passed'); process.exit(bad ? 1 : 0);

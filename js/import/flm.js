@@ -201,15 +201,26 @@ export function flmToModel(P) {
     const dw = ch.modules.filter((m) => m.type === 1), syn = dw.length ? null : ch.modules.find((m) => synthOf(m));
     // an unidentified module with a synth-sized parameter set on a notes channel is its instrument (not an effect): reported by id
     const unk = dw.length || syn || !ch.tracks.some((t) => t.kind === 'notes') ? null : ch.modules.find((m) => !FLM_TYPES[m.type] && m.params.length >= 40);
-    const instMods = new Set(dw.length ? dw : syn ? [syn] : unk ? [unk] : []);
+    // layering (FL Studio Mobile: every instrument of a channel's rack plays, each adding its sound at its place in the module order, Honeydew
+    // audio_engine process_racks): two or more synths -> layers; the effects between instrument k and k+1 process the layers 1..k
+    const syns = dw.length ? [] : ch.modules.filter((m) => synthOf(m)), layerFx = new Set(), modOf = (m) => ({ name: m.name, enabled: m.enabled, ...(m.level != null && m.level < 0.999 ? { mix: m.level } : {}), ...(m.postGain != null && Math.abs(m.postGain - 0.5) > 1e-4 ? { postGain: m.postGain } : {}), ...(m.wetPan != null && Math.abs(m.wetPan - 0.5) > 1e-4 ? { wetPan: m.wetPan } : {}), preset: m.preset && m.preset !== 'Default' ? m.preset : '', params: m.params, ...(m.notes ? { notes: m.notes } : {}), id: m.id, flmType: m.type, ...(FLM_TYPES[m.type] && FLM_TYPES[m.type].sure === false ? { sure: false } : {}), app: 'FL Studio Mobile' });
+    if (syns.length > 1) { const a0 = ch.modules.indexOf(syns[0]), a1 = ch.modules.indexOf(syns[syns.length - 1]); ch.modules.forEach((x, q) => { if (q > a0 && q < a1 && !syns.includes(x)) layerFx.add(x); }); }
+    const instMods = new Set(dw.length ? dw : syns.length > 1 ? syns : syn ? [syn] : unk ? [unk] : []);
     const c = { kind: ch.kind, name: ch.name, number: ch.number, hue: hue(ch.hue), ...(ch.zipped ? { zipped: true } : {}), gain: flmGain(ch.vol), pan: ch.pan * 2 - 1, sends: (ch.sends || []).map((q) => ({ target: q.target, on: q.enabled, gain: flmGain(q.level) })), ...(ch.mute ? { mute: true } : {}), ...(ch.solo ? { solo: true } : {}), tracks: [], pads: [],
-      modules: ch.modules.filter((m) => !instMods.has(m)).map((m) => ({ name: m.name, enabled: m.enabled, ...(m.level != null && m.level < 0.999 ? { mix: m.level } : {}), ...(m.postGain != null && Math.abs(m.postGain - 0.5) > 1e-4 ? { postGain: m.postGain } : {}), ...(m.wetPan != null && Math.abs(m.wetPan - 0.5) > 1e-4 ? { wetPan: m.wetPan } : {}), preset: m.preset && m.preset !== 'Default' ? m.preset : '', params: m.params, ...(m.notes ? { notes: m.notes } : {}), id: m.id, flmType: m.type, ...(FLM_TYPES[m.type] && FLM_TYPES[m.type].sure === false ? { sure: false } : {}), app: 'FL Studio Mobile' })) };
+      modules: ch.modules.filter((m) => !instMods.has(m) && !layerFx.has(m)).map(modOf) };
     if (dw.length) {
       const lib = dw.find((m) => m.library);
       c.instrument = { kind: 'directwave', name: 'DirectWave', layers: dw.filter((m) => m.enabled && m.sample).map((m) => ({ sample: m.sample, root: m.root ?? DW_ROOT0, params: m.params, level: m.level ?? 1, pan: m.pan || 0, ...(m.keys ? { keys: m.keys } : {}) })), library: lib ? lib.library : '', preset: dw[0].preset, enabled: dw.some((m) => m.enabled) };
       if (!c.instrument.layers.length && !c.instrument.library && dw[0].sample) c.instrument.layers.push({ sample: dw[0].sample, root: dw[0].root ?? DW_ROOT0, params: dw[0].params, level: dw[0].level ?? 1, pan: dw[0].pan || 0 });
     } else if (unk) { c.instrument = { kind: 'unknown', name: 'Instrumen FLM #' + unk.type, preset: unk.preset && unk.preset !== 'Default' ? unk.preset : '', params: unk.params, enabled: unk.enabled, flmType: unk.type };
-    } else if (syn) { const k = synthOf(syn); c.instrument = { kind: k.kind, name: k.name, preset: syn.preset && syn.preset !== 'Default' ? syn.preset : '', params: syn.params, enabled: syn.enabled, flmType: syn.type, ...(syn.gms ? { gms: syn.gms } : {}), ...(k.kind === 'soundfont' ? { library: syn.presetPath } : {}), ...(syn.loop ? { loop: syn.loop } : {}), ...(syn.sens != null ? { sens: syn.sens } : {}), ...(syn.keys ? { keys: syn.keys } : {}) }; }
+    } else if (syn) {
+      const instOf = (m) => { const k = synthOf(m); return { kind: k.kind, name: k.name, preset: m.preset && m.preset !== 'Default' ? m.preset : '', params: m.params, enabled: m.enabled, flmType: m.type, ...(m.gms ? { gms: m.gms } : {}), ...(k.kind === 'soundfont' ? { library: m.presetPath } : {}), ...(m.loop ? { loop: m.loop } : {}), ...(m.sens != null ? { sens: m.sens } : {}), ...(m.keys ? { keys: m.keys } : {}) }; };
+      c.instrument = instOf(syn);
+      if (syns.length > 1) {   // chain k = instrument k + every effect between it and the last instrument (the sum of layers 1..j passes the effects after layer j)
+        const at = syns.map((m) => ch.modules.indexOf(m)), last = at[at.length - 1];
+        c.layers = syns.map((m, k) => ({ instrument: instOf(m), fx: ch.modules.filter((x, q) => q > at[k] && q < last && !syns.includes(x)).map(modOf) }));
+      }
+    }
     c.pads = ch.pads.map((q, k) => ({ path: q.path, name: (q.path.split('/').pop() || 'Pad ' + (k + 1)).replace(/\.[^.]+$/, ''), gain: flmGain(q.vol), pan: q.pan * 2 - 1, pitch: Math.trunc(Math.fround(q.pitch * 48 - 24)), env: q.params.length >= 10 ? { a: q.params[6], d: q.params[7], s: q.params[8], r: q.params[9] } : null, reverse: !!q.reverse, cut: q.cut | 0, poly: q.poly !== false, mute: !!q.mute, solo: !!q.solo, offset: Number.isFinite(q.offset) ? q.offset : 0,
       startSec: q.params.length >= 11 ? Math.sign(2 * q.params[10] - 1) * 0.5 * (2 * q.params[10] - 1) ** 2 : 0, length: q.params[5] > 0 ? q.params[5] : 0, send: q.link ? q.link.send : -1, ...(q.warp ? { warp: q.warp } : {}) }));
     // Honeydew drums.rs: Speed = trunc(48 v - 24) whole semitones (f32); Sample Start = +-0.5 u^2 s, u = 2 v - 1 (later start, or silence

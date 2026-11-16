@@ -121,6 +121,7 @@ function decide0(m, mode) {
 export async function migrateJson(json, mode = 'map', onProgress = () => {}) {
   const chains = [json.master, ...(json.returns || []), ...(json.tracks || [])].filter(Boolean);
   const all = []; for (const c of chains) for (const d of c.devices || []) if (d.missing) all.push(d);
+  for (const t of json.tracks || []) for (const ch of (t && t.inst && t.inst.chains) || []) for (const d of ch.devices || []) if (d.missing) all.push(d);   // effects inside FLM layer chains (Instrument Rack)
   const S = summary();
   for (let k = 0; k < all.length; k++) {
     const d = all[k], r = decide(d.missing, mode);
