@@ -103,6 +103,29 @@ for (const th of ['dark', 'light', 'midlight', 'live', 'lightlc', 'medc']) { awa
     const im = g.getImageData(Math.round(q.x * d) - 40, Math.round(q.top * d), 80, Math.round((T.probe(0, 1).top - q.top) * d)).data; for (let k = 0; k < im.length; k += 4) if (im[k] > 220 && im[k + 1] < 110 && im[k + 2] < 110) n++; return n; });
   ok(red > 20, `Automation Mode draws the track's automation over its clip in red (${red} red pixels around bar 6)`);
   ok(a1.start === 4 && a1.bar === a0.bar + 4 && b1.start === 4 && b1.bar === a0.bar, `Lock Envelopes off: clip bar ${a0.start} -> ${a1.start}, its automation peak bar ${a0.bar} -> ${a1.bar}; on: the peak stays at bar ${b1.bar}`); }
+// Honeydew's clip handles on a selected audio clip: the end capsule (outside its right edge) sets the length, the start capsule trims the start
+// with the audio in place, and the bar under its right end stretches the audio at once (no Stretch mode)
+{ const setup = () => ev(async () => { const P = await import('./js/project.js'), T = await import('./js/timeline.js'), W = await import('./js/waveform.js');
+    P.newProject(false); P.addTrack('audio'); const n = 48000 * 8, l = new Float32Array(n); for (let k = 0; k < n; k++) l[k] = Math.sin(k / 20) * (0.3 + 0.7 * Math.abs(Math.sin(k / 9000)));
+    const smp = { id: 0, path: 'test/handles.wav', name: 'handles.wav', duration: 8, pyr: W.buildPyramid(l, l), peaks: [] }; P.state.samples[smp.path] = smp;
+    P.state.tracks[0].clips.push({ id: 880001, start: 2 * P.BAR, len: 4 * P.BAR, name: '', sample: smp, offset: 0, gain: 1 });
+    T.view.x0 = 0; T.view.ppt = (document.querySelector('#arr canvas').getBoundingClientRect().width - T.headWidth()) / (12 * P.BAR); P.selectTrack(0); P.selectClip(0, 880001); P.emit('all'); });
+  const clip = () => ev(async () => { const P = await import('./js/project.js'); const c = P.state.tracks[0].clips[0]; return { s: c.start / P.BAR, l: c.len / P.BAR, o: c.offset }; });
+  const pos = (bar, dy) => ev(async ([bar, dy]) => { const T = await import('./js/timeline.js'), P = await import('./js/project.js'); const q = T.probe(bar * P.BAR, 0), b = T.probe(0, 1); return { x: q.x, y: dy === 'mid' ? (q.top + b.top) / 2 : dy === 'below' ? b.top + 9 : q.top }; }, [bar, dy]);
+  const g = await geo(), K4 = bx.width / g.w;
+  const dragBy = async (p, dxBars, hold) => { const step = (await pos(1, 'mid')).x - (await pos(0, 'mid')).x; await page.mouse.move(bx.x + p.x * K4, bx.y + p.y * K4); await page.mouse.down(); await page.waitForTimeout(60);
+    await page.mouse.move(bx.x + (p.x + dxBars * step) * K4, bx.y + p.y * K4, { steps: 8 }); const mid = await clip(); if (!hold) { await page.mouse.up(); await page.waitForTimeout(400); } return mid; };
+  await setup(); await page.waitForTimeout(400); await page.screenshot({ path: path.join(out, 'clip-handles.png') });
+  let p = await pos(6, 'mid'); p.x += 9; await dragBy(p, 2); const r1 = await clip();
+  await setup(); await page.waitForTimeout(300); p = await pos(2, 'mid'); p.x += 5; await dragBy(p, 2); const r2 = await clip();   // the grid is 2 bars here (set by the grid menu test)
+  await setup(); await page.waitForTimeout(300); p = await pos(6, 'below'); const mid = await dragBy(p, 2, true); await page.screenshot({ path: path.join(out, 'clip-stretch.png') }); await page.mouse.up(); await page.waitForTimeout(500);
+  await setup(); await page.waitForTimeout(300); { const q = await pos(2, 'top'); const st = (await pos(1, 'mid')).x - (await pos(0, 'mid')).x;
+    await page.mouse.move(bx.x + (q.x + 6) * K4, bx.y + (q.y + 20) * K4); await page.mouse.down(); await page.waitForTimeout(60); await page.mouse.move(bx.x + (q.x + 6 + st * 0.5) * K4, bx.y + (q.y + 20) * K4, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(300); }
+  const fi = await ev(async () => (await import('./js/project.js')).state.tracks[0].clips[0].fadeIn || 0);
+  ok(fi > 0.5 && fi < 1.5, `fade-in handle (top left corner): dragged half a bar -> fade in ${fi.toFixed(2)} s`);
+  ok(r1.s === 2 && r1.l === 6, `end capsule: length 4 -> ${r1.l} bars, start stays at bar ${r1.s + 1}`);
+  ok(r2.s === 4 && r2.l === 2 && r2.o > 3.9 && r2.o < 4.1, `start capsule: start bar 3 -> ${r2.s + 1}, length ${r2.l}, audio offset ${r2.o.toFixed(2)} s (the audio stays in place)`);
+  ok(mid.l > 5.5, `the bar under the clip stretches it while dragged: length 4 -> ${mid.l.toFixed(2)} bars, without Stretch mode`); }
 // MIDI editor: Live 12's velocity tools - Ramp lines the velocities up from the first note to the last, Randomize moves each one
 { await ev(async () => { const P = await import('./js/project.js'), T = await import('./js/timeline.js'); P.newProject(false); P.addTrack('midi');
     const c = P.addClip(0, 0, 2 * P.BAR); for (let k = 0; k < 16; k++) c.notes.push({ t: k * 240, d: 200, p: 60 + (k % 8), v: 0.4 + 0.5 * ((k * 7) % 10) / 10 }); c.notes[15].v = 0.9; c.notes[0].v = 0.3;

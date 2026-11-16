@@ -217,7 +217,7 @@ const inkCache = new Map();
 function ink(hex) {                     // text on a colour: dark on light colours, white on dark ones
   let r = inkCache.get(hex); if (r) return r;
   const n = parseInt(String(hex).slice(1, 7), 16) || 0, l = 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
-  r = l > 100 ? 'rgba(14,14,18,.9)' : 'rgba(255,255,255,.94)'; inkCache.set(hex, r); return r;   // Live: black text / content on all but the darkest colours (pink, orange, teal included)
+  r = l > 75 ? 'rgba(14,14,18,.9)' : 'rgba(255,255,255,.94)'; inkCache.set(hex, r); return r;   // (threshold 75: red and saturated colours take black, as in Live 12) Live: black text / content on all but the darkest colours (pink, orange, teal included)
 }
 
 const contentInk = (hex) => (ink(hex).startsWith('rgba(14') ? 'rgba(10,10,12,.86)' : 'rgba(250,250,252,.88)');   // Live: black content on light clip colours, white on dark ones
@@ -249,7 +249,7 @@ function drawClip(t, c, y, hh) {
   if (isSel && !c.muted) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.strokeRect(Math.round(x) + 1.5, y0 + 1.5, Math.max(0, Math.round(w) - 3), h0 - 3); }   // selected: a light inner edge
   if (tall && w > 18) {
     ctx.fillStyle = ink(col); ctx.font = FONT(600, 10); ctx.textBaseline = 'middle';
-    ctx.fillText(c.name || (c.sample ? c.sample.name : t.name), xs + 5, y0 + hd / 2 + 0.5, Math.max(0, xe - xs - 10));
+    { const room = xe - xs - 10, nm = c.name || (c.sample ? c.sample.name : t.name); if (room > 8) ctx.fillText(cut2(nm, room), xs + 5, y0 + hd / 2 + 0.5); }   // owner: cut with an ellipsis ("11 Cas…"), never squeezed
   }
   const by = y0 + hd + 2, bh = h0 - hd - 4, INK = c.muted ? 'rgba(20,20,24,.6)' : contentInk(t.color);
   if (t.kind === 'auto' && c.pts && bh > 8) {
@@ -324,10 +324,7 @@ function drawClip(t, c, y, hh) {
     ctx.strokeStyle = shade(t.color, 0.65); ctx.lineWidth = 1.5; ctx.strokeRect(x + 0.75, y0 + 0.75, w - 1.5, h0 - 1.5);
     if (tall && w > 44 && !msel.size) { const mx = Math.min(x + w, CW) - 12, my = y0 + hd / 2; ctx.fillStyle = shade(t.color, 0.75); for (const d of [-4, 0, 4]) { ctx.beginPath(); ctx.arc(mx + d, my, 1.3, 0, 6.2832); ctx.fill(); } }   // ⋯ : the clip's context menu
     const hl = Math.min(26, h0 - hd - 10), hy = y0 + hd + (h0 - hd - hl) / 2, st = stretchMode && t.kind === 'audio';   // edge grips for touch: pills on both ends
-    if (hl > 6 && w > 26) {
-      ctx.fillStyle = shade(t.color, 0.7); ctx.fillRect(x + 3, hy, 3, hl);                              // edge grips: slim bars in the clip's ink
-      ctx.fillStyle = st ? C('#ffa722') : shade(t.color, 0.7); ctx.fillRect(x + w - 6, hy, 3, hl);
-    }
+    if (hl > 6 && w > 26 && st) { ctx.fillStyle = C('#ffa722'); ctx.fillRect(x + w - 6, hy, 3, hl); }   // the stretch mode's mark (the handles are drawn by drawHandles)
   }
   ctx.restore();
 }
@@ -390,12 +387,13 @@ function draw() {
     if (y < LB && y + h > RULER && CW > 120) {
       ctx.setLineDash([4, 4]); ctx.strokeStyle = C('#3c3c41'); ctx.lineWidth = 1; ctx.strokeRect(6.5, y + 6.5, CW - 13, h - 13); ctx.setLineDash([]);
       ctx.fillStyle = C('#6c6c73'); ctx.font = FONT(500, 11); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-      ctx.fillText('Seret sample, instrumen, atau efek ke sini • ketuk + untuk track baru', CW / 2, y + h / 2 + 0.5, CW - 30); ctx.textAlign = 'left';
+      ctx.fillText(cut2('Seret sample, instrumen, atau efek ke sini • ketuk + untuk track baru', CW - 30), CW / 2, y + h / 2 + 0.5); ctx.textAlign = 'left';
     } }
   ctx.restore();
   // clips
   const first = Math.max(0, rowAt(RULER)), last = Math.min(n - 1, rowAt(LB));
   for (let i = first; i <= last; i++) for (const c of state.tracks[i].clips) { const b = laneBox(i, c); if (b.h < 2) continue; drawClip(state.tracks[i], c, b.y, b.h); }   // a clip of a sub-track sits in its row
+  drawHandles();
   // Automation Mode (Live, refs/live12/112-115): the track's automation drawn over its clips - a red line with its breakpoints, the parameter's
   // name at the lane's top left. Display only: the curve is edited on its automation lane. The first visible lane of the track is shown.
   if (autoMode()) for (let i = first; i <= last; i++) {
@@ -519,7 +517,7 @@ function drawTimeRuler() {
   for (const [type, lbl, r] of bg) {                         // Live-style fields: flat, 1 px border, lighter while pressed
     ctx.fillStyle = pressed === type ? C('#55555b') : C('#3a3a3e'); ctx.fillRect(r.x, r.y, r.w, r.h);
     ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
-    ctx.fillStyle = C('#d4d4d8'); ctx.fillText(lbl, r.x + r.w / 2, r.y + r.h / 2 + 0.5, r.w - 6);
+    ctx.fillStyle = C('#d4d4d8'); ctx.fillText(cut2(lbl, r.w - 6), r.x + r.w / 2, r.y + r.h / 2 + 0.5);
   }
   ctx.textAlign = 'left';
 }
@@ -607,7 +605,7 @@ function foldTri(cx, cy, folded, col) {        // Live 12 fold toggle: a ring wi
 // header button: flat grey with a 1 px border when off, filled with its colour when on (activator yellow, solo blue, arm red)
 function drawBtn(r, label, on, col, quiet) {
   if (quiet) { ctx.fillStyle = C('#3e3e43'); ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);   // quiet switch: only the text lights up (input monitoring is on by default)
-    ctx.fillStyle = on ? col : C('#8b8b92'); ctx.font = FONT(700, 10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 0.5, r.w - 2); ctx.textAlign = 'left'; return; }
+    ctx.fillStyle = on ? col : C('#8b8b92'); ctx.font = FONT(700, 10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(cut2(label, r.w - 2), r.x + r.w / 2, r.y + r.h / 2 + 0.5); ctx.textAlign = 'left'; return; }
   ctx.fillStyle = on ? col : C('#3e3e43'); ctx.fillRect(r.x, r.y, r.w, r.h);
   ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
   const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
@@ -616,7 +614,7 @@ function drawBtn(r, label, on, col, quiet) {
     ctx.strokeStyle = on ? '#15151a' : C('#b4b4ba'); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(cx - 6, cy + 4); ctx.lineTo(cx - 2, cy - 3); ctx.lineTo(cx + 2, cy + 1); ctx.lineTo(cx + 6, cy - 4); ctx.stroke(); return;
   }
   ctx.fillStyle = on ? '#15151a' : C('#c8c8cc'); ctx.font = FONT(700, r.fs || (r.h < 16 ? 9 : 10.5)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(label, cx, cy + 0.5, r.w - 2); ctx.textAlign = 'left';
+  ctx.fillText(cut2(label, r.w - 2), cx, cy + 0.5); ctx.textAlign = 'left';
 }
 // Live's header slider: a dark well, a grey fill up to the value (from the centre for pan) and the value written over it
 function drawSlider(r, frac, label, fromCenter) {
@@ -626,14 +624,14 @@ function drawSlider(r, frac, label, fromCenter) {
   else ctx.fillRect(r.x + 1, r.y + 1, Math.max(0, frac * (r.w - 2)), r.h - 2);
   ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
   ctx.font = FONT(700, r.fs || 9.5); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillStyle = C('#f2f2f4'); ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 0.5, r.w - 4); ctx.textAlign = 'left';
+  ctx.fillStyle = C('#f2f2f4'); ctx.fillText(cut2(label, r.w - 4), r.x + r.w / 2, r.y + r.h / 2 + 0.5); ctx.textAlign = 'left';
 }
 function drawSwitch(r, label, on, isPressed) {   // Live-style switch: LED + text in a flat field
   ctx.fillStyle = isPressed ? C('#55555b') : C('#3a3a3e'); ctx.fillRect(r.x, r.y, r.w, r.h);
   ctx.strokeStyle = C('#141415'); ctx.lineWidth = 1; ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
   const ly = r.y + r.h / 2; ctx.fillStyle = on ? T('--accent') : C('#55555b'); ctx.beginPath(); ctx.arc(r.x + 10, ly, 3.5, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = on ? C('#e0e0e4') : C('#8b8b92'); ctx.font = FONT(600, 10); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-  ctx.fillText(label, r.x + r.w / 2 + 6, ly + 0.5, r.w - 24); ctx.textAlign = 'left';
+  ctx.fillText(cut2(label, r.w - 24), r.x + r.w / 2 + 6, ly + 0.5); ctx.textAlign = 'left';
 }
 function drawSubHeads(i) {                     // sub-track rows of a track header: a slim colour edge, the name (Steps / Notes) and an activator
   const t = state.tracks[i], L = P.subsOf(t), hx = CW, ik = C('#c8c8ce');
@@ -837,6 +835,44 @@ function edgeScroll(x) {
 }
 
 // ------------------------------------------------------------------ hit testing + actions
+// The selected clip's handles, as Honeydew's (src/ui/clips.rs handle_rects, GPL-3.0-or-later): the start capsule ending 0.5 U inside the clip's
+// left edge (none when it would touch the end one), the end capsule from 0.15 U right of its right edge, both centred on the clip vertically, and
+// under an audio clip that does not loop a third bar (↔) centred on its right edge, 0.12 U below it: drag it = stretch the audio (no mode switch).
+// A capsule is 0.42 U + 2 px by 1.41 U + 2 px; a touch zone is 1 U wide (the start one at most a third of the clip), the bar's 1 U tall.
+const HU = 22;
+function selHandles() {
+  if (msel.size || drag && drag.k !== 'resize' && drag.k !== 'resizeL' && drag.k !== 'stretch') return null;
+  const id = state.sel.clip; if (id == null) return null;
+  const i = state.tracks.findIndex((t) => t.clips.some((c) => c.id === id)); if (i < 0) return null;
+  const t = state.tracks[i], c = t.clips.find((q) => q.id === id), b = laneBox(i, c); if (t.kind === 'auto' || t.fold || b.h < 24) return null;
+  const g = gl.get(c.id), x0 = tx(g ? g.s : c.start), x1 = tx((g ? g.s : c.start) + (g ? g.l : c.len)), y0 = b.y + 1, y1 = b.y + b.h - 1;
+  const cw = Math.round(HU * 0.42) + 2, ch = Math.min(Math.round(HU * 1.41) + 2, y1 - y0 - 4), cy = (y0 + y1) / 2 - ch / 2;
+  const end = { x: x1 + HU * 0.15, y: cy, w: cw, h: ch }, start = { x: x0 + HU * 0.5 - cw, y: cy, w: cw, h: ch };
+  const out = { i, c, t, x0, x1, y1, end, start: start.x + start.w < end.x ? start : null, scale: null };
+  if (t.kind === 'audio' && !P.loopOf(c) && (c.sample || c.dsample)) out.scale = { x: x1 - HU / 2, y: y1 + HU * 0.12, w: HU, h: Math.round(HU * 0.56) + 2 };
+  return out;
+}
+function handleHit(x, y) {
+  const s = selHandles(); if (!s) return null;
+  if (s.t.kind === 'audio' && Math.abs(y - (rowY(s.i) + 1 + (rh(s.i) >= 40 ? 14 : 0) + 5)) < 9 && x > s.x0 - 4 && x < s.x1 + 4) return null;   // Live's fade squares (top corners) come first
+  const zone = (r, w, hh) => inRect({ x: r.x + r.w / 2 - w / 2, y: r.y + r.h / 2 - hh / 2, w, h: hh }, x, y);
+  const hit = (zn) => ({ type: 'clip', i: s.i, c: s.c, tick: xt(x), zone: zn });
+  if (s.scale && zone(s.scale, s.scale.w, HU)) return hit('scale');
+  if (zone(s.end, HU, s.end.h)) return hit('right');
+  if (s.start && zone(s.start, Math.min(HU, (s.x1 - s.x0) / 3), s.start.h)) return hit('left');
+  return null;
+}
+function drawHandles() {
+  const s = selHandles(); if (!s) return;
+  const light = currentTone() === 'light', frame = light ? 'rgba(20,20,24,.3)' : 'rgba(240,240,244,.3)', grip = light ? 'rgba(20,20,24,.7)' : 'rgba(240,240,244,.7)';
+  const pill = (r) => { ctx.fillStyle = frame; ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, r.w / 2); ctx.fill();
+    const gw = Math.max(2, r.w * 0.18 * 2), gh = r.h * 0.44; ctx.fillStyle = grip; ctx.beginPath(); ctx.roundRect(r.x + r.w / 2 - gw / 2, r.y + r.h / 2 - gh / 2, gw, gh, gw / 2); ctx.fill(); };
+  ctx.save(); ctx.beginPath(); ctx.rect(0, RULER, CW, LANE_B() - RULER); ctx.clip();
+  if (s.start) pill(s.start); pill(s.end);
+  if (s.scale) { const r = s.scale, a = drag && drag.k === 'stretch'; ctx.fillStyle = a ? T('--accent') : frame; ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 3); ctx.fill();
+    ctx.strokeStyle = a ? '#15151a' : grip; ctx.lineWidth = 1.4; const cy = r.y + r.h / 2, l = r.x + 5, rr = r.x + r.w - 5; ctx.beginPath(); ctx.moveTo(l, cy); ctx.lineTo(rr, cy); ctx.moveTo(l + 3, cy - 3); ctx.lineTo(l, cy); ctx.lineTo(l + 3, cy + 3); ctx.moveTo(rr - 3, cy - 3); ctx.lineTo(rr, cy); ctx.lineTo(rr - 3, cy + 3); ctx.stroke(); }   // ↔
+  ctx.restore();
+}
 function hit(x, y) {
   if (y < RULER) {
     if (x >= CW) { const q = cornerRects(); return inRect(q.set, x, y, 2) ? { type: 'locset' } : inRect(q.prev, x, y, 1) ? { type: 'locprev' } : inRect(q.next, x, y, 1) ? { type: 'locnext' } : q.auto.w && inRect(q.auto, x, y, 1) ? { type: 'automode' } : q.lock.w && inRect(q.lock, x, y, 1) ? { type: 'lockenv' } : { type: 'corner' }; }
@@ -856,6 +892,7 @@ function hit(x, y) {
     for (const [type, , r] of badges()) if (inRect(r, x, y, 3)) return { type };
     return x >= CW ? { type: 'follow' } : { type: 'tbar', tick: xt(x) };
   }
+  if (x < CW) { const hh = handleHit(x, y); if (hh) return hh; }                                // the selected clip's handles reach outside it
   const i = rowAt(y);
   if (Math.abs(x - CW) <= 4) return { type: 'headw' };                                         // the header column's left edge: drag = its width
   if (x >= CW) {
@@ -1415,8 +1452,8 @@ function setup() {
       if (t.type === 'clip' && (t.zone === 'fadeIn' || t.zone === 'fadeOut')) { checkpoint(); drag = { k: t.zone, c: t.c, i: t.i }; return true; }
       if (t.type === 'clip') {
         checkpoint(); P.selectClip(t.i, t.c.id);
-        if (t.zone === 'right' && stretchMode && state.tracks[t.i].kind === 'audio') { delete t.c.ll; delete t.c.lp; }
-        drag = { ll0: P.patternLen(t.c, state.tracks[t.i].kind), had: t.c.ll > 0, lp0: t.c.lp || 0, looped: !!P.loopOf(t.c), k: t.zone === 'right' ? (stretchMode && state.tracks[t.i].kind === 'audio' ? 'stretch' : 'resize') : t.zone === 'left' ? 'resizeL' : 'move', c: t.c, i: t.i, i0: t.i, start: t.c.start, len: t.c.len, off: t.tick - t.c.start, t0: t.tick,
+        if ((t.zone === 'scale' || t.zone === 'right' && stretchMode) && state.tracks[t.i].kind === 'audio') { delete t.c.ll; delete t.c.lp; }
+        drag = { ll0: P.patternLen(t.c, state.tracks[t.i].kind), had: t.c.ll > 0, lp0: t.c.lp || 0, looped: !!P.loopOf(t.c), k: t.zone === 'scale' ? 'stretch' : t.zone === 'right' ? (stretchMode && state.tracks[t.i].kind === 'audio' ? 'stretch' : 'resize') : t.zone === 'left' ? 'resizeL' : 'move', c: t.c, i: t.i, i0: t.i, start: t.c.start, len: t.c.len, off: t.tick - t.c.start, t0: t.tick,
           offset: t.c.offset || 0, notes: t.c.notes ? t.c.notes.map((n) => ({ ...n })) : null, pts: t.c.pts ? t.c.pts.map((n) => ({ ...n })) : null };
         return true;
       }
