@@ -546,10 +546,12 @@ export function addFlmPanels(VI) {
       { name: 'Chorus', on: 33, build: () => DS('Chorus', { g: chorusDisp(k, { on: 33, rate: 34, mod: 35, mix: 36, min: 84, flm: true }), rows: [[NUM(k, 34, 'Rate'), NUM(k, 35, 'Mod'), NUM(k, 36, 'Mix')]] }) },
       { name: 'Phaser', on: 37, build: () => DS('Phaser', { g: phaserDisp(k, { on: 37, speed: 38, width: 39, fb: 40, freq: 41, mix: 42, min: 84, flm: true }), rows: [[NUM(k, 38, 'Speed'), NUM(k, 39, 'Width'), NUM(k, 40, 'Feedback'), NUM(k, 41, 'Freq'), NUM(k, 42, 'Mix')]] }) }])],
   ], { 2: () => k.get(12) !== 0, 3: () => k.get(13) !== 0, 5: () => [25, 28, 33, 37].some((o) => k.get(o) > 0.5) });
-  VI[33] = (k) => tabs(k, ['OSC', 'FILTER', 'LFO', 'LEVEL', 'MOD', 'VOICES', 'FX'], [
+  // SuperSaw (redesign 2026-11-16): one or two sections a tab as the other FLM synths (the old OSC tab held three side by side, ~1200 px):
+  // OSC = the oscillator + its unison, SYNC = Supersync's own sweep envelope (lit while the Osc Mode is Supersync), AMP = the amp envelope + output
+  VI[33] = (k) => tabs(k, ['OSC', 'SYNC', 'FILTER', 'LFO', 'AMP', 'MOD', 'VOICES', 'FX'], [
     () => [DS('Oscillator', { g: ssWave(k), rows: [CHH(k, 1, ['Supersaw', 'Supersync']), [TG(k, 0, 'Pulse', 46), TG(k, 2, 'Retrig', 50), NUM(k, 3, 'PW'), NUM(k, 4, 'Sub Osc')]] }),
-      DS('Unison', { k: [KN(k, 6, 'Detune')], g: ssUnison(k), rows: [[MEN(k, 5, 'Voices', 66), NUM(k, 9, 'Phase'), NUM(k, 8, 'Spread'), NUM(k, 7, 'Pan')]] }),
-      DS('Supersync', { k: [KN(k, 10, 'Sync')], g: env(k, 12, 13, 14, 15, OR), rows: [[NUM(k, 11, 'Sync PW'), NUM(k, 16, 'Amount'), TG(k, 17, 'Flip', 40)], ADSRN(k, 12, 13, 14, 15)] })],
+      DS('Unison', { k: [KN(k, 6, 'Detune')], g: ssUnison(k), rows: [[MEN(k, 5, 'Voices', 66), NUM(k, 9, 'Phase'), NUM(k, 8, 'Spread'), NUM(k, 7, 'Pan')]] })],
+    () => [DS('Supersync', { k: [KN(k, 10, 'Sync')], g: env(k, 12, 13, 14, 15, OR), rows: [[NUM(k, 11, 'Sync PW'), NUM(k, 16, 'Amount'), TG(k, 17, 'Flip', 40)], ADSRN(k, 12, 13, 14, 15)] })],
     () => [DS('Filter', { k: [KN(k, 18, 'Cutoff'), KN(k, 19, 'Reso')], g: filt(k, 18, 19, () => 0), rows: [[NUM(k, 20, 'Kbd Trk'), NUM(k, 21, 'Vel Trk')]] }),
       DS('Filter Envelope', { g: env(k, 22, 23, 24, 25, OR, () => 'Amount ' + Math.round(k.get(26))), rows: [ADSRN(k, 22, 23, 24, 25)], r: [KN(k, 26, 'Amount')] })],
     () => [DS('LFO', { k: [KN(k, 32, 'Amount')], g: lfo(k, { shape: 30, amt: 32, mode: 27, rate: 28, sync: 29, att: 31 }),
@@ -560,5 +562,5 @@ export function addFlmPanels(VI) {
     () => [fxPage(k, [
       { name: 'Distortion', build: () => DS('Distortion', { k: [KN(k, 52, 'Drive')], g: distWave(k, { drive: 52, dmax: 99, gain: 53 }), rows: [[NUM(k, 53, 'Gain')]] }) },
       { name: 'Delay', build: () => DS('Delay', { g: taps(k, { time: 54, fb: 55, filt: 56, mix: 57, beats: (i) => SS_DELAY_BEATS[clamp(Math.round(i), 0, 4)] }), rows: [[MEN(k, 54, 'Time', 64), NUM(k, 55, 'Feedback'), NUM(k, 56, 'Filter'), NUM(k, 57, 'Mix')]] }) }])],
-  ], { 2: () => k.get(32) !== 0, 6: () => k.get(52) > 0 || k.get(57) > 0 });
+  ], { 1: () => Math.round(k.get(1)) === 1, 3: () => k.get(32) !== 0, 7: () => k.get(52) > 0 || k.get(57) > 0 });
 }
