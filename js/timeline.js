@@ -364,7 +364,7 @@ function draw() {
   for (const i of visRows()) { if (i < n || i >= nn) continue;                          // Master / effect track rows: no clips, they only mix
     const y = rowY(i), h = rh(i), x = xInfo(i);
     ctx.fillStyle = state.sel.track === x.strip ? C('#2f2f33') : C('#252527'); ctx.fillRect(0, y, CW, h);   // theme background first, so the tint below is a real transparent wash in dark AND light themes
-     ctx.fillStyle = HD('--hd-line', '#141415'); ctx.fillRect(0, y + h - 1, CW, 1);
+     ctx.fillStyle = HD('--hd-line', '#141415'); ctx.fillRect(0, y + h - 1, CW, 1); if (i === state.tracks.length) ctx.fillRect(0, y - 1, CW, 1);   // the first Master / FX row: a line above it too (it sits under the drop area)
     const src = x.master ? state.tracks.filter((q) => q.kind !== 'auto' && !q.mute).length : state.tracks.filter((q) => q.out === x.k && !q.mute).length;
     xl.push({ y, h, t: `${src} track aktif → ${x.name}` });
   }
@@ -703,7 +703,8 @@ function drawHeads() {
         if (vr - vx > 30) drawSlider({ x: vx, y: r.act.y, w: vr - vx, h: r.act.h, fs: 10 }, Math.sqrt(clamp(vol / VMAX, 0, 1)), dbTxt(vol) + ' dB', false);
       }
       meterWell();
-      ctx.fillStyle = HD('--hd-line', '#141415'); ctx.fillRect(hx, y + h - 1, HEAD, 1);
+      ctx.fillStyle = HD('--hd-line', '#141415'); ctx.fillRect(hx, y + h - 1, HEAD, 1); if (i === n) ctx.fillRect(hx, y - 1, HEAD, 1);   // Live: the Main / return rows are boxed like the tracks
+      if (full()) ctx.fillRect(hx + nw, y, 1, h - 1);
       continue;
     }
     let t = state.tracks[i]; if (rh(i) < 2) continue; { const tc = tone(t.color); if (tc !== t.color) t = { __proto__: t, color: tc }; }

@@ -1809,3 +1809,13 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 #top .b.ic:not(.on):not(.tport *), #top .readout, #top-l #rd-bpm, #top .seg .b:not(.on) { color: var(--tb-ico, var(--text)); }
 #top .tport #btn-rec:not(.on) svg { fill: currentColor; } #top .tport #btn-rec.on svg { fill: var(--rec); }
 #top .tport #btn-rec svg { width: 26px; height: 26px; } #top .tport #btn-play svg { width: 20px; height: 20px; }
+/* FPS / CPU meter: one fixed-size field, FPS over CPU, the CPU load as a thin bar along its bottom edge - never clipped, never hidden */
+#top .perf { display: flex !important; flex-direction: column; justify-content: center; align-items: stretch; gap: 0; flex: none !important; width: 82px; min-width: 82px; padding: 0 7px 2px; position: relative; overflow: hidden; }
+#top .perf .fpsbox { display: flex !important; align-items: baseline; justify-content: space-between; height: auto !important; min-width: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; gap: 4px; line-height: 1.2; }
+#top .perf .fpsbox b, #top .perf #cpu #cpu-t::before { display: inline !important; font-size: 9px; font-weight: var(--fw-b); letter-spacing: .06em; color: var(--tb-ico, var(--text)); opacity: .7; }
+#top .perf .fpsbox span, #top .perf #cpu #cpu-t { font-size: 11px; font-weight: var(--fw-b); color: var(--tb-ico, var(--text)); min-width: 0; text-shadow: none; }
+#top .perf .cpubox { display: block !important; height: auto !important; position: static; }
+#top .perf #cpu { display: block !important; position: static !important; width: auto !important; height: auto !important; border: 0 !important; background: transparent !important; overflow: visible; }
+#top .perf #cpu #cpu-t { position: static !important; display: flex !important; align-items: baseline; justify-content: space-between; gap: 4px; line-height: 1.2; }
+#top .perf #cpu #cpu-t::before { content: "CPU"; }
+#top .perf #cpu i { position: absolute !important; left: 1px; bottom: 1px; top: auto !important; height: 2px !important; opacity: 1; }
