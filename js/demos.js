@@ -9,7 +9,7 @@ const OLD = ['/Projects/Bombay Bass (Dubstep Demo).mdaw'].concat(['Kick Dub', 'S
 
 export const DEMOS = [
   { id: 'meadow-wind', title: 'Meadow Wind \u2013 Orkestra', time: '2:48', file: 'demos/meadow-wind.mdaw', name: 'Meadow Wind (Orchestral Demo)', sf: true, samples: [] },
-  { id: 'neon-horizon', title: 'Neon Horizon \u2013 Progressive House', time: '2:00', file: 'demos/progressive-house.mdaw', name: 'Neon Horizon (Progressive House Showcase)', sf: false, samples: ['NH Kick', 'NH Clap', 'NH Hat Closed', 'NH Hat Open', 'NH Snare', 'NH Crash', 'NH Ride', 'NH Noise Riser'] },   // the tutorial showcase (tools/make-proghouse.mjs)
+  { id: 'neon-horizon', title: 'Neon Horizon \u2013 Progressive House', time: '2:00', file: 'demos/progressive-house.mdaw', name: 'Neon Horizon (Progressive House Showcase)', sf: false, samples: ['NH Kick', 'NH Clap', 'NH Snare', 'NH Snare Layer', 'NH Hat Closed', 'NH Hat Open', 'NH Shaker', 'NH Rim', 'NH Bongo', 'NH Crash', 'NH Ride', 'NH Noise Riser', 'NH FX Reverse Crash', 'NH FX Sub Drop', 'NH FX Impact', 'NH FX Downlifter'] },   // the tutorial showcase (tools/make-proghouse.mjs)
   { id: 'ghibli-sky', title: 'Ghibli Sky \u2013 Piano & Orkestra', time: '3:03', file: 'demos/ghibli-sky.mdaw', name: 'Ghibli Sky (Piano & Orchestra Demo)', sf: true, samples: [] },
 ];
 

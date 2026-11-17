@@ -43,6 +43,6 @@ but the program as distributed from this point on is GPL-3.0-or-later as a whole
 
 ## Stargate DAW sample pack (CC0 1.0)
 The drum samples of the tutorial showcase song (`demos/Samples/NH *.wav`) come from the Stargate DAW sample pack,
-https://github.com/stargatedaw/stargate-sample-pack, contributed by the Stargate DAW team and Fugue State Audio and dedicated to
+https://github.com/stargatedaw/stargate-sample-pack, contributed by the Stargate DAW team, Fugue State Audio and freesound.org users (menegass) and dedicated to
 the public domain under Creative Commons Zero 1.0 (https://creativecommons.org/publicdomain/zero/1.0/). They were trimmed and
 normalized; the original file of each one is listed in `demos/README.txt`.

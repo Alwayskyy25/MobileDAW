@@ -98,7 +98,7 @@ const s0 = await page.evaluate(() => ({ splash: !!document.querySelector('.tut-c
 if (shots) await page.screenshot({ path: path.join(root, 'docs/redesign/tutorial/06-showcase-intro.png') });
 await next(); for (let q = 0; q < 300 && await page.evaluate(() => !!document.querySelector('.tut-card.busy')); q++) await page.waitForTimeout(100);
 const s1 = await page.evaluate(async () => { const P = await import('./js/project.js'); const k = P.state.tracks.find((t) => t.name === 'Kick'), nz = P.state.tracks.find((t) => t.name === 'Noise Riser'); return { name: P.state.projectName, tracks: P.state.tracks.map((t) => t.name), markers: P.state.markers.length, bpm: P.state.bpm, kickSmp: !!(k && k.inst.pads[0].sample && /NH Kick/.test(k.inst.pads[0].sample.path) && k.inst.pads[0].sample.duration > 0.3), noise: !!(nz && nz.clips[0] && nz.clips[0].sample && nz.clips[0].sample.duration > 7) }; });
-ok(s0.splash && s0.tips >= 3 && s0.prog && /Neon Horizon/.test(s1.name) && s1.markers === 7 && s1.bpm === 128 && ['Kick', 'Drums', 'Cymbals', 'Bass', 'Pluck Arp', 'Pad', 'Lead', 'Riser', 'Noise Riser'].every((n) => s1.tracks.includes(n)) && s1.kickSmp && s1.noise,
+ok(s0.splash && s0.tips >= 3 && s0.prog && /Neon Horizon/.test(s1.name) && s1.markers === 7 && s1.bpm === 128 && ['Kick', 'Claps', 'Hats', 'Percussion', 'Cymbals', 'Sub Bass', 'Mid Bass', 'Chord Stabs', 'Pad', 'Pluck Arp', 'Lead', 'Lead Layer', 'Riser', 'FX', 'Noise Riser'].every((n) => s1.tracks.includes(n)) && s1.kickSmp && s1.noise,
   'showcase: chapter splash + tips + progress; "Neon Horizon" opens (128 BPM, 7 markers, ' + s1.tracks.length + ' tracks) with its CC0 samples loaded (kick ' + s1.kickSmp + ', noise riser ' + s1.noise + ')');
 await next(); await page.waitForTimeout(400);                        // "Dengarkan dulu": live map + play buttons
 await page.evaluate(() => [...document.querySelectorAll('.tut-xacts .b')].find((x) => /Drop/.test(x.textContent)).click());
@@ -113,7 +113,7 @@ for (let k = 0; k < 3; k++) { await next(); for (let q = 0; q < 50 && await page
 await page.waitForTimeout(500);
 const s4 = await page.evaluate(async () => { const P = await import('./js/project.js'); const r = document.querySelector('.tut-ring').getBoundingClientRect(); const c = [...document.querySelectorAll('#dbody .card')].find((x) => x.textContent.slice(0, 80).includes('Autoduck')); const cr = c && c.getBoundingClientRect(); return { title: document.querySelector('.tut-card h4').textContent, sel: P.state.tracks[P.state.sel.track].name, onCard: !!(cr && Math.abs(cr.left - r.left) < 12 && Math.abs(cr.top - r.top) < 12) }; });
 if (shots) await page.screenshot({ path: path.join(root, 'docs/redesign/tutorial/08-showcase-sidechain.png') });
-ok(/sidechain/.test(s4.title) && s4.sel === 'Bass' && s4.onCard, 'sidechain step: the Bass track selected, the spotlight on its Autoduck card (' + JSON.stringify(s4) + ')');
+ok(/sidechain/.test(s4.title) && s4.sel === 'Sub Bass' && s4.onCard, 'sidechain step: the Sub Bass track selected, the spotlight on its Autoduck card (' + JSON.stringify(s4) + ')');
 await page.evaluate(async () => { (await import('./js/tutorial.js')).stopTutorial(); const P = await import('./js/project.js'); if (P.state.playing) P.togglePlay(); });
 // 3. the menu entry and the chapter list
 await page.click('#btn-menu'); await page.waitForTimeout(700);

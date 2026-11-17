@@ -862,3 +862,11 @@ Permintaan pemilik: SEMUA efek dan instrumen diganti dengan set stok Ableton Liv
   di demos/Samples/NH *.wav (2,2 MB); DEMOS `neon-horizon` menyalinnya ke /Samples/Demo saat dibuka. Track baru: Cymbals (crash di setiap
   bagian, ride di Drop B) dan Noise Riser (audio + Auto Filter 250 Hz → 18 kHz). Level solo RMS: Kick -13, Lead -17, Pad -20, Bass -21,
   Drums -22..-26, Pluck -27 dB; mix puncak -3,3 dBFS. Kredit: demos/README.txt, THIRD_PARTY_NOTICES.md.
+- Showcase dibangun ulang secara profesional (permintaan "bukan ala-ala"): 16 track (drum per peran, Sub + Mid Bass, Chord Stabs, Pad,
+  Atmosphere, Pluck Arp, Lead + Lead Layer, Riser, FX, Noise Riser), Drum Bus (Glue 4:1 + saturasi) dan Music Bus (Autoduck dari Kick,
+  Glue, high-pass otomatis di build-up), harmoni Fm9 - Dbmaj7 - Ab(add9) - Eb dengan pedal tone, hook satu ritme di empat akor, transisi
+  (reverse crash, impact, sub drop, downlifter, noise / synth riser, kick roll, satu ketukan hening sebelum Drop). Master: EQ, Glue
+  ringan, soft clipper (Saturator), Limiter. Diukur dengan analyzer BS.1770 (scratch): -8,3 LUFS integrated, -1,2 dBTP, PLR 7,1;
+  Drop -7,7 / Intro -9,1 / Breakdown -10,1 LUFS short-term; spektrum drop per oktaf menurun halus dari 63 Hz. Temuan selama mixing:
+  kick yang terlalu keras membuat semua bagian sama keras; tanpa clipper limiter menekan seluruh drop 2-3 dB. Sample tambahan: snare
+  layer, shaker, rim (Stargate CC0), bongo (freesound CC0) dan 4 FX transisi yang disintesis (CC0). Bab showcase ditulis ulang (16 langkah).
