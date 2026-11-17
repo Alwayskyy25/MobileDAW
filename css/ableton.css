@@ -2075,3 +2075,14 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 /* reduce motion */
 .tut.calm, .tut.calm *, .tut.calm *::before, .tut.calm *::after { animation: none !important; transition: none !important; }
 @media (prefers-reduced-motion: reduce) { .tut *, .tut-offer, .tut-list * { animation: none !important; transition: none !important; } }
+/* tutorial chapter list: fits the dialog at every width (labels wrap, left-aligned, nothing cut off) */
+.tut-list { min-width: 0; width: min(440px, 100%); }
+.modal .tut-list .b { width: 100%; min-width: 0; height: auto; min-height: 36px; padding: 6px 10px; justify-content: flex-start; text-align: left; white-space: normal; line-height: 1.3; box-sizing: border-box; overflow: hidden; }
+.modal .tut-list .tut-hero { align-items: center; padding: 8px 10px; }
+.modal .tut-list .tut-hero > div { min-width: 0; flex: 1; }
+.modal .tut-list .tut-hero .tut-eq { flex: none; }
+.tut-li { flex: none; }
+/* the tutorial dialog: wider than a plain prompt, centred, never taller than the screen (the chapter list scrolls, the buttons stay) */
+.modal:has(.tut-list) { width: min(460px, 94%); top: 50%; transform: translate(-50%, -50%); max-height: 94%; display: flex; flex-direction: column; }
+.modal:has(.tut-list) > h3, .modal:has(.tut-list) > .acts { flex: none; }
+.modal:has(.tut-list) > div:not(.acts) { flex: 1 1 auto; min-height: 0; overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; padding-bottom: 2px; }
