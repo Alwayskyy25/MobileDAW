@@ -24,7 +24,7 @@ export const NOISE_BANDS = 32, NOISE_FLO = 40;
 export function analyzeResynth(L, R, sr, { quality = 1, maxSec = 60, onProgress } = {}) {
   const len = Math.min(L.length, Math.round(maxSec * sr)), stereo = !!R && R !== L;
   const mono = new Float32Array(len); for (let i = 0; i < len; i++) mono[i] = stereo ? 0.5 * (L[i] + R[i]) : L[i];
-  const tr = trackPitch(mono, sr, { hop: Math.round(sr * 0.005), minF: 40, maxF: 2000, threshold: 0.25 });
+  const tr = trackPitch(mono, sr, { hop: Math.round(sr * 0.005), minF: 27, maxF: 2000, threshold: 0.25 });   // down to A0: an 808 / sub bass (D1 = 36.7 Hz) analyses as a pitched tone
   // voicing without flicker: an unvoiced run of <= 20 ms between two voiced frames within a semitone of each other is voiced (f0
   // interpolated) - a harmonic switched off and on every few ms is a rough, noisy modulation the source does not have
   { const v = (i) => tr.f0[i] > 0 && tr.conf[i] > 0.6, n = tr.f0.length, gap = Math.max(1, Math.round(0.02 * sr / tr.hop));
@@ -36,7 +36,7 @@ export function analyzeResynth(L, R, sr, { quality = 1, maxSec = 60, onProgress 
   const Q = RESYNTH_QUALITY[Math.max(0, Math.min(2, quality))];
   if (pitched) {
     const vf = []; for (let i = 0; i < tr.f0.length; i++) if (tr.f0[i] > 0 && tr.conf[i] > 0.85) vf.push(tr.f0[i]); vf.sort((a, b) => a - b);
-    const fmin = Math.max(40, vf[Math.floor(0.03 * (vf.length - 1))] * 0.94);
+    const fmin = Math.max(27, vf[Math.floor(0.03 * (vf.length - 1))] * 0.94);
     const even = (x) => 2 * Math.round(x / 2), Wmax = even(Math.ceil(Q.P * sr / fmin)), Wu = even(0.025 * sr);
     let NF = 256; while (NF < 2 * Math.max(Wmax, Wu)) NF <<= 1;
     const hop = Math.max(Math.round(Q.hopMs / 1000 * sr), Math.ceil(len / (MAX_FRAMES - 1))), frames = Math.max(1, Math.ceil(len / hop) + 1);

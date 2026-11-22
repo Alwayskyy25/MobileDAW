@@ -30,7 +30,7 @@ async function install(i, t, out) {
   P.setInstParamQuiet(j, HM.MAP_A, ids[0]); P.setInstParamQuiet(j, HM.MAP_B, out.B ? ids[1] : -1); P.setInstParamQuiet(j, HM.MAP_N, out.N ? ids[2] : -1); P.setInstParamQuiet(j, HM.MAP_W, out.W ? ids[3] : -1);
   if (!(t.inst.params[HM.MAP_MIX] > 0)) P.setInstParamQuiet(j, HM.MAP_MIX, 1);
 }
-const cacheKey = (kind, path, extra) => 'hm' + kind + '|' + path + '|' + (eng.fileSize ? eng.fileSize(path) : 0) + '|' + JSON.stringify(extra) + '|v3';   // v3: harmonic + noise resynthesis, residual waveform
+const cacheKey = (kind, path, extra) => 'hm' + kind + '|' + path + '|' + (eng.fileSize ? eng.fileSize(path) : 0) + '|' + JSON.stringify(extra) + '|v4';   // v3: harmonic + noise resynthesis, residual waveform; v4: pitch search down to 27 Hz (sub bass)
 async function fromCache(key) {
   const a = await P.cacheGet(key + '|A'); if (!a) return null;
   const b = await P.cacheGet(key + '|B'), nz = await P.cacheGet(key + '|N'), wv = await P.cacheGet(key + '|W');

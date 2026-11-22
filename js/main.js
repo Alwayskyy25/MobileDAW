@@ -111,7 +111,7 @@ function wireTransport() {
   const bpm = $('#rd-bpm');
   let d = null;
   bpm.addEventListener('pointerdown', (e) => { bpm.setPointerCapture(e.pointerId); d = { y: e.clientY, b: state.bpm, moved: false }; });
-  bpm.addEventListener('pointermove', (e) => { if (!d) return; const dy = d.y - e.clientY; if (Math.abs(dy) > 4) d.moved = true; if (d.moved) P.setBpm(Math.round((d.b + dy * 0.25) * 100) / 100); });
+  bpm.addEventListener('pointermove', (e) => { if (!d) return; const dy = d.y - e.clientY; if (!d.moved && Math.abs(dy) > 12) { d.moved = true; d.y = e.clientY; } if (d.moved) P.setBpm(Math.round((d.b + (d.y - e.clientY) * 0.1) * 100) / 100); });   // a deliberate drag only (12 px), 0.1 BPM per px: a tap or a scroll that brushes the field no longer changes the tempo
   bpm.addEventListener('pointerup', (e) => {
     if (d && !d.moved) Tempo.openTempo();
     d = null;
