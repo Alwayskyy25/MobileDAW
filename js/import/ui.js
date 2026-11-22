@@ -41,6 +41,7 @@ export async function importDialog(after) {
   try {
     const buf = new Uint8Array(await f.arrayBuffer());
     P.stop();
+    const lib2 = P.libIndex();
     const io = {
       home: eng.home(),
       saveBytes: async (path, bytes) => { await eng.saveBytes(path, bytes.buffer.byteLength === bytes.byteLength ? bytes.buffer : bytes.slice().buffer); },
@@ -50,7 +51,8 @@ export async function importDialog(after) {
         if (P.bakesPending()) { P.bakeHooks.progress = (d, t, name) => prog(t ? d / t : 1, 'Menyesuaikan klip ke tempo: ' + name, d, t); try { await P.ensureBakes(); } finally { P.bakeHooks.progress = null; } }
         return miss;
       },
-      findDwp: (lib) => P.findLibFile(lib.split('/').pop().replace(/\.dwp$/i, '') + '.dwp'),   // a DirectWave library program the owner copied into the library
+      findDwp: (lib) => lib2(/\.dwp$/i.test(lib) ? lib : lib + '.dwp'),   // a DirectWave program the owner has on the device (FLM's library or their own)
+      findLib: (p) => lib2(p),                                         // a sample not in the archive but already on the device
       fxMode,
       ensureSoundFont: async (path) => { if (!eng.fileSize(path)) { const r = await fetch('demos/SoundFonts/' + path.split('/').pop()); if (r.ok) await eng.saveBytes(path, await r.arrayBuffer()); } },
     };
@@ -78,7 +80,7 @@ function fxSections(fx) {
 function report(r, secs) {
   const R = r.report;
   const body = h('div', { class: 'imp-rep' },
-    h('div', { class: 'sv' }, `Dari ${r.app}: ${R.tracks} track, ${R.clips} klip${R.pitched ? ` (${R.pitched} klip audio dengan pitch)` : ''}, ${R.notes} not, ${R.samplesFound} sample ditemukan, dalam ${secs.toFixed(1)} dtk. Tersimpan sebagai Projects/${r.name}.mdaw.`),
+    h('div', { class: 'sv' }, `Dari ${r.app}: ${R.tracks} track, ${R.clips} klip${R.pitched ? ` (${R.pitched} klip audio dengan pitch)` : ''}, ${R.notes} not, ${R.samplesFound} sample ditemukan${R.samplesFromLib ? ` (${R.samplesFromLib} dari folder perangkat)` : ''}, dalam ${secs.toFixed(1)} dtk. Tersimpan sebagai Projects/${r.name}.mdaw.`),
     sec('Instrumen', (R.instruments || []).map((x) => `${x.track}: ${x.from} \u2192 ${x.to}`)),
     sec('Presisi', R.precision || []),
     ...fxSections(r.fx),

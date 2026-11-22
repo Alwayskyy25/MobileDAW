@@ -894,6 +894,23 @@ export function findLibFile(name, dir) {
   for (const top of ['/Samples', '/FLM', '/Recordings', '/SoundFonts', '/Exports']) for (const d of (eng.allDirs ? eng.allDirs(top) : [top])) { const f = hit(d); if (f) return f; }
   return null;
 }
+// The library as a lookup for an imported project's files: find(path) -> the device file with that name (case / Unicode tolerant) whose
+// folders match the most trailing folders of `path` ("My Samples/Kicks/k.wav" prefers .../Kicks/k.wav), or null. exclude: a folder to
+// skip (the import's own placeholders). Built once per import: one pass over the library folders.
+export function libIndex(exclude = '/_missing/') {
+  const fold = (x) => String(x).normalize('NFC').toLowerCase(), by = new Map();
+  if (eng.listDir) for (const top of ['/FLM', '/Samples', '/Recordings', '/SoundFonts', '/Exports']) for (const d of (eng.allDirs ? eng.allDirs(top) : [top])) {
+    if (exclude && (d + '/').includes(exclude)) continue;
+    const r = eng.listDir(d); for (const it of (r && r.items) || []) if (!it.dir) { const k = fold(it.name); if (!by.has(k)) by.set(k, []); by.get(k).push(d + '/' + it.name); }
+  }
+  return (path) => {
+    const parts = String(path || '').replace(/\\/g, '/').split('/').filter(Boolean), base = parts.pop(); if (!base) return null;
+    const hits = by.get(fold(base)); if (!hits) return null;
+    let best = hits[0], top = -1;
+    for (const h of hits) { const dp = h.split('/').filter(Boolean); dp.pop(); let n = 0; for (let a = parts.length - 1, b = dp.length - 1; a >= 0 && b >= 0 && fold(parts[a]) === fold(dp[b]); a--, b--) n++; if (n > top) { top = n; best = h; } }
+    return best;
+  };
+}
 // a DirectWave program (.dwp, js/dwp.js) into DirectWave (30): its zones replace the track's (16 at most). Embedded audio is saved next to the
 // program as .wav / .flac (Samples/DirectWave/<program>/) so the project refers to plain files; a zone's file is looked up by name in the
 // .dwp's folder, then the whole library. Attack / Release from the program's last zone. Returns { zones, missing: [names], error }.

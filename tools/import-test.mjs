@@ -339,8 +339,31 @@ if (process.env.FLM_ZIP && fs.existsSync(process.env.FLM_ZIP)) {
 {
   const MD = { app: 'FL Studio Mobile', name: 'D', bpm: 120, channels: [{ kind: 'master', name: 'MASTER', number: 0, gain: 1, pan: 0, sends: [], tracks: [], pads: [], modules: [] },
     { kind: 'track', name: 'Piano', number: 1, gain: 1, pan: 0, sends: [], pads: [], modules: [], instrument: { kind: 'directwave', name: 'DirectWave', library: 'DirectWave Samples/Keyboard/Grand Piano.dwp' }, tracks: [] }] };
-  const withLib = buildMdaw(MD, { root: '/S', has: () => true, findDwp: (lib) => (/Grand Piano/.test(lib) ? '/Samples/Progs/Grand Piano.dwp' : null) }).json.tracks[0].inst;
-  const without = buildMdaw(MD, { root: '/S', has: () => true }).json.tracks[0].inst;
+  const wavOnly = (p) => (/\.wav$/i.test(p) ? p : null);
+  const withLib = buildMdaw(MD, { root: '/S', resolve: wavOnly, findDwp: (lib) => (/Grand Piano/.test(lib) ? '/Samples/Progs/Grand Piano.dwp' : null) }).json.tracks[0].inst;
+  const without = buildMdaw(MD, { root: '/S', resolve: wavOnly }).json.tracks[0].inst;
   ok(withLib && withLib.type === 30 && withLib.dwp === '/Samples/Progs/Grand Piano.dwp' && without && without.type === 6, 'DirectWave library program: the .dwp from the library when there is one (' + (withLib && withLib.type) + '), else the GM SoundFont (' + (without && without.type) + ')');
+}
+// a DirectWave program inside the archive: used (copied with the sample its zone names), never the GM stand-in; a sample that is not in the
+// archive but already on the device: used where it is (not copied, not missing)
+{
+  const rec = (tag, body) => { const b = new Uint8Array(12 + body.length), dv = new DataView(b.buffer); dv.setUint32(0, tag, true); dv.setUint32(4, body.length, true); b.set(body, 12); return b; };
+  const cat = (...a) => { const o = new Uint8Array(a.reduce((n, x) => n + x.length, 0)); let k = 0; for (const x of a) { o.set(x, k); k += x.length; } return o; };
+  const fmt = new Uint8Array(32), fv = new DataView(fmt.buffer); fv.setUint32(0, 1000, true); fv.setUint32(8, 1, true); fv.setFloat32(16, 44100, true);
+  const z0 = new Uint8Array(25); z0.set([60, 0, 127, 0, 127]); new DataView(z0.buffer).setFloat32(9, 1, true);
+  const zone = cat(rec(0x1f4, z0), rec(0x1f6, new TextEncoder().encode('C:/x/My Samples/Pno C4.wav\0')), rec(0x1f7, fmt));
+  const dwp = cat(new TextEncoder().encode('DwPr'), new Uint8Array([38, 0, 0, 0]), rec(1, rec(3, zone)));
+  const arc = new Map([['My Programs/Soft Keys.dwp', dwp], ['My Samples/Pno C4.wav', new Uint8Array(4)]]);
+  const res = (p) => { const k = p.replace(/^\/+/, ''); if (arc.has(k)) return k; for (const e of arc.keys()) if (e.split('/').pop().toLowerCase() === k.split('/').pop().toLowerCase()) return e; return null; };
+  const MP = { app: 'FL Studio Mobile', name: 'D', bpm: 120, channels: [{ kind: 'master', name: 'MASTER', number: 0, gain: 1, pan: 0, sends: [], tracks: [], pads: [], modules: [] },
+    { kind: 'track', name: 'Keys', number: 1, gain: 1, pan: 0, sends: [], pads: [], modules: [], instrument: { kind: 'directwave', name: 'DirectWave', library: 'My Programs/Soft Keys.dwp' }, tracks: [] },
+    { kind: 'track', name: 'Lead', number: 2, gain: 1, pan: 0, sends: [], pads: [], modules: [], instrument: { kind: 'directwave', name: 'DirectWave', layers: [{ sample: 'My Samples/Lead/lead C5.wav', root: 72 }] }, tracks: [] }] };
+  const B = buildMdaw(MP, { root: '/FLM/D', resolve: res, read: (rel) => arc.get(rel), findLib: (p) => (/lead C5\.wav$/.test(p) ? '/FLM/Old/My Samples/Lead/lead C5.wav' : null) });
+  const keys = B.json.tracks[0].inst, lead = B.json.tracks[1].inst, srcs = B.files.map((f) => f.src);
+  ok(keys.type === 30 && keys.dwp === '/FLM/D/My Programs/Soft Keys.dwp' && srcs.includes('My Programs/Soft Keys.dwp') && srcs.includes('My Samples/Pno C4.wav'),
+    'a .dwp in the archive: DirectWave with that program, copied with the sample its zone names (' + keys.type + ', ' + keys.dwp + ')');
+  const lf = B.files.find((f) => f.lib);
+  ok(lead.type === 30 && lead.zones[0].sample.path === '/FLM/Old/My Samples/Lead/lead C5.wav' && !lead.zones[0].missing && lf && !B.report.samplesMissing.length && B.report.samplesFromLib === 1,
+    'a sample missing from the archive but on the device: used where it is, not a silent placeholder (' + lead.zones[0].sample.path + ')');
 }
 console.log(bad ? `\n${bad} FAILED` : '\nimport-test: all passed'); process.exit(bad ? 1 : 0);

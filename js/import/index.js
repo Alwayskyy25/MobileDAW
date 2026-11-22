@@ -54,14 +54,21 @@ export async function importProject(fileName, buf, io, onProgress = () => {}) {
   const name = safeName(M.name || projName.replace(/\.\w+$/, ''));
   // sample lookup: exact relative path, else the same file name anywhere in the archive (desktop projects store absolute paths)
   const byBase = new Map();
-  for (const k of entries.keys()) { const b = k.split('/').pop().toLowerCase(); if (!byBase.has(b)) byBase.set(b, k); }
-  const resolve = (p) => { const k = norm(p); if (entries.has(k)) return k; for (const e of entries.keys()) if (k.endsWith('/' + e) || e.endsWith('/' + k)) return e; return byBase.get(k.split('/').pop().toLowerCase()) || null; };
+  // (names compared case-insensitively and Unicode-normalised: a zip from another phone may store "é" decomposed)
+  const fold = (x) => x.normalize('NFC').toLowerCase(), byPath = new Map();
+  for (const k of entries.keys()) { const b = fold(k.split('/').pop()); if (!byBase.has(b)) byBase.set(b, k); byPath.set(fold(k), k); }
+  const resolve = (p) => {
+    const k = norm(p); if (!k) return null; if (entries.has(k)) return k;
+    const f = fold(k); if (byPath.has(f)) return byPath.get(f);
+    for (const [fe, e] of byPath) if (f.endsWith('/' + fe) || fe.endsWith('/' + f)) return e;
+    return byBase.get(fold(k.split('/').pop())) || null;
+  };
   // 3. convert (30 - 35 %)
   onProgress(0.3, 'Mengonversi track, klip dan efek…'); await yieldUI();
   // FL Studio Mobile samples go to FLM/<project>/<their folders> (e.g. FLM/My Song/My Samples/...); other formats to Samples/Imports/<project>
   const root = (io.home || '') + (kind === 'flm' ? '/FLM/' : '/Samples/Imports/') + name;
   const relName = (e) => (projDir && e.startsWith(projDir + '/') ? e.slice(projDir.length + 1) : e);
-  const { json, files, report } = buildMdaw(M, { root, resolve, relName, findDwp: io.findDwp });
+  const { json, files, report } = buildMdaw(M, { root, resolve, relName, findDwp: io.findDwp, findLib: io.findLib, read: (rel) => entries.get(rel) });
   json.name = name;
   // 3b. FL Studio Mobile modules -> the same module on FLM's own DSP (C++, exact values, always); other modules MDAW does not have -> stock
   //     plugins where the sound is kept (io.fxMode 'map' | 'all'; 'none' = only the exact FLM modules)
@@ -70,6 +77,7 @@ export async function importProject(fileName, buf, io, onProgress = () => {}) {
   // 4. samples (35 - 70 %)
   for (let k = 0; k < files.length; k++) {
     const f = files[k];
+    if (f.lib) continue;                                        // already on the device: used where it is
     onProgress(0.36 + 0.34 * k / Math.max(1, files.length), `Menyalin sample ${k + 1}/${files.length}…`);
     await io.saveBytes(f.path, f.missing ? silentWav() : entries.get(f.src));
     if (k % 4 === 3) await yieldUI();

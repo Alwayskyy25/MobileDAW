@@ -6,6 +6,7 @@
 //   - a DirectWave / sampler instrument whose sample is missing keeps its pattern (notes) and shows the missing program in its card;
 //   - a drum pad whose sample is missing keeps its steps (the pad is muted until a sample is loaded).
 // Model units: beats, linear gain (1 = default level), pan -1..1.
+import { parseDwp } from '../dwp.js';
 import { DEVICES, PRESETS, INSTRUMENTS, FLM_FMT } from '../defs.js';
 import { FLMFX } from '../flmfx.js';
 import { gmFor, GM_SF } from './gm.js';
@@ -140,8 +141,12 @@ export function buildMdaw(M, opts) {
     const key = String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
     if (!files.has(key)) {
       const rel = key ? resolve(key) : null, base = (key.split('/').pop() || name || 'sample').replace(/\.[^.]+$/, '');
-      files.set(key, rel ? { path: root + '/' + (opts.relName ? opts.relName(rel) : rel), missing: false, src: rel } : { path: root + '/_missing/' + safeName(base) + '.wav', missing: true, src: key, name: base });
-      const ok = !!rel;
+      // not in the archive: the same file already on the device (the owner's FLM / Samples folders, found by name, the closest folder path
+      // first) is used where it is, nothing copied; else a silent placeholder keeps the clip / zone
+      const lib = !rel && key && opts.findLib ? opts.findLib(key) : null;
+      files.set(key, rel ? { path: root + '/' + (opts.relName ? opts.relName(rel) : rel), missing: false, src: rel } : lib ? { path: lib, missing: false, lib: true, src: key }
+        : { path: root + '/_missing/' + safeName(base) + '.wav', missing: true, src: key, name: base });
+      const ok = !!(rel || lib); if (lib) report.samplesFromLib = (report.samplesFromLib || 0) + 1;
       if (ok) report.samplesFound++; else report.samplesMissing.push(key || name || '?');
     }
     return files.get(key);
@@ -211,7 +216,17 @@ export function buildMdaw(M, opts) {
     }
     // a library program (built into FL Studio Mobile, never in the archive): its .dwp from the MobileDAW library when the owner has copied it
     // there (same file name), loaded with all its zones when the project opens (project.js loadDwpProgram); else the General MIDI stand-in
-    const dwpPath = I.library && opts.findDwp ? opts.findDwp(I.library) : null;
+    // the program itself: in the archive (copied with the samples its zones name, so it loads as in FLM), else on the device
+    let dwpPath = null;
+    if (I.library && !/\.(sf2|flmpst)$/i.test(I.library)) {
+      const lp = I.library.replace(/\\/g, '/').replace(/^\/+/, ''), name = /\.dwp$/i.test(lp) ? lp : lp + '.dwp', rel = resolve(name);
+      if (rel && /\.dwp$/i.test(rel)) {
+        dwpPath = sample(name).path;
+        let prog = null; try { const b = opts.read && opts.read(rel); prog = b ? parseDwp(b) : null; } catch (_) { prog = null; }
+        if (prog) for (const z of prog.zones) if (z.file && !z.audio && resolve(z.file)) sample(z.file);   // a zone without embedded audio: its file, looked up by name next to the program when it loads
+      }
+    }
+    if (!dwpPath && I.library && opts.findDwp) dwpPath = opts.findDwp(I.library);
     if (dwpPath) { note('DirectWave: program "' + I.library.replace(/^.*\//, '') + '" dari pustaka (' + dwpPath + ')', 'exact'); return { type: 30, params: {}, pitch: 0, zones: [], dwp: dwpPath, from: { app: M.app, name: I.name, preset: I.preset || '', library: I.library } }; }
     const gm = I.library ? gmFor(I.library) : null;
     if (gm) { needSf = true; note('SoundFont GM: ' + gm.name + ' (pengganti program library yang tidak ada di arsip)', 'substitute'); return { type: 6, params: { 0: 0.8 }, pitch: 0, sf: { path: GM_SF, preset: gm.program }, sub: { from: I.name, library: gm.label, gm: gm.name } }; }
