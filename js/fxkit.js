@@ -437,29 +437,55 @@ V[31] = (k) => {
     const c = h('div', { class: 'lk-cell' }, ib, k.T(b * 5, String(b + 1), { cls: 'lk-eqon', w: 34 })); c.addEventListener('pointerdown', () => { if (sel !== b) { sel = b; fillCtl(); } }, true); return c; }));
   return k.row(ctlBox, k.sep(), k.col(disp, cells), k.sep(), h('div', { class: 'lk-col lk-eqr' }, k.TL('Scale', k.N(40, { w: 64 })), k.TL('Gain', k.N(41, { w: 64 }))));
 };
-// Spectrum: Block / Channel / Avg / Graph / Max / Scale X / Auto | spectrum display (L+R or one channel, bins or line, peak hold)
+// Spectrum, as Live's: Block / Channel | Refresh / Avg | Graph (Line / Bins) + Max, Scale X, Auto + Range | the analyser filling the rest:
+// a dark plot with the fine log grid (every 2..9 of each decade, 100 / 1k / 10k stronger and named along the top), a line every 12 dB
+// named inside on the left, the spectrum as a bright cyan line (no fill; Bins = bars) and the peak hold (Max) as a darker teal line above it.
+// Auto fits the top of the range to the signal; off = Range Max .. Range Min. Refresh = how often the plot updates.
+const SPEC = { line: '#5fd4f5', max: '#2b8aa6', bar: 'rgba(79,195,240,.9)', minor: 'rgba(255,255,255,.055)', major: 'rgba(255,255,255,.16)', h: 'rgba(255,255,255,.11)', ink: '#9b9ea4' };
 V[32] = (k) => {
-  let sp = null, mx = null; const W = 380, H = 232;
-  const disp = k.D(W, H, (g) => {
-    const lin = Math.round(k.get(5)) === 0, auto = k.get(6) > 0.5; let lo = -120, hi = 0;
-    if (sp && auto) { let a = -200, b = 0; for (const v of sp) { if (v > a) a = v; } hi = Math.min(0, Math.ceil(a / 6) * 6 + 6); lo = hi - 72; }
-    const yd = (db) => 4 + (hi - Math.max(lo, Math.min(hi, db))) / (hi - lo) * (H - 18), N = sp ? sp.length : 256;
-    g.fillStyle = DISPC.grid; for (let d = Math.ceil(lo / 12) * 12; d <= hi; d += 12) { g.fillRect(0, Math.round(yd(d)), W, 1); label(g, String(d), 3, yd(d) - 2, DISPC.ink, 14); }
-    const st = Math.round(k.get(5)) === 2;
-    if (st) for (let o = 1; o <= 9; o++) { const f = 32.703 * Math.pow(2, o - 1), x = Math.log(f / 20) / Math.log(1000) * W; g.fillRect(Math.round(x), 0, 1, H - 12); label(g, 'C' + o, x + 2, H - 2, DISPC.ink, 8); }
-    else if (!lin) for (const f of [100, 1000, 10000]) { const x = Math.log(f / 20) / Math.log(1000) * W; g.fillRect(Math.round(x), 0, 1, H - 12); label(g, f >= 1000 ? f / 1000 + 'k' : String(f), x - 8, 16, DISPC.ink, 15); }
-    else for (const f of [5000, 10000, 15000, 20000]) { const x = f / (SR / 2) * W; g.fillRect(Math.round(x), 0, 1, H - 12); label(g, f / 1000 + 'k', x + 2, H - 2, DISPC.ink, 8); }
-    if (!sp) return;
-    if (Math.round(k.get(3)) === 1) { g.fillStyle = 'rgba(79,195,240,.85)'; for (let b = 0; b < N; b++) { const x = b / N * W, y = yd(sp[b]); g.fillRect(x, y, Math.max(1, W / N - 0.5), H - 12 - y); } }
-    else lvPath(g, Array.from(sp, (v, b) => [b / (N - 1) * W, yd(v)]), DISPC.bl, H - 12, 1.4);
-    if (k.get(4) > 0.5 && mx) lvPath(g, Array.from(mx, (v, b) => [b / (N - 1) * W, yd(v)]), DISPC.or, null, 1);
+  let sp = null, mx = null, top = null, last = 0;
+  const disp = k.DF(500, 232, (g, W, H) => {
+    const sc = Math.round(k.get(5)), lin = sc === 0, auto = k.get(6) > 0.5, rmax = k.get(8), rmin = Math.min(k.get(9), rmax - 12);
+    let hi = rmax, lo = rmin;
+    if (auto && top != null) { hi = top; lo = Math.min(rmin, hi - 24); }
+    const yd = (db) => 2 + (hi - Math.max(lo - 6, Math.min(hi, db))) / (hi - lo) * (H - 4), xf = (f) => (lin ? f / (SR / 2) : Math.log(f / 20) / Math.log(1000)) * W;
+    // the frequency grid: Lin = every 1 kHz (5k stronger); Log / ST = 2..9 of every decade fine, 100 / 1k / 10k strong
+    if (lin) for (let f = 1000; f < SR / 2; f += 1000) { g.fillStyle = f % 5000 ? SPEC.minor : SPEC.major; g.fillRect(Math.round(xf(f)), 0, 1, H); }
+    else for (let dec = 10; dec <= 10000; dec *= 10) for (let m = 1; m < 10; m++) { const f = dec * m; if (f < 20 || f > 20000) continue; g.fillStyle = m === 1 && dec >= 100 ? SPEC.major : SPEC.minor; g.fillRect(Math.round(xf(f)), 0, 1, H); }
+    for (let d = Math.ceil(hi / 12) * 12; d >= lo; d -= 12) { const y = Math.round(yd(d)); g.fillStyle = SPEC.h; g.fillRect(0, y, W, 1); }
+    // the curves (Max behind), then the labels on top so they stay readable
+    const N = sp ? sp.length : 0, X = (b) => (b + 0.5) / N * W;
+    const line = (arr, col, lw) => { g.beginPath(); for (let b = 0; b < N; b++) { const x = X(b), y = yd(arr[b]); if (b) g.lineTo(x, y); else g.moveTo(x, y); } g.strokeStyle = col; g.lineWidth = lw; g.lineJoin = 'round'; g.stroke(); };
+    if (N && k.get(4) > 0.5 && mx && mx.length === N) line(mx, SPEC.max, 1.3);
+    if (N && Math.round(k.get(3)) === 1) { g.fillStyle = SPEC.bar; const bw = Math.max(1, W / N - 1); for (let b = 0; b < N; b++) { const y = yd(sp[b]); g.fillRect(b / N * W, y, bw, H - y); } }
+    else if (N) line(sp, SPEC.line, 1.5);
+    g.font = '500 12px system-ui,sans-serif'; g.textBaseline = 'middle'; g.fillStyle = SPEC.ink; g.textAlign = 'left';
+    for (let d = Math.ceil(hi / 12) * 12; d >= lo; d -= 12) { const y = yd(d); if (y > 8 && y < H - 6) g.fillText(String(d), 4, y); }
+    g.textBaseline = 'top'; g.textAlign = 'center';
+    if (sc === 2) for (let o = 1; o <= 9; o++) { const x = xf(32.703 * Math.pow(2, o - 1)); if (x > 30 && x < W - 10) g.fillText('C' + o, x, 3); }
+    else if (lin) for (let f = 5000; f < SR / 2; f += 5000) g.fillText(f / 1000 + 'k', xf(f), 3);
+    else for (const f of [100, 1000, 10000]) g.fillText(f >= 1000 ? f / 1000 + 'k' : String(f), xf(f), 3);
+    g.textAlign = 'left';
   });
-  disp.classList.add('lk-hero');
-  k.every(60, () => { const r = k.out(); if (r.length) { sp = r; if (k.get(4) > 0.5) { mx = mx && mx.length === r.length ? mx.map((v, j) => Math.max(v - 0.15, r[j])) : r.slice(); } else mx = null; disp.paint(); } });
-  // Live: a compact settings column in groups split by thin rules (Block / Channel | Avg | Graph + Max, Scale X, Auto) and the analyser filling the rest
-  const hr = () => h('div', { class: 'lk-hr' });
-  return k.row(h('div', { class: 'lk-col lk-spl' }, k.LN('Block', k.S(0, { w: 76 })), hr(), k.LN('Channel', k.CH(1, ['L', 'R', 'L+R'])), hr(), k.LN('Avg', k.N(2, { w: 60 })), hr(),
-    k.LN('Graph', k.row(k.CH(3, ['Line', 'Bins']), k.T(4, 'Max', { w: 40 }))), k.LN('Scale X', k.CH(5, ['Lin', 'Log', 'ST'])), k.row(k.T(6, 'Auto', { w: 48 }))), disp);
+  disp.classList.add('lk-hero', 'lk-spec');
+  k.every(15, () => {
+    const now = performance.now(); if (now - last < k.get(7)) return; last = now;
+    const r = k.out(); if (!r.length) return;
+    sp = r;
+    if (k.get(4) > 0.5) mx = mx && mx.length === r.length ? mx.map((v, j) => Math.max(v - 0.05, r[j])) : r.slice(); else mx = null;
+    let pk = -200; for (const v of r) if (v > pk) pk = v;
+    const want = Math.min(0, Math.ceil((pk + 3) / 12) * 12);           // Auto: the top follows the loudest bin (up at once, down slowly)
+    top = top == null || want > top ? want : top - Math.min(top - want, 0.25);
+    disp.paint();
+  });
+  const hr = () => h('div', { class: 'lk-hr' }), dim = (el) => { const upd = () => el.classList.toggle('off', k.get(6) > 0.5); k.reg({ update: upd }, 6); upd(); return el; };
+  return k.row(h('div', { class: 'lk-col lk-spl' },
+    k.LN('Block', k.S(0, { w: 84 })), hr(),
+    k.LN('Channel', k.CH(1, ['L', 'R', 'L+R'])), hr(),
+    k.LN('Refresh', k.N(7, { w: 84 })), k.LN('Avg', k.N(2, { w: 84 })), hr(),
+    k.LN('Graph', k.row(k.CY(3, ['Line', 'Bins'], { w: 50 }), k.T(4, 'Max', { w: 44 }))),
+    k.LN('Scale X', k.CH(5, ['Lin', 'Log', 'ST'])),
+    h('div', { class: 'lk-ln lk-specr' }, k.T(6, 'Auto', { w: 52, cls: 'lk-blue' }), dim(h('div', { class: 'lk-row lk-rng' }, k.N(8, { w: 50, fill: false }), h('span', {}, '-'), k.N(9, { w: 54, fill: false }))))), disp);
 };
 
 // ================================================================================================ Live 12 set, part 2 (engine: js/engine/fx4.js)

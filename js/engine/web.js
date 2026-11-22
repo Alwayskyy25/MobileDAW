@@ -6,7 +6,7 @@ import { parseSf2 } from './sf2.js';
 import { encodeWav, finishRender, postRender } from './wav.js';
 import { Mp3Encoder, mp3Rate, MP3_RATES, concatBytes } from './mp3.js';
 import { makeZip } from '../zip.js';
-import { buildPyramid } from '../waveform.js';
+import { buildPyramid, buildPyramidAsync, yieldTask } from '../waveform.js';
 import * as FS from '../storage.js';
 import { log } from '../log.js';
 import { prefs } from '../prefs.js';
@@ -14,7 +14,7 @@ import { isNativeApp, saveAndShare, subFor, pickerAccept, accepts } from '../nat
 import { createNativeSink } from './nativesink.js';
 
 export const FOLDERS = ['/Samples', '/SoundFonts', '/Recordings', '/Projects', '/Exports', '/Presets/Mixer', '/Presets/Instruments', '/FLM'];   // FLM/<project>/<sample folders>: samples of imported FL Studio Mobile projects
-const NO_MIRROR = /\/_autosave\.mdaw$/;   // rewritten every few seconds: stays in the app's own storage only
+const NO_MIRROR = /\/_autosave\.mdaw$|^\/\.cache\//;   // rewritten every few seconds / render cache: stays in the app's own storage only
 const TEXT_RE = /\.(mdaw|json)$/i;
 const dcache = new Map(); let dbytes = 0; const DMAX = 2e9;   // decoded samples (LRU): a preview makes the following "add" instant, and re-adding costs no decode
 const dcDrop = (path) => { const d = dcache.get(path); if (d) { dbytes -= d.bytes; dcache.delete(path); } };
@@ -386,7 +386,7 @@ export function createWebBackend() {
     const ab = bytes instanceof ArrayBuffer ? bytes : ArrayBuffer.isView(bytes) ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : bytes;
     const buf = await st.ctx.decodeAudioData(ab);                      // bytes is a fresh copy from IndexedDB / the folder: no slice needed
     if (buf.length * 2 > 90e6) throw new Error('Audio terlalu panjang untuk dimuat ke RAM (maks sekitar 8 menit stereo).');
-    const l = buf.getChannelData(0).slice(), r = buf.numberOfChannels > 1 ? buf.getChannelData(1).slice() : l;
+    const l = buf.getChannelData(0), r = buf.numberOfChannels > 1 ? buf.getChannelData(1) : l;   // the AudioBuffer's own data: no copy (the engine gets its own)
     const d = { l, r, sr: buf.sampleRate, bytes: (l === r ? 1 : 2) * l.byteLength, pk: null, pyr: null };
     dcache.set(path, d); dbytes += d.bytes;
     for (const [k, v] of dcache) { if (dbytes <= DMAX || dcache.size <= 1) break; if (k !== path) { dbytes -= v.bytes; dcache.delete(k); } }
@@ -404,15 +404,17 @@ export function createWebBackend() {
   me.loadSample = async (id, path) => {
     try {
       const d = await decode(path), { l, r, sr } = d;
+      await yieldTask();                                     // a big file: decode, hand-over and waveform each in their own task, so the UI keeps drawing
       st.bank[id] = { l, r };
       st.node.port.postMessage({ c: 'sample', id, l, r });   // structured clone = a copy: the main thread keeps its own for WAV export
       if (nat.mirror) nat.sink.sample(id, l, r);
-      d.pyr = d.pyr || buildPyramid(l, r);                   // built once per file, shared with the preview and later re-adds
+      await yieldTask();
+      d.pyr = d.pyr || await buildPyramidAsync(l, r);        // built once per file (in slices), shared with the preview and later re-adds
       return { id, duration: l.length / sr, peaks: peaksFromPyr(d.pyr, 2048), pyr: d.pyr };
     } catch (e) { return { error: e.message || String(e) }; }
   };
   // direct buffer registration (reversed / stretched / recorded audio)
-  me.putSampleBuffers = async (id, l, r) => { await me.start(); st.bank[id] = { l, r }; st.node.port.postMessage({ c: 'sample', id, l, r }); if (nat.mirror) nat.sink.sample(id, l, r); const pyr = buildPyramid(l, r); return { id, duration: l.length / st.ctx.sampleRate, peaks: peaksFromPyr(pyr, 2048), pyr }; };
+  me.putSampleBuffers = async (id, l, r) => { await me.start(); st.bank[id] = { l, r }; st.node.port.postMessage({ c: 'sample', id, l, r }); if (nat.mirror) nat.sink.sample(id, l, r); await yieldTask(); const pyr = await buildPyramidAsync(l, r); return { id, duration: l.length / st.ctx.sampleRate, peaks: peaksFromPyr(pyr, 2048), pyr }; };
   me.sampleBuffers = (id) => st.bank[id];
   // ---- sample preview for the file browser (plays straight to the output, independent of the project transport)
   const pv = { src: null, tok: 0, t0: 0, dur: 0 };
@@ -771,7 +773,11 @@ export function createWebBackend() {
   me.cancelExport = () => { st.cancel = true; return true; };
 
   me.syncFolder = (onProgress) => lib.sync(onProgress);
-  me.init = async () => { await lib.init(); await FS.initStorage(); await Promise.race([lib.sync().catch((e) => log('warn', 'sinkron folder gagal', e)), new Promise((r) => setTimeout(r, 8000))]);
+  // start-up does not wait for the folder scan: the library index (IndexedDB) already knows the files of earlier sessions, so the last
+  // project opens at once; the scan goes on behind it (whenSynced) and a sample it could not find yet is tried again once the scan is done
+  me.whenSynced = () => me.syncing || null;             // the running scan (a promise), or null
+  me.init = async () => { await lib.init(); await FS.initStorage();
+    me.syncing = lib.sync().then((r) => { if (r && (r.added || r.removed)) { try { window.dispatchEvent(new CustomEvent('libchange')); } catch (_) { /* no window */ } } return r; }).catch((e) => log('warn', 'sinkron folder gagal', e)).finally(() => { me.syncing = null; });
     let lastSync = Date.now();                              // coming back from the file manager: pick up new / changed / removed files by itself
     document.addEventListener('visibilitychange', () => { if (!document.hidden && FS.active() && Date.now() - lastSync > 15000) { lastSync = Date.now(); lib.sync().then((r) => { if (r && (r.added || r.removed)) { try { window.dispatchEvent(new CustomEvent('libchange')); } catch (_) { /* no window */ } } }).catch(() => {}); } });
   };   // a slow folder scan goes on in the background instead of holding up start-up

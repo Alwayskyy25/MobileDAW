@@ -2097,3 +2097,10 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .ldm-bar i { display: block; height: 100%; width: 0; background: var(--accent, #ffad56); transition: width .15s linear; }
 @keyframes ldm-in { from { opacity: 0; transform: translate(-50%, -3px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .reduce-motion .ldm { animation: none; }
+/* Spectrum (Live): the Range fields dim while Auto fits the range by itself; the plot fills the rest of the device */
+.lk-specr { gap: 6px; }
+.lk-rng { gap: 3px; align-items: center; }
+.lk-rng.off { opacity: .45; }
+.lk-spec { min-width: 380px; }
+.lk .lv-btn.lk-blue.on, .lv-btn.lk-blue.on { background: #4fc3f0 !important; border-color: #4fc3f0 !important; color: #0d1b22 !important; }   /* Live: Spectrum's Auto is the blue toggle */
+.lk-spec { min-width: 500px; }

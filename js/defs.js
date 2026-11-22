@@ -474,7 +474,9 @@ Object.assign(DEVICES, {
     q((b + 1) + ' Freq', 10, 22000, [30, 100, 250, 1000, 2500, 5000, 10000, 18000][b], { curve: 'log', unit: 'Hz' }), q((b + 1) + ' Gain', -15, 15, 0, { unit: 'dB' }), q((b + 1) + ' Q', 0.1, 18, 0.71, { curve: 'log', unit: '' })]).flat(),
     q('Scale', -2, 2, 1, { fmt: 'width' }), q('Gain', -12, 12, 0, { unit: 'dB' })] };
   D[32] = { name: 'Spectrum', kit: true, params: [list('Block', ['1024', '2048', '4096', '8192', '16384'], 2), list('Channel', ['L', 'R', 'L+R'], 2), q('Avg', 1, 20, 4, { step: 1, fmt: 'num' }),
-    list('Graph', ['Line', 'Bins'], 0), onoff('Max'), list('Scale X', ['Lin', 'Log', 'ST'], 1), onoff('Auto', 1)] };
+    list('Graph', ['Line', 'Bins'], 0), onoff('Max'), list('Scale X', ['Lin', 'Log', 'ST'], 1), onoff('Auto', 1),
+    // Live's Refresh (display update interval) and Range (the dB span shown when Auto is off): display only, the engine does not read them
+    q('Refresh', 10, 1000, 60, { curve: 'log', unit: 'ms' }), q('Range Max', -60, 0, -15, { step: 1, fmt: 'num' }), q('Range Min', -200, -40, -140, { step: 1, fmt: 'num' })] };
 }
 
 // ---- Live 12 effects, part 2 (engine: js/engine/fx4.js)

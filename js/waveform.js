@@ -29,6 +29,34 @@ export function buildPyramid(l, r) {
   return { l, r, mono, lv };
 }
 
+// a new task (not a microtask): the browser can draw a frame and handle taps in between. MessageChannel: no 4 ms timer clamp.
+export const yieldTask = () => new Promise((res) => { if (typeof MessageChannel === 'undefined') { setTimeout(res, 0); return; } const c = new MessageChannel(); c.port1.onmessage = () => { c.port1.close(); res(); }; c.port2.postMessage(0); });
+// buildPyramid in slices of about 256k samples with a task break after each: the same result, no long freeze on a long file
+export async function buildPyramidAsync(l, r) {
+  const n = l.length, mono = r === l;
+  if (n <= 1 << 19) return buildPyramid(l, r);
+  const nb0 = Math.ceil(n / B0), mn = new Float32Array(nb0), mx = new Float32Array(nb0), STEP = 4096;
+  for (let b0 = 0; b0 < nb0; b0 += STEP) {
+    for (let b = b0, be = Math.min(nb0, b0 + STEP); b < be; b++) {
+      let lo = Infinity, hi = -Infinity;
+      for (let i = b * B0, e = Math.min(n, i + B0); i < e; i++) {
+        const a = l[i]; if (a < lo) lo = a; if (a > hi) hi = a;
+        if (!mono) { const c = r[i]; if (c < lo) lo = c; if (c > hi) hi = c; }
+      }
+      if (lo === Infinity) { lo = 0; hi = 0; }
+      mn[b] = lo; mx[b] = hi;
+    }
+    await yieldTask();
+  }
+  const lv = [{ size: B0, mn, mx }]; let a = mn, z = mx, nb = nb0;
+  while (nb > 256) {
+    const nn = Math.ceil(nb / GROW), mn2 = new Float32Array(nn), mx2 = new Float32Array(nn);
+    for (let b = 0; b < nn; b++) { let lo = Infinity, hi = -Infinity; for (let i = b * GROW, e = Math.min(nb, i + GROW); i < e; i++) { if (a[i] < lo) lo = a[i]; if (z[i] > hi) hi = z[i]; } mn2[b] = lo; mx2[b] = hi; }
+    a = mn2; z = mx2; nb = nn; lv.push({ size: lv[lv.length - 1].size * GROW, mn: a, mx: z });
+  }
+  return { l, r, mono, lv };
+}
+
 let MN = 0, MX = 0;
 function range(p, a, b) {                                       // min / max over samples [a, b) -> MN, MX
   const n = p.l.length;

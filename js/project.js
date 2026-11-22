@@ -1782,8 +1782,10 @@ async function loadAssets({ missing }, gen, onProgress) {
   const touch = (t) => { dirty.add(t); if (!flushT) flushT = setTimeout(flush, 150); };
   const sampleJob = (s) => async () => {
     say('Memuat sample: ' + s.name);
-    const r = await loadSampleObj(s.path);
+    let r = await loadSampleObj(s.path);
     if (!live()) return;
+    const scan = !r && eng.whenSynced && eng.whenSynced();         // not found while the folder is still being scanned: once more after the scan
+    if (scan && typeof scan.then === 'function') { say('Menunggu pemindaian folder: ' + s.name); await scan; if (!live()) return; if (!state.samples[s.path]) state.samples[s.path] = s; r = await loadSampleObj(s.path); if (!live()) return; }
     step();
     if (!r) { failed.add(s); missing.push(s.path); }
     for (const t of [...state.tracks]) {                         // everything that uses it: its stretch / pitch renders, then a re-sync
@@ -2020,6 +2022,41 @@ async function renderAudio(l, r, opts) {
   await new Promise((res) => setTimeout(res, 0));
   return processBuffers(l, r, opts);
 }
+// ---- render cache: a stretch / pitch render is kept in the app's own storage (/.cache/render, never mirrored to the device folder), so
+// opening the project again plays it at once instead of rendering it again. Keyed by the file (path, size, length in frames) and the settings;
+// the file holds its key and is checked on read (a hash collision cannot play the wrong audio). At most RC_MAX bytes: oldest first out.
+const RC_DIR = '/.cache/render/', RC_MAX = 768 * 1024 * 1024, RC_IDX = 'mobiledaw.rcache.v1';
+const fnv = (str, h) => { for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h; };
+function rcKey(base, key, frames) { const k = key + '|' + (eng.fileSize ? eng.fileSize(base.path) : 0) + '|' + frames + '|' + ((eng.info && eng.info().sampleRate) || 0); return { k, path: RC_DIR + fnv(k, 2166136261).toString(16).padStart(8, '0') + fnv(k, 33554467).toString(16).padStart(8, '0') + '.f32' }; }
+const rcIdx = () => { try { return JSON.parse(localStorage.getItem(RC_IDX)) || []; } catch (_) { return []; } };
+const rcSave = (ix) => { try { localStorage.setItem(RC_IDX, JSON.stringify(ix)); } catch (_) { /* full: the cache just stays smaller */ } };
+async function rcGet({ k, path }) {
+  try {
+    if (!eng.fileSize || !(eng.fileSize(path) > 0)) return null;
+    const buf = await eng.readBytes(path); if (!buf) return null;
+    const ab = buf instanceof ArrayBuffer ? buf : buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), h = new Uint32Array(ab, 0, 4);
+    if (h[0] !== 0x4d445243) return null;
+    const frames = h[1], ch = h[2], kl = h[3], kb = 16 + kl + ((4 - kl % 4) % 4);
+    if (new TextDecoder().decode(new Uint8Array(ab, 16, kl)) !== k || ab.byteLength < kb + frames * ch * 4) return null;
+    const l = new Float32Array(ab, kb, frames), r = ch > 1 ? new Float32Array(ab, kb + frames * 4, frames) : l;
+    const ix = rcIdx(), e = ix.find((x) => x.p === path); if (e) { e.t = Date.now(); rcSave(ix); }
+    return { l, r };
+  } catch (_) { return null; }
+}
+function rcPut({ k, path }, l, r) {
+  try {
+    if (!eng.saveBytes) return;
+    const ch = r && r !== l ? 2 : 1, kb8 = new TextEncoder().encode(k), kl = kb8.length, kb = 16 + kl + ((4 - kl % 4) % 4), size = kb + l.length * ch * 4;
+    if (size > RC_MAX / 4) return;
+    const ab = new ArrayBuffer(size); new Uint32Array(ab, 0, 4).set([0x4d445243, l.length, ch, kl]); new Uint8Array(ab, 16, kl).set(kb8);
+    new Float32Array(ab, kb, l.length).set(l); if (ch > 1) new Float32Array(ab, kb + l.length * 4, l.length).set(r);
+    let ix = rcIdx().filter((x) => x.p !== path); ix.push({ p: path, s: size, t: Date.now() });
+    ix.sort((a, b) => a.t - b.t); let tot = ix.reduce((n, x) => n + x.s, 0);
+    while (tot > RC_MAX && ix.length > 1) { const o = ix.shift(); tot -= o.s; if (eng.deleteFile) eng.deleteFile(o.p); }
+    rcSave(ix);
+    Promise.resolve(eng.saveBytes(path, ab)).catch(() => {});
+  } catch (_) { /* no cache: the render was still used */ }
+}
 const dLoads = new Map();          // gen|key -> the render in flight
 export function deriveSample(base, warp) {
   deriveErr = '';
@@ -2033,8 +2070,13 @@ export function deriveSample(base, warp) {
     const b = eng.sampleBuffers(base.id);
     if (!b) return null;
     let l, r;
-    try { ({ l, r } = await renderAudio(b.l, b.r || b.l, { rev, pitch, ratio, mode })); }
-    catch (e) { deriveErr = 'Gagal memproses audio: ' + (e && e.message || e); return null; }
+    const ck = rcKey(base, key, b.l.length), hit = await rcGet(ck);    // rendered before (this file, these settings): no render at all
+    if (hit) ({ l, r } = hit);
+    else {
+      try { ({ l, r } = await renderAudio(b.l, b.r || b.l, { rev, pitch, ratio, mode })); }
+      catch (e) { deriveErr = 'Gagal memproses audio: ' + (e && e.message || e); return null; }
+      rcPut(ck, l, r);
+    }
     if (gen !== loading.gen) return null;
     if (state.nextSample >= SAMPLE_MAX) { deriveErr = SAMPLE_FULL; return null; }
     const id = state.nextSample++;

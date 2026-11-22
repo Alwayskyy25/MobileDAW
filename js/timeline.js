@@ -258,9 +258,9 @@ function drawClip(t, c, y, hh) {
   // Live (replica of the arrangement clip, same in every theme: clip colours are not themed): title strip and body in the clip colour, the name and the
   // content (waveform / notes / envelope) in near-black on a light colour or near-white on a dark one, a thin dark edge; a selected clip turns lighter,
   // a deactivated clip is grey. Folded / short rows show only the colour + content (no strip).
-  const body = c.muted ? '#9a9a9f' : isSel ? tint(t.color, 0.32) : t.color;
+  const body = c.muted ? '#9a9a9f' : t.color;                              // owner: the clip keeps exactly its track's colour (the header's) also when selected; the light edge shows the selection
   ctx.fillStyle = body; ctx.fillRect(x, y0, w, h0);
-  if (tall) { ctx.fillStyle = isSel ? tint(col, 0.18) : col; ctx.fillRect(x, y0, w, hd); ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.fillRect(x, y0 + hd, w, 1); }   // the name strip: same colour, a faint line under it
+  if (tall) { ctx.fillStyle = col; ctx.fillRect(x, y0, w, hd); ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.fillRect(x, y0 + hd, w, 1); }   // the name strip: same colour, a faint line under it
   // Live 12 (refs/live12-official/02): no outline around a clip; the arrangement grid runs through its body as faint darker lines (beats, bars)
   { const gx = gridT(), bp = BAR * view.ppt; if (gx * view.ppt >= 6) { ctx.fillStyle = 'rgba(0,0,0,.08)'; for (let tk = Math.ceil(cs / gx) * gx; tk < cs + cl; tk += gx) { const lx = Math.round(tx(tk)); if (lx > xs && lx < xe) ctx.fillRect(lx, y0 + hd, 1, h0 - hd); } }
     if (bp >= 4) { ctx.fillStyle = 'rgba(0,0,0,.12)'; for (let b = Math.max(0, P.barAt(cs)); P.barStart(b) < cs + cl; b++) { const lx = Math.round(tx(P.barStart(b))); if (lx > xs && lx < xe) ctx.fillRect(lx, y0 + hd, 1, h0 - hd); } } }
@@ -716,7 +716,7 @@ function drawHeads() {
     else { ctx.fillStyle = t.color; ctx.fillRect(hx, y, nw, h - 1); }                                     // the whole name block in the track colour, as in Live
     if (fullLook) { ctx.fillStyle = HD('--hd-line', '#141415'); ctx.fillRect(hx + nw, y, 1, h - 1); }   // Live: a thin dark line between the name block and the mixer column
     if (t.mute) { ctx.fillStyle = 'rgba(30,30,34,.35)'; ctx.fillRect(hx, y, nw, h - 1); }                  // deactivated track: the block dims
-    if (on) { ctx.strokeStyle = ik; ctx.globalAlpha = 0.55; ctx.lineWidth = 2; ctx.strokeRect(hx + 1, y + 1, nw - 2, h - 4); ctx.globalAlpha = 1; }   // selected: an inner outline
+    if (on) { ctx.strokeStyle = ik; ctx.globalAlpha = 0.55; ctx.lineWidth = 2; ctx.strokeRect(hx + 1, y + 1, nw - 2, h - 3); ctx.globalAlpha = 1; }   // selected: an inner outline flush with the block (it ends where the block ends, no strip of colour under it)
     foldTri(hx + 12, y + r.th / 2, !!t.fold, ik);
     ctx.fillStyle = ik; ctx.font = FONT(on ? 600 : 500, 10.5); ctx.textBaseline = 'middle';   // Live: the track name in a regular weight, a step smaller
     const nameR = !fullLook && r.mute ? r.mute.x - 4 : hx + nw - 6;

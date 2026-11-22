@@ -535,11 +535,12 @@ function boot() {
     if (w === 'sel' || w === 'all' || w === 'clips') { if (tab === 'clip') { ED.refresh(); const c = P.selectedClip(); $('#dtitle').textContent = c ? (c.clip.name || state.tracks[c.track].name) : ''; } else if (tab === 'dev') DV.render(); else if (tab === 'keys') KB.render(); }
     if (w === 'sel') MX.update();
   });
+  showTab('dev');                                           // the device panel is drawn at once (it redraws when the project is in), never a black area
   Promise.resolve(eng.start()).catch((e) => showFatal(e));
   if (backendError()) showFatal(backendError());
   Promise.resolve(eng.init ? eng.init() : null).catch(() => {}).then(() => {
     eng.setLatencyMs(prefs.latencyMs); eng.metroVol(prefs.metroVol ?? 1); eng.masterLimit(prefs.masterLimit !== false); if (eng.pdc) eng.pdc(prefs.pdc !== false);
-    restore().then((ok) => { if (!ok) P.newProject(true); }).catch(() => P.newProject(true)).then(() => { showTab('dev'); startAutosave(); QS.initSaveState(); QS.onSaveState((d) => $('#btn-menu').classList.toggle('unsaved', d)); });
+    restore().then((ok) => { if (!ok) P.newProject(true); }).catch(() => P.newProject(true)).then(() => { startAutosave(); QS.initSaveState(); QS.onSaveState((d) => $('#btn-menu').classList.toggle('unsaved', d)); });
     if (prefs.midiOn && !isNativeApp()) enableMidi(true);   // no Web MIDI in the Android WebView
     if (isNativeApp() && eng.setEngine) {                 // Android: the native C++ engine (Oboe) unless Pengaturan -> Audio chose the WebView (falls back to it by itself)
       addEventListener('enginechange', (e) => engineToast(e.detail));
