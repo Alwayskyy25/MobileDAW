@@ -716,7 +716,7 @@ function drawHeads() {
     else { ctx.fillStyle = t.color; ctx.fillRect(hx, y, nw, h - 1); }                                     // the whole name block in the track colour, as in Live
     if (fullLook) { ctx.fillStyle = HD('--hd-line', '#141415'); ctx.fillRect(hx + nw, y, 1, h - 1); }   // Live: a thin dark line between the name block and the mixer column
     if (t.mute) { ctx.fillStyle = 'rgba(30,30,34,.35)'; ctx.fillRect(hx, y, nw, h - 1); }                  // deactivated track: the block dims
-    if (on) { ctx.strokeStyle = ik; ctx.globalAlpha = 0.55; ctx.lineWidth = 2; ctx.strokeRect(hx + 1, y + 1, nw - 2, h - 3); ctx.globalAlpha = 1; }   // selected: an inner outline flush with the block (it ends where the block ends, no strip of colour under it)
+    if (on) { ctx.strokeStyle = ik; ctx.globalAlpha = 0.45; ctx.lineWidth = 1; ctx.strokeRect(hx + 0.5, y + 0.5, nw - 1, h - 2); ctx.globalAlpha = 1; }   // selected: an inner outline flush with the block (it ends where the block ends, no strip of colour under it)
     foldTri(hx + 12, y + r.th / 2, !!t.fold, ik);
     ctx.fillStyle = ik; ctx.font = FONT(on ? 600 : 500, 10.5); ctx.textBaseline = 'middle';   // Live: the track name in a regular weight, a step smaller
     const nameR = !fullLook && r.mute ? r.mute.x - 4 : hx + nw - 6;
