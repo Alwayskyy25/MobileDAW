@@ -241,7 +241,7 @@ function drawClip(t, c, y, hh) {
     const col = c.muted ? '#8a8a8f' : tone(t.color), by = y + 1, bh2 = hh - 2;   // Live 12 (refs/live12-official 04): the folded row is filled by the clip colour, "..." at its start
     ctx.fillStyle = col; ctx.fillRect(x, by, w, bh2);
     if (w > 16) { ctx.fillStyle = ink(col); ctx.font = FONT(700, 10); ctx.textBaseline = 'middle'; ctx.fillText('...', Math.max(x, 0) + 4, by + bh2 / 2); }
-    if (state.sel.clip === c.id || msel.has(c.id)) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 1.5, by + 0.5, Math.max(1, Math.round(w) - 3), bh2 - 1); }
+    if (state.sel.clip === c.id || msel.has(c.id)) { ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 0.5, by + 0.5, Math.max(1, Math.round(w) - 1), bh2 - 1); }
     return; }
   { const tc = tone(t.color); if (tc !== t.color) t = { __proto__: t, color: tc }; }   // Color Intensity / Hue of the theme reach the clip colours
   const g = gl.get(c.id), cs = g ? g.s : c.start, cl = g ? g.l : c.len;
@@ -264,7 +264,6 @@ function drawClip(t, c, y, hh) {
   // Live 12 (refs/live12-official/02): no outline around a clip; the arrangement grid runs through its body as faint darker lines (beats, bars)
   { const gx = gridT(), bp = BAR * view.ppt; if (gx * view.ppt >= 6) { ctx.fillStyle = 'rgba(0,0,0,.08)'; for (let tk = Math.ceil(cs / gx) * gx; tk < cs + cl; tk += gx) { const lx = Math.round(tx(tk)); if (lx > xs && lx < xe) ctx.fillRect(lx, y0 + hd, 1, h0 - hd); } }
     if (bp >= 4) { ctx.fillStyle = 'rgba(0,0,0,.12)'; for (let b = Math.max(0, P.barAt(cs)); P.barStart(b) < cs + cl; b++) { const lx = Math.round(tx(P.barStart(b))); if (lx > xs && lx < xe) ctx.fillRect(lx, y0 + hd, 1, h0 - hd); } } }
-  if (isSel && !c.muted) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.strokeRect(Math.round(x) + 1.5, y0 + 1.5, Math.max(0, Math.round(w) - 3), h0 - 3); }   // selected: a light inner edge
   if (tall && w > 18) {
     ctx.fillStyle = ink(col); ctx.font = FONT(500, 10); ctx.textBaseline = 'middle';   // Live: clip names regular weight
     { const room = xe - xs - 10, nm = c.name || (c.sample ? c.sample.name : t.name); if (room > 8) ctx.fillText(cut2(nm, room), xs + 5, y0 + hd / 2 + 0.5); }   // owner: cut with an ellipsis ("11 Cas…"), never squeezed
@@ -339,7 +338,7 @@ function drawClip(t, c, y, hh) {
     }
   }
   if (isSel) {
-    ctx.strokeStyle = shade(t.color, 0.65); ctx.lineWidth = 1.5; ctx.strokeRect(x + 0.75, y0 + 0.75, w - 1.5, h0 - 1.5);
+    ctx.strokeStyle = shade(t.color, 0.6); ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 0.5, y0 + 0.5, Math.max(0, Math.round(w) - 1), h0 - 1);   // selected: one crisp 1 px edge (owner: thinner)
     if (tall && w > 44 && !msel.size) { const mx = Math.min(x + w, CW) - 12, my = y0 + hd / 2; ctx.fillStyle = shade(t.color, 0.75); for (const d of [-4, 0, 4]) { ctx.beginPath(); ctx.arc(mx + d, my, 1.3, 0, 6.2832); ctx.fill(); } }   // ⋯ : the clip's context menu
     const hl = Math.min(26, h0 - hd - 10), hy = y0 + hd + (h0 - hd - hl) / 2, st = stretchMode && t.kind === 'audio';   // edge grips for touch: pills on both ends
     if (hl > 6 && w > 26 && st) { ctx.fillStyle = C('#ffa722'); ctx.fillRect(x + w - 6, hy, 3, hl); }   // the stretch mode's mark (the handles are drawn by drawHandles)
@@ -742,7 +741,7 @@ function drawHeads() {
     if (!t.fold && h >= MIN_ROW && (on || (drag && drag.k === 'rowh' && drag.i === i))) { ctx.fillStyle = drag && drag.k === 'rowh' && drag.i === i ? T('--accent') : C('#46464c'); ctx.fillRect(hx + (HEAD - METW) / 2 - 8, y + h - 3, 16, 1); }   // grip of the selected track: drag the bottom edge = row height
   }
   ctx.restore();
-  ctx.fillStyle = HD('--hd-line', '#08080a'); ctx.fillRect(hx - 1, 0, 2, H);                                // line between clip area and headers
+  ctx.fillStyle = HD('--hd-line', '#08080a'); ctx.fillRect(hx - 1, 0, 1, H);                                // line between clip area and headers (1 px)
   // top corner: Snap switch (tap: snap, follow, select / fold options)
   ctx.fillStyle = HD('--hd-bg', '#2c2c2f'); ctx.fillRect(hx + 1, 0, HEAD - 1, RULER); ctx.fillStyle = HD('--hd-line', '#141415'); ctx.fillRect(hx, RULER - 1, HEAD, 1);
   { const q = cornerRects(), tri = (r, dir) => { const cx = r.x + r.w / 2, cy = r.y + r.h / 2; ctx.fillStyle = HD('--hd-ink', '#d4d4d8'); ctx.beginPath(); ctx.moveTo(cx - 4 * dir, cy); ctx.lineTo(cx + 3 * dir, cy - 4.5); ctx.lineTo(cx + 3 * dir, cy + 4.5); ctx.closePath(); ctx.fill(); };
