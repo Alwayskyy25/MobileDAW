@@ -106,6 +106,24 @@ Keputusan pemilik: loop suara real-time Harmor di C++ (pola Moisture); semua bag
   acak fase, jumlah partial + kualitas, tanpa aliasing (−81 dB), sub, stretch, stealing tanpa klik, release ke senyap, chord 8 voice
   tanpa clipping, pitch bend, CPU (≈18 % satu core desktop untuk 8 voice × 256 partial). Golden `inst-harmor`: desktop = WASM identik.
 
+### Phase 2a — Harmor pitch, filter, articulator, LFO, unison: selesai (tes lulus)
+- Pitch: Coarse / Fine, vibrato (rate, depth, delay), artikulator Pitch (±48 st), pitch bend, Mono / Legato / Glide.
+- Filter 1 / 2 sebagai gain per partial (presisi, tanpa osilator tambahan): Low-pass / High-pass (12 / 24 / 48 dB), Band-pass, Band-stop,
+  Formant (vokal A-E-I-O-U digeser cutoff), Custom (kurva gambar dari bank sample); resonansi sampai +24 dB dengan lebar dan offset
+  (oktaf), self-oscillation (sinus di frekuensi resonansi), key tracking, velocity ke cutoff, mix per filter.
+- Articulator (10, 8 aktif sekarang; 2 untuk image di Phase 3): multi-titik (≤ 16 titik, kurva, titik sustain, loop) atau AHDSR, dengan depth:
+  Volume, Pitch, Cutoff 1 / 2, Frequency (stretch), Harmonic level (kemiringan dB/oktaf), Harmonic phase, Timbre mix.
+- LFO 1 / 2 per voice: sine / triangle / saw / square / S&H, rate, phase, depth, retrigger, tujuan (pitch, cutoff 1/2, volume, timbre
+  mix, harmonic phase, pan, stretch).
+- Unison sampai 8 salinan per voice: detune, pitch spread, stereo spread (equal power), fase acak, distribusi volume; daya dinormalisasi.
+- Tes (`tools/harmor-test.mjs`, 52 pemeriksaan): vibrato ±49,4 ct / 5,0 Hz; LP 24 dB tepat (−0,02 / −3,01 / −24,10 dB), HP 12 dB tepat,
+  band-stop −80 dB, resonansi +24 dB, mix filter −6,02 dB, key tracking identik antar-oktaf, self-osc, formant A, kurva gambar,
+  attack 200 ms (0,51 di 100 ms), loop multi-titik 100 ms, tilt −12 dB/okt tepat, fase harmonik, timbre mix, stretch, LFO 4 Hz,
+  pan, unison (kiri flat / kanan sharp, level terjaga), chord 8 × 8 unison tanpa clipping, glide legato tanpa klik, CPU ≈ 22 % satu core
+  desktop untuk 8 voice × 4 unison + 2 filter + LFO + articulator. Golden `inst-harmor` diperluas: desktop vs WASM −203 dBFS.
+- Berikutnya (Phase 2b): efek internal Harmor (Distortion, Chorus, Phaser, Delay, Reverb, Compressor, EQ, urutan bisa diubah)
+  dan modul khusus Prism / Pluck / Blur / Phaser.
+
 ## 5. Referensi dari pemilik (untuk fase berikutnya)
 
 ### Tampilan Harmor (screenshot Harmor di Live 12) — acuan Phase 6, disederhanakan untuk HP, tidak ditiru

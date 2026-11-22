@@ -45,7 +45,7 @@ const live = () => root && root.isConnected && root.dataset.active === '1' && !d
 function every(ms, fn) { const t = setInterval(() => { if (live()) fn(); }, ms); timers.push(t); }
 
 function knobGrid(def, count) {
-  const cols = count > 8 ? Math.ceil(count / 2) : Math.max(1, Math.min(count, 4));
+  const cols = count > 8 ? Math.min(12, Math.ceil(count / 2)) : Math.max(1, Math.min(count, 4));   // many knobs: rows of at most 12
   return h('div', { class: 'knobs', style: `max-width:${cols * 60}px` });
 }
 

@@ -1,25 +1,39 @@
 // Harmor (MobileDAW instrument 38): an additive synthesizer in the spirit of Image-Line's Harmor, MobileDAW's own DSP (no Image-Line
-// code or data). Every voice is a bank of up to 516 sine partials; two timbres (a waveform + a drawn harmonic level / phase table each)
-// give every partial its amplitude and phase, mixed (complex sum) or morphed (amplitude + phase direction interpolated).
-// The parameter indices below are the stable IDs of js/harmor/schema.js: never renumber, only add.
-// Phase 1: partial engine, timbres, voices, MIDI (pitch bend), amplitude envelope. Later phases add the pitch / filter / articulator /
-// unison / effects / image / resynthesis sections at the indices reserved in the schema.
+// code or data). Every voice is a bank of up to 516 sine partials (times its unison copies); two timbres (a waveform + a drawn harmonic
+// level / phase table each) give every partial its amplitude and phase, mixed (complex sum) or morphed (amplitude + phase direction).
+// The filters, the resonance and the formants are gains per partial (by its frequency), so they are exact and cost no extra oscillators.
+// The parameter indices below are the stable IDs of js/harmor/schema.js: never renumber or reuse one, only add.
+// 90 is never used: the host sends the track transpose there to every instrument.
 #pragma once
 #include "units.h"
 
 namespace mdaw {
 
-constexpr int HM_PARAMS = 512;
+constexpr int HM_PARAMS = 1024;
 constexpr int HM_MAXP = 516;          // partials per voice
 constexpr int HM_POLY = 16;           // voices
+constexpr int HM_UNI = 8;             // unison copies per voice
 // global
-constexpr int HM_VOL = 0, HM_PARTIALS = 1, HM_QUALITY = 2, HM_POLY_P = 3, HM_PITCH = 4, HM_FINE = 5;
+constexpr int HM_VOL = 0, HM_PARTIALS = 1, HM_QUALITY = 2, HM_POLY_P = 3, HM_PITCH = 4, HM_FINE = 5, HM_GLIDE = 6, HM_MONO = 7, HM_LEGATO = 8;
 // timbre t (0 / 1): base + 10 * t
 constexpr int HM_T_WAVE = 10, HM_T_LEVEL = 11, HM_T_PRND = 12, HM_T_TABLE = 13;
 // timbre mix / harmonic mapping
 constexpr int HM_MIX = 30, HM_BLEND = 31, HM_STRETCH = 32, HM_SUB = 33;
-// amplitude envelope
-constexpr int HM_ATT = 40, HM_DEC = 41, HM_SUS = 42, HM_REL = 43, HM_VELS = 44;
+// amplitude ADSR (used while the Volume articulator is off), vibrato
+constexpr int HM_ATT = 40, HM_DEC = 41, HM_SUS = 42, HM_REL = 43, HM_VELS = 44, HM_VIB_RATE = 45, HM_VIB_DEPTH = 46, HM_VIB_DELAY = 47;
+// filter f (0 / 1): base + 10 * f
+constexpr int HM_F_ON = 50, HM_F_TYPE = 51, HM_F_CUT = 52, HM_F_RES = 53, HM_F_WIDTH = 54, HM_F_OFS = 55, HM_F_SLOPE = 56, HM_F_KEY = 57, HM_F_MIX = 58, HM_F_TABLE = 59;
+enum { HM_LP = 0, HM_HP = 1, HM_BP = 2, HM_BS = 3, HM_FORMANT = 4, HM_FCUSTOM = 5 };
+constexpr int HM_SELFOSC = 70, HM_VEL_FLT = 71;
+// unison
+constexpr int HM_U_VOICES = 75, HM_U_DETUNE = 76, HM_U_SPREAD = 77, HM_U_PHASE = 78, HM_U_PITCH = 79, HM_U_VOLDIST = 80;
+// LFO l (0 / 1): base + 6 * l: rate (Hz), shape, phase, depth, destination, retrigger
+constexpr int HM_L_RATE = 91, HM_L_SHAPE = 92, HM_L_PHASE = 93, HM_L_DEPTH = 94, HM_L_DEST = 95, HM_L_RETRIG = 96, HM_L_STRIDE = 6;
+enum { HM_LD_OFF = 0, HM_LD_PITCH, HM_LD_CUT1, HM_LD_CUT2, HM_LD_VOL, HM_LD_MIX, HM_LD_HPHASE, HM_LD_PAN, HM_LD_STRETCH, HM_LD_COUNT };
+// articulators (envelopes) e = 0..9: base 110 + 60 e. Slot: 0 on, 1 depth (-1..1), 2 points (0 = the AHDSR below), 3 sustain point,
+// 4 loop start point, 5..9 attack / hold / decay / sustain / release, 10 + 3 j: point j = time from the previous point (s), level, curve
+constexpr int HM_ENV = 110, HM_ENV_STRIDE = 60, HM_ENVS = 10, HM_ENV_PTS = 16;
+enum { HM_E_VOL = 0, HM_E_PITCH, HM_E_CUT1, HM_E_CUT2, HM_E_FREQ, HM_E_HLEVEL, HM_E_HPHASE, HM_E_MIX, HM_E_IMGFREQ, HM_E_IMGGAIN };
 // waveforms of a timbre
 enum { HM_SINE = 0, HM_SAW = 1, HM_SQUARE = 2, HM_TRI = 3, HM_CUSTOM = 4 };
 

@@ -135,4 +135,113 @@ const SR = 48000, F = 220, A = Math.round(SR * 0.3), N = Math.round(SR * 0.5);
   console.log(`info 8 voices (Normal quality, adaptive partials): ${(ms / 40).toFixed(1)} % of one desktop core per second of audio`);
   ok(ms / 4000 < 0.35, 'Normal quality stays well inside real time on a desktop core');
 }
+
+// ================================================================ phase 2: pitch, filters, articulators, LFO, unison, mono
+const E = (e, k) => 110 + 60 * e + k;                       // articulator e, slot k (harmor.h)
+const env = (e, o) => { const r = { [E(e, 0)]: 1 }; for (const [k, v] of Object.entries(o)) r[E(e, { depth: 1, n: 2, sus: 3, loop: 4, a: 5, h: 6, d: 7, s: 8, r: 9 }[k])] = v; return r; };
+const pts = (e, list, sus = -1, loop = -1) => { const r = { [E(e, 2)]: list.length, [E(e, 3)]: sus, [E(e, 4)]: loop }; list.forEach(([dt, lv, cv], j) => { r[E(e, 10 + 3 * j)] = dt; r[E(e, 11 + 3 * j)] = lv; r[E(e, 12 + 3 * j)] = cv || 0; }); return r; };
+const SAW110 = { ...flat, 10: 1, 1: 516, 2: 2 }, F2 = 110, AN = Math.round(SR * 0.4), A2 = Math.round(SR * 0.4);
+const hAmp = (x, k, a = A2, n = AN) => bin(x, SR, F2 * k, a, n).amp;
+// vibrato: rate and depth from the measured frequency track
+{
+  const { L } = await synth(SR, { ...flat, 10: 0, 45: 5, 46: 50, 47: 0 }, [on(0, 57)], 2);
+  const tr = []; for (let t = 0.5; t < 1.5; t += 0.005) { const a = Math.round(t * SR); tr.push(freqAt(L, SR, F, a, 960)); }
+  const hi = Math.max(...tr), lo = Math.min(...tr), cents = 1200 * Math.log2(hi / lo) / 2; let cross = 0; const mid = Math.sqrt(hi * lo); for (let i = 1; i < tr.length; i++) if ((tr[i - 1] - mid) * (tr[i] - mid) < 0) cross++;
+  ok(Math.abs(cents - 50) < 8 && Math.abs(cross / 2 - 5) <= 1, `vibrato 5 Hz / 50 cents: measured +-${cents.toFixed(1)} cents, ${(cross / 2).toFixed(1)} cycles per second`);
+}
+// pitch articulator: +12 semitones held for 0.3 s, then down to the note
+{
+  const { L } = await synth(SR, { ...flat, 10: 0, ...env(1, { depth: 0.25, a: 0.001, h: 0.3, d: 0.05, s: 0, r: 0.1 }) }, [on(0, 57)], 1);
+  const f1 = freqAt(L, SR, 2 * F, Math.round(SR * 0.05), 4096), f2 = freqAt(L, SR, F, Math.round(SR * 0.5), 4096);
+  ok(Math.abs(f1 - 2 * F) < 0.1 && Math.abs(f2 - F) < 0.05, `pitch articulator (depth 25 % = +12 st): ${f1.toFixed(2)} Hz while it holds, then ${f2.toFixed(2)} Hz`);
+}
+// filters: exact magnitude per partial
+{
+  const ref = (await synth(SR, SAW110, [on(0, 45)], 1)).L;
+  const rel = (x, k) => db(hAmp(x, k) / hAmp(ref, k));
+  const lp = (await synth(SR, { ...SAW110, 50: 1, 51: 0, 52: 880, 56: 1 }, [on(0, 45)], 1)).L;   // 24 dB / oct at 880 Hz
+  const want = (fo) => 20 * Math.log10(1 / Math.sqrt(1 + Math.pow(2, 8 * fo)));
+  ok([4, 8, 16].every((k) => Math.abs(rel(lp, k) - want(Math.log2(F2 * k / 880))) < 0.2), `low-pass 24 dB at 880 Hz: partial 4 ${rel(lp, 4).toFixed(2)} dB (${want(-1).toFixed(2)}), 8 ${rel(lp, 8).toFixed(2)} (${want(0).toFixed(2)}), 16 ${rel(lp, 16).toFixed(2)} (${want(1).toFixed(2)})`);
+  const hp = (await synth(SR, { ...SAW110, 50: 1, 51: 1, 52: 880, 56: 0 }, [on(0, 45)], 1)).L;
+  const wh = (fo) => 20 * Math.log10(1 / Math.sqrt(1 + Math.pow(2, -4 * fo)));
+  ok([2, 4, 8].every((k) => Math.abs(rel(hp, k) - wh(Math.log2(F2 * k / 880))) < 0.2), `high-pass 12 dB at 880 Hz: partial 2 ${rel(hp, 2).toFixed(2)} dB (${wh(-2).toFixed(2)}), 4 ${rel(hp, 4).toFixed(2)} (${wh(-1).toFixed(2)})`);
+  const bs = (await synth(SR, { ...SAW110, 50: 1, 51: 3, 52: 880, 56: 1 }, [on(0, 45)], 1)).L;
+  ok(rel(bs, 8) < -60 && Math.abs(rel(bs, 2)) < 0.5, `band-stop at 880 Hz: partial 8 ${rel(bs, 8).toFixed(0)} dB, partial 2 untouched`);
+  const bp = (await synth(SR, { ...SAW110, 50: 1, 51: 2, 52: 880, 56: 1 }, [on(0, 45)], 1)).L;
+  ok(Math.abs(rel(bp, 8)) < 0.2 && rel(bp, 4) < -8 && rel(bp, 16) < -8, `band-pass at 880 Hz: partial 8 passes, 4 ${rel(bp, 4).toFixed(1)} dB, 16 ${rel(bp, 16).toFixed(1)} dB`);
+  const rs = (await synth(SR, { ...SAW110, 50: 1, 51: 0, 52: 880, 56: 1, 53: 1, 54: 0.25 }, [on(0, 45)], 1)).L;
+  ok(Math.abs(rel(rs, 8) - (want(0) + 20 * Math.log10(16))) < 0.3, `resonance 100 %: +24 dB at the cutoff (partial 8 ${rel(rs, 8).toFixed(2)} dB)`);
+  const mix = (await synth(SR, { ...SAW110, 50: 1, 51: 3, 52: 880, 56: 1, 58: 0.5 }, [on(0, 45)], 1)).L;
+  ok(Math.abs(rel(mix, 8) - db(0.5)) < 0.3, `filter mix 50 %: a notch only half deep (${rel(mix, 8).toFixed(2)} dB)`);
+  // key tracking: an octave up moves the cutoff an octave up (same partial, same gain)
+  const k1 = (await synth(SR, { ...SAW110, 50: 1, 51: 0, 52: 880, 56: 1, 57: 1 }, [on(0, 45)], 1)).L, k2 = (await synth(SR, { ...SAW110, 50: 1, 51: 0, 52: 880, 56: 1, 57: 1 }, [on(0, 57)], 1)).L, r2 = (await synth(SR, SAW110, [on(0, 57)], 1)).L;
+  const g1 = db(hAmp(k1, 8) / hAmp(ref, 8)), g2 = db(bin(k2, SR, 220 * 8, A2, AN).amp / bin(r2, SR, 220 * 8, A2, AN).amp);
+  ok(Math.abs(g1 - g2) < 0.2, `key tracking 100 %: partial 8 of A2 ${g1.toFixed(2)} dB, of A3 ${g2.toFixed(2)} dB`);
+  // self-oscillation: a sine at the cutoff without any partial there
+  const so = (await synth(SR, { ...flat, 10: 0, 50: 1, 51: 0, 52: 1500, 56: 1, 70: 1 }, [on(0, 45)], 1)).L;
+  ok(db(bin(so, SR, 1500, A2, AN).amp / bin(so, SR, 110, A2, AN).amp) > -12, `self-oscillation: a tone at the 1.5 kHz cutoff (${db(bin(so, SR, 1500, A2, AN).amp / bin(so, SR, 110, A2, AN).amp).toFixed(1)} dB re the fundamental)`);
+  // formant: vowel A peaks (800, 1150 Hz) over a flat saw
+  const fm = (await synth(SR, { ...SAW110, 50: 1, 51: 4, 52: 200 }, [on(0, 45)], 1)).L;
+  ok(rel(fm, 7) - rel(fm, 5) > 6 && rel(fm, 7) - rel(fm, 4) > 6, `formant A: 770 Hz ${(rel(fm, 7) - rel(fm, 5)).toFixed(1)} dB above 550 Hz`);
+  // drawn filter curve (sample bank slot): a step at the cutoff
+  const w = await loadWasmEngine(SR), cv = new Float32Array(256); for (let j = 0; j < 256; j++) cv[j] = j < 128 ? 1 : 0.1; w.setBlob(cv);
+  let cmd = 'masterLimit 0\ntrackVol 0 1\nsample 30 @0:256\ntrackInst 0 38\n'; for (const [k, v] of Object.entries({ ...SAW110, 50: 1, 51: 5, 52: 880, 59: 30 })) cmd += `instParam 0 ${k} ${v}\n`; w.cmd(cmd + 'preview 0 45 1 1\n');
+  const cu = new Float32Array(SR), cr = new Float32Array(SR); w.render(cu, cr, SR);
+  ok(Math.abs(rel(cu, 4)) < 0.3 && Math.abs(rel(cu, 16) - db(0.1)) < 0.3, `drawn filter curve: below the cutoff 0 dB (${rel(cu, 4).toFixed(2)}), above it -20 dB (${rel(cu, 16).toFixed(2)})`);
+}
+// articulators: AHDSR attack time, multi-point loop, harmonic tilt / phase, timbre mix, frequency (stretch)
+{
+  const rmsAt = (x, t, w = 0.004) => { const a = Math.round(t * SR), n = Math.round(w * SR); let e = 0; for (let i = a; i < a + n; i++) e += x[i] * x[i]; return Math.sqrt(e / n); };
+  const at = (await synth(SR, { ...flat, 10: 0, ...env(0, { depth: 1, a: 0.2, h: 0, d: 0.1, s: 1, r: 0.1 }) }, [on(0, 57)], 1)).L;
+  const r1 = rmsAt(at, 0.1), r2 = rmsAt(at, 0.5);
+  ok(Math.abs(r1 / r2 - 0.5) < 0.06, `volume articulator attack 200 ms: half level at 100 ms (${(r1 / r2).toFixed(3)})`);
+  const lp = (await synth(SR, { ...flat, 10: 0, ...env(0, { depth: 1 }), ...pts(0, [[0, 0], [0.05, 1], [0.05, 0.1], [0.1, 0]], 2, 0) }, [on(0, 57)], 1)).L;
+  const tr = []; for (let t = 0.2; t < 0.8; t += 0.002) tr.push(rmsAt(lp, t, 0.002));
+  const best = [0.08, 0.1, 0.12].map((per) => { const d = Math.round(per / 0.002); let s = 0; for (let i = 0; i + d < tr.length; i++) s += Math.abs(tr[i] - tr[i + d]); return [per, s]; }).sort((a, b) => a[1] - b[1])[0][0];
+  ok(best === 0.1 && Math.max(...tr) / Math.min(...tr) > 4, `multi-point articulator with loop: repeats every ${best * 1000} ms while held (100 ms loop)`);
+  const tl = (await synth(SR, { ...SAW110, ...env(5, { depth: -1, a: 0.001, h: 1, d: 0.1, s: 1, r: 0.1 }) }, [on(0, 45)], 1)).L, ref = (await synth(SR, SAW110, [on(0, 45)], 1)).L;
+  ok(Math.abs(db(hAmp(tl, 8) / hAmp(ref, 8)) + 36) < 0.3 && Math.abs(db(hAmp(tl, 1) / hAmp(ref, 1))) < 0.1, `harmonic level articulator: -12 dB per octave of harmonic number (partial 8 ${db(hAmp(tl, 8) / hAmp(ref, 8)).toFixed(2)} dB)`);
+  const hp = (await synth(SR, { ...SAW110, ...env(6, { depth: 1, a: 0.001, h: 1, d: 0.1, s: 1, r: 0.1 }) }, [on(0, 45)], 1)).L;
+  let diff = 0; for (let i = A2; i < A2 + AN; i++) diff += (hp[i] - ref[i]) ** 2;
+  ok([2, 3, 5, 9].every((k) => Math.abs(db(hAmp(hp, k) / hAmp(ref, k))) < 0.1) && Math.sqrt(diff / AN) > 0.01, 'harmonic phase articulator: magnitudes kept, waveform changed');
+  const mx = (await synth(SR, { ...SAW110, 20: 2, ...env(7, { depth: 1, a: 0.001, h: 1, d: 0.1, s: 1, r: 0.1 }) }, [on(0, 45)], 1)).L;
+  ok(hAmp(mx, 2) / hAmp(mx, 1) < 1e-3, 'timbre mix articulator: saw -> square (no even partials at the top of the envelope)');
+  const st = (await synth(SR, { ...SAW110, ...env(4, { depth: 0.5, a: 0.001, h: 1, d: 0.1, s: 1, r: 0.1 }) }, [on(0, 45)], 1)).L, f4 = F2 * Math.pow(4, 1.1);
+  ok(Math.abs(freqAt(st, SR, f4, A2, AN) - f4) < 0.05, `frequency articulator: stretch +1 moves partial 4 to ${f4.toFixed(1)} Hz`);
+}
+// LFO: cutoff modulation at its rate; tremolo; pan
+{
+  const { L } = await synth(SR, { ...SAW110, 50: 1, 51: 0, 52: 880, 56: 1, 91: 4, 92: 0, 94: 1, 95: 2 }, [on(0, 45)], 2);
+  const tr = []; for (let t = 0.3; t < 1.8; t += 0.01) tr.push(db(bin(L, SR, 1760, Math.round(t * SR), 2048).amp));
+  const mid = (Math.max(...tr) + Math.min(...tr)) / 2; let cross = 0; for (let i = 1; i < tr.length; i++) if ((tr[i - 1] - mid) * (tr[i] - mid) < 0) cross++;
+  ok(Math.abs(cross / 2 / 1.5 - 4) < 0.7 && Math.max(...tr) - Math.min(...tr) > 20, `LFO 4 Hz on cutoff 1: partial 16 swings ${(Math.max(...tr) - Math.min(...tr)).toFixed(0)} dB, ${(cross / 2 / 1.5).toFixed(1)} times a second`);
+  const pn = await synth(SR, { ...flat, 10: 0, 91: 2, 94: 1, 95: 7 }, [on(0, 57)], 1);
+  let lMax = 0, rMax = 0; for (let t = 0.1; t < 0.9; t += 0.01) { const a = Math.round(t * SR); const l = bin(pn.L, SR, F, a, 960).amp, r = bin(pn.R, SR, F, a, 960).amp; lMax = Math.max(lMax, l / (r + 1e-9)); rMax = Math.max(rMax, r / (l + 1e-9)); }
+  ok(lMax > 10 && rMax > 10, 'LFO on pan: the voice moves left and right');
+}
+// unison: detune spread around the note, stereo, no louder than the power sum, no clipping
+{
+  const one = (await synth(SR, { ...flat, 10: 0 }, [on(0, 57)], 1)), uni = await synth(SR, { ...flat, 10: 0, 75: 4, 76: 30, 77: 1, 78: 1 }, [on(0, 57)], 1);
+  const fl = freqAt(uni.L, SR, F * Math.pow(2, -15 / 1200), A2, Math.round(SR * 0.5)), fr = freqAt(uni.R, SR, F * Math.pow(2, 15 / 1200), A2, Math.round(SR * 0.5));
+  ok(fl < F - 1 && fr > F + 1, `unison 4 x 30 cents, spread 100 %: the left side sits flat (${fl.toFixed(2)} Hz), the right side sharp (${fr.toFixed(2)} Hz)`);
+  const rms = (x) => { let e = 0; for (let i = A2; i < A2 + AN; i++) e += x[i] * x[i]; return Math.sqrt(e / AN); };
+  ok(Math.abs(db((rms(uni.L) + rms(uni.R)) / (rms(one.L) + rms(one.R)))) < 3, `unison keeps the level (${db((rms(uni.L) + rms(uni.R)) / (rms(one.L) + rms(one.R))).toFixed(1)} dB re one copy)`);
+  const ch = await synth(SR, { 10: 1, 0: 1, 3: 8, 42: 1, 40: 0.001, 44: 0, 75: 8, 76: 25, 77: 1, 78: 1 }, [48, 52, 55, 59, 62, 64, 67, 71].map((p) => on(0, p)), 1);
+  ok(Math.max(peak(ch.L), peak(ch.R)) < 1, `8-note chord x 8 unison copies at full volume: peak ${db(Math.max(peak(ch.L), peak(ch.R))).toFixed(1)} dBFS (soft-limited, never clips)`);
+}
+// mono / legato / glide: the second key glides, the envelope is not restarted
+{
+  const { L } = await synth(SR, { ...flat, 10: 0, 7: 1, 8: 1, 6: 0.2 }, [on(0, 57), on(0.5, 69), off(0.9, 69), off(0.9, 57)], 1.2);
+  const fa = freqAt(L, SR, F, Math.round(SR * 0.3), 4096), fm = freqAt(L, SR, 330, Math.round(SR * 0.53), 512), fb = freqAt(L, SR, 440, Math.round(SR * 0.78), 4096);
+  let jump = 0; for (let i = Math.round(SR * 0.49); i < Math.round(SR * 0.52); i++) jump = Math.max(jump, Math.abs(L[i] - 2 * L[i - 1] + L[i - 2]));
+  ok(Math.abs(fa - 220) < 0.1 && fm > 240 && fm < 420 && Math.abs(fb - 440) < 0.5 && jump < 0.01, `mono legato glide: 220 Hz -> ${fm.toFixed(0)} Hz on the way -> ${fb.toFixed(1)} Hz, no retrigger click`);
+}
+// CPU: 8 voices x 4 unison copies, both filters, an LFO and a stretch articulator (Normal)
+{
+  const w = await loadWasmEngine(SR); let cmd = 'masterLimit 0\ntrackInst 0 38\n'; for (const [k, v] of Object.entries({ 10: 1, 1: 256, 75: 4, 50: 1, 52: 1500, 60: 1, 61: 4, 62: 900, 91: 3, 94: 0.5, 95: 2, [E(4, 0)]: 1, [E(4, 1)]: 0.2 })) cmd += `instParam 0 ${k} ${v}\n`;
+  for (const p of [36, 40, 43, 47, 50, 55, 59, 62]) cmd += `preview 0 ${p} 1 1\n`; w.cmd(cmd);
+  const n = SR * 4, L = new Float32Array(n), R = new Float32Array(n), t0 = performance.now(); w.render(L, R, n); const ms = performance.now() - t0;
+  console.log(`info 8 voices x 4 unison, 2 filters, LFO + stretch articulator: ${(ms / 40).toFixed(1)} % of one desktop core (the partial budget shares 2048 partials among the 32 banks)`);
+  ok(ms / 4000 < 0.35 && L.every(Number.isFinite), 'heavy patch stays inside real time on a desktop core, output finite');
+}
 console.log(bad ? `\n${bad} FAILED` : '\nharmor-test: all passed'); process.exit(bad ? 1 : 0);

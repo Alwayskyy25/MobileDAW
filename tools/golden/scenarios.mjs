@@ -258,6 +258,12 @@ export const SCENARIOS = [
       P(3, 6); P(10, 1); P(20, 2); P(30, 0.35); e.play(); play(e, 1.5, [128, 77, 256]);
       P(31, 1); P(12, 0.7); P(32, 0.4); P(33, 0.5); P(2, 0); play(e, 1.2);
       P(2, 2); P(1, 400); P(40, 0.05); P(43, 0.6); e.bend(0, 1.5); play(e, 1.2);
+      // phase 2: filters (+ resonance, self-osc, formant), unison, LFOs, articulators (AHDSR and multi-point with loop), vibrato, mono glide
+      P(50, 1); P(52, 900); P(53, 0.7); P(57, 0.5); P(70, 0.4); P(60, 1); P(61, 4); P(62, 600); P(75, 4); P(76, 20); P(77, 1);
+      P(91, 3); P(94, 0.6); P(95, 2); P(97, 0.7); P(98, 4); P(100, 0.5); P(101, 7); P(45, 5); P(46, 30);
+      P(110, 1); P(115, 0.02); P(117, 0.3); P(118, 0.6); P(119, 0.4); P(170, 1); P(171, 0.1); P(410, 1); P(411, 0.4); play(e, 1.5);
+      P(230, 1); P(231, 0.5); P(232, 4); P(233, 2); P(234, 0); P(240, 0); P(241, 0); P(243, 0.05); P(244, 1); P(246, 0.05); P(247, 0.2); P(249, 0.1); P(250, 0); play(e, 1.2);
+      P(7, 1); P(8, 1); P(6, 0.1); play(e, 1.2);
     } },
   { name: 'inst-moisture', native: true, info: 'C++ only (native/engine/moist2.cpp): Moisture (37), the Serum-style wavetable synth: wavetables A / B, WT position, unison + detune + blend, warp modes (sync, bend, PWM, FM from B), sub, noise, the filter types, Env 1-3, LFO -> matrix routes, mono glide, pitch bend, every effect of the rack, tempo change',
     run(e) {
