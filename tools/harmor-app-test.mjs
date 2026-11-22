@@ -43,6 +43,14 @@ const rel = r.audio.lv.map((a) => 20 * Math.log10(a / r.audio.lv[0]));
 ok(r.unity.mapLevel === 4 && Math.abs(20 * Math.log10(r.unity.p1 / 0.3)) < 1, `resynthesis at the file's level: Map Level ${r.unity.mapLevel}x on load, Volume 100 % -> partial 1 = ${r.unity.p1.toFixed(3)} (file 0.300, ${(20 * Math.log10(r.unity.p1 / 0.3)).toFixed(2)} dB)`);
 ok(r.audio.ok && r.audio.report && r.audio.report.pitched && Math.abs(r.audio.report.note - 57) < 0.1 && [0, -6.02, -9.54, -15.56].every((w, i) => Math.abs(rel[i] - w) < 0.6), `resynthesis in the app: note ${r.audio.report && r.audio.report.note.toFixed(2)}, harmonics ${rel.map((v) => v.toFixed(2)).join(' / ')} dB (0 / -6.02 / -9.54 / -15.56)`);
 ok(r.reopen.slotA >= 0 && r.reopen.lv2.every((a, i) => Math.abs(20 * Math.log10(a / r.audio.lv[i])) < 0.05), `saved and opened again: the map is back and sounds the same (opened in ${r.reopen.tOpen} ms)`);
+// the project menu's ZIP export (project + samples) carries the audio a Harmor map is made from (it used to leave it out)
+{ const dl = page.waitForEvent('download', { timeout: 60000 });
+  await page.click('#btn-menu'); await page.waitForTimeout(500);
+  await page.locator('.menu .mi', { hasText: 'Ekspor' }).first().click(); await page.waitForTimeout(500);
+  await page.locator('.menu .mi', { hasText: 'ZIP (proyek' }).first().click();
+  const d = await dl, fp = await d.path(), { readZip } = await import(path.join(root, 'js/zip.js'));
+  const names = (await readZip(fs.readFileSync(fp).buffer.slice(0))).map((e) => e.name);
+  ok(names.some((n) => /\.mdaw$/.test(n)) && names.includes('Samples/saw.wav'), `ZIP export carries the Harmor source: ${names.join(', ')}`); }
 ok(!errs.length, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
 await b.close(); server.close();
 console.log(bad ? `\n${bad} FAILED` : '\nharmor-app-test: all passed'); process.exit(bad ? 1 : 0);

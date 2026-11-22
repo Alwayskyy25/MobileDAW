@@ -150,7 +150,7 @@ function usedFiles() {
   const set = new Set();
   for (const t of state.tracks) {
     for (const c of t.clips || []) if (c.sample && c.sample.path) set.add(c.sample.path);
-    if (t.inst) { if (t.inst.sf && t.inst.sf.path) set.add(t.inst.sf.path); for (const z of t.inst.zones || []) if (z.sample && z.sample.path) set.add(z.sample.path); }
+    if (t.inst) { if (t.inst.sf && t.inst.sf.path) set.add(t.inst.sf.path); for (const z of t.inst.zones || []) if (z.sample && z.sample.path) set.add(z.sample.path); if (t.inst.hm && t.inst.hm.path) set.add(t.inst.hm.path); }   // Harmor: the image / audio its map is made from
     for (const q of (t.kind === 'drum' && t.inst && t.inst.pads) || []) { if (q.sample && q.sample.path) set.add(q.sample.path); const ci = q.chain && q.chain.inst; if (ci && ci.sample && ci.sample.path) set.add(ci.sample.path); }   // drum pads + pad chains
   }
   return [...set];
