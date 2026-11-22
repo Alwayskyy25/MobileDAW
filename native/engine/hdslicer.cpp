@@ -98,6 +98,8 @@ class Slicer : public Instrument {
     else if (i == 7) { float s = (float)v; if (s != sens) { sens = s; dirty = true; } }
     else if (i == 8) firstSet = (int)v;
     else if (i == 90) semis = std::isfinite(v) ? v : 0;   // the track's Pitch: on top of the module's (MobileDAW)
+    else if (i == 9) { int m = std::isfinite(v) ? std::max(0, std::min(128, (int)v)) : 0; if (m != markN) { markN = m; dirty = true; } }   // MobileDAW: explicit slice markers (0 = detect)
+    else if (i >= 200 && i < 328) { double f = std::isfinite(v) ? std::min(std::max(v, 0.0), 1.0) : 0.0; if (f != marks[i - 200]) { marks[i - 200] = f; dirty = true; } }   // marker k: its start, a fraction of the loop
   }
   void noteOn(int key, double vel) override {
     const Sample* s = sample(); if (!s) return;
@@ -140,6 +142,7 @@ class Slicer : public Instrument {
  private:
   float rate; Bank* bank; float p[7] = { 1, 0.5f, 0, 0, 1, 0, 0 }; int sampleId = -1; float sens = 0.25f; int firstSet = 0; double semis = 0;
   std::vector<Voice> voices; uint64_t age = 0; std::vector<size_t> slices; const Sample* sliced = nullptr; bool dirty = true;
+  int markN = 0; double marks[128] = {};   // explicit markers (a chop sheet built elsewhere: the slices are exactly where it says)
   double x4(int i) const { double x = 0.95 * (double)p[i] + 0.05; return x * x * x * x; }
   int firstKey() const { int f = firstSet > 0 ? firstSet : 48; int sl = (int)std::min(std::max(slices.size(), (size_t)1), (size_t)128); return std::min(f, 128 - sl); }
   static float lerp(const float* x, size_t n, double pos) { size_t i = (size_t)pos; if (i >= n) i = n - 1; float a = x[i], b = i + 1 < n ? x[i + 1] : x[i]; return a + (b - a) * (float)(pos - (double)i); }
@@ -147,7 +150,10 @@ class Slicer : public Instrument {
   const Sample* sample() {
     const Sample* s = sampleId >= 0 && sampleId < 256 && bank ? bank->s[sampleId] : nullptr;
     if (!s || s->frames <= 0) return nullptr;
-    if (dirty || s != sliced) { slices = slicerDetect(s->l, s->r, (size_t)s->frames, sens); sliced = s; dirty = false; }
+    if (dirty || s != sliced) {
+      if (markN > 0) { slices.clear(); for (int k = 0; k < markN; k++) { size_t q = (size_t)std::llround(marks[k] * (double)s->frames); if (q >= (size_t)s->frames) break; if (slices.empty() || q > slices.back()) slices.push_back(q); } if (slices.empty()) slices.push_back(0); }
+      else slices = slicerDetect(s->l, s->r, (size_t)s->frames, sens);
+      sliced = s; dirty = false; }
     return s;
   }
 };

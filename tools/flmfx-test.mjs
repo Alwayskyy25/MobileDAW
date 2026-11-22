@@ -147,7 +147,10 @@ ok(dryR > 0.01, `the test signal plays (${dryR.toFixed(3)} rms)`);
   const up = zc(await play(49, ['instParam 0 1 0.75']), SR * 0.02, SR * 0.3);
   ok(Math.abs(up / (330 * 2) - 1) < 0.01, `Slicer Pitch +12 (FLM law trunc(48 v - 24)): slice 2 plays ${up.toFixed(0)} Hz`);
   const first = zc(await play(60, ['instParam 0 8 60']), SR * 0.02, SR * 0.3), past = rms(await play(52), 0, SR * 0.3);
-  ok(Math.abs(first / 220 - 1) < 0.01 && past < 1e-6, `Slicer First Key 60 plays slice 1 there (${first.toFixed(0)} Hz); a key past the last slice plays nothing`); }
+  ok(Math.abs(first / 220 - 1) < 0.01 && past < 1e-6, `Slicer First Key 60 plays slice 1 there (${first.toFixed(0)} Hz); a key past the last slice plays nothing`);
+  // explicit markers (MobileDAW: param 9 = count, 200 + k = start as a fraction of the loop): two slices at tones 2 and 4, no detection
+  const M = ['instParam 0 9 2', 'instParam 0 200 0.25', 'instParam 0 201 0.75'], m0 = zc(await play(48, M), SR * 0.02, SR * 0.3), m1 = zc(await play(49, M), SR * 0.02, SR * 0.3), m2 = rms(await play(50, M), 0, SR * 0.3);
+  ok(Math.abs(m0 / 330 - 1) < 0.01 && Math.abs(m1 / 550 - 1) < 0.01 && m2 < 1e-6, `Slicer markers: key 48 plays the marker at 25 % (${m0.toFixed(0)} Hz), key 49 the one at 75 % (${m1.toFixed(0)} Hz), key 50 nothing`); }
 // JS fallback engine: no FLM modules, but their place in the chain is kept
 { const d = makeDevice(FLMFX_BASE + 32, SR), L = Float32Array.from([0.5, -0.25]), R = Float32Array.from([0.1, 0.2]);
   d.setParam(3, 0.9); d.process(L, R, 2); ok(L[0] === 0.5 && R[1] === Math.fround(0.2) && makeDevice(299, SR) === null, 'JS fallback: an FLM module is a pass-through placeholder (later devices keep their index)'); }

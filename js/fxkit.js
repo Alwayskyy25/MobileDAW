@@ -1976,7 +1976,8 @@ VI[35] = (k) => {
     const pk = sm.peaks || [], n = pk.length, mid = hh / 2; g.fillStyle = DISPC.bl;
     for (let x = 0; x < w; x += 2) { const a = pk[Math.min(n - 1, Math.floor(x / w * n))] || 0; g.fillRect(x, mid - a * (mid - 6), 1.5, Math.max(1, a * (mid - 6) * 2)); }
     // the slices the engine plays (the same detection, js/slicerdetect.js): a line at each start, the key it plays on (first key: param 8, 0 = C3)
-    const st = slicesOf(sm.pyr, k.get(7)), fr = sm.pyr && sm.pyr.l ? sm.pyr.l.length : 0;
+    const pr = (t.inst && t.inst.params) || {}, mN = Math.round(pr[9] || 0), fr0 = sm.pyr && sm.pyr.l ? sm.pyr.l.length : 0;   // explicit markers (param 9 + 200..): exactly those
+    const st = mN > 0 && fr0 ? Array.from({ length: mN }, (_, q) => Math.round((pr[200 + q] || 0) * fr0)) : slicesOf(sm.pyr, k.get(7)), fr = fr0;
     if (st && fr) { const n = st.length, fk = Math.min(Math.round(k.get(8)) > 0 ? Math.round(k.get(8)) : 48, 128 - Math.max(1, n)), NN = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
       st.forEach((f, q) => { const x = Math.round(f / fr * w) + 0.5; g.fillStyle = DISPC.or; g.fillRect(x - 0.5, 14, 1, hh - 14); if (w / Math.max(1, n) > 22 || q === 0) label(g, NN[(fk + q) % 12] + (Math.floor((fk + q) / 12) - 2), x + 2, hh - 4, DISPC.or, 8); });
       label(g, n + ' slice', w - 6, 12, DISPC.ink, 9, 'right'); }

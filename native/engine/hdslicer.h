@@ -2,6 +2,7 @@
 // Port of Honeydew crates/audio/src/slicer.rs (https://github.com/daijro/honeydew, GPL-3.0-or-later, see THIRD_PARTY_NOTICES.md), C++ only.
 // Params 0..6 are FLM's normalized values (0 Enable, 1 Pitch, 3 Attack, 4 Decay, 5 Sustain, 6 Mono); 7 = Sensitivity (FLM's CSTM SENS, 0 = the
 // file's cue markers, none here); 8 = the first key (0 = FLM's default 48); 100 = the loop (bank sample id: zone 0 of project.js).
+// MobileDAW: 9 = the number of explicit slice markers (0 = detect at the Sensitivity), 200 + k = marker k's start as a fraction of the loop.
 // Copyright (C) 2026 daijro and the Honeydew contributors (original Rust); port (C) MobileDAW contributors. GPL-3.0-or-later.
 #pragma once
 #include "units.h"
