@@ -105,3 +105,23 @@ Keputusan pemilik: loop suara real-time Harmor di C++ (pola Moisture); semua bag
   distribusi harmonik saw/square/triangle/sine, fase partial, tabel gambar (level + fase, berubah saat note berbunyi), mix vs morph,
   acak fase, jumlah partial + kualitas, tanpa aliasing (−81 dB), sub, stretch, stealing tanpa klik, release ke senyap, chord 8 voice
   tanpa clipping, pitch bend, CPU (≈18 % satu core desktop untuk 8 voice × 256 partial). Golden `inst-harmor`: desktop = WASM identik.
+
+## 5. Referensi dari pemilik (untuk fase berikutnya)
+
+### Tampilan Harmor (screenshot Harmor di Live 12) — acuan Phase 6, disederhanakan untuk HP, tidak ditiru
+Yang diambil dari referensi: susunan **bagian atas = mesin suara** (Timbre A/B dengan dua thumbnail gelombang + MIX, Phase start/rand,
+Blur, Tremolo, Prism, Harmonizer, Unison, Pitch/Vibrato/Legato, Filter 1/2 + Pluck + Phaser + EQ) dan **bagian bawah = editor besar**
+dengan tab **ENV / IMG / FX / ADV**, pemilih target envelope (Volume, Pitch, Filter …) dan kurva envelope multi-titik yang memenuhi area,
+plus panel Global (limit, legato, porta, strum, vol/pitch, pad XY "MOD").
+Versi MobileDAW (gaya Live 12: charcoal/graphite, aksen oranye, knob bulat, label kecil, garis tipis):
+- Bagian atas dipecah jadi **halaman** yang bisa digeser/dipilih (Timbre · Pitch · Filter · Unison · Prism/Blur/Pluck/Phaser), satu
+  halaman sekali tampil di HP — bukan semua knob sekaligus.
+- Bagian bawah tetap editor besar (ENV / IMG / FX / ADV); di portrait editor di atas, kontrol di bawah; di landscape berdampingan.
+- Editor harmonik (level / fase) dan envelope: sentuh-geser untuk menggambar, cubit untuk zoom, dua jari untuk geser.
+- Meter output + spectrum kecil di header plugin.
+
+### deriz-synth.ts (sampler pitch/speed terpisah) — acuan teknik untuk rekonstruksi NewTone (Phase 5)
+WSOLA 75 % overlap dengan penyelarasan **sub-sampel** (korelasi silang ternormalisasi, kasar → halus → pecahan), panjang frame
+mengikuti nada, **penjaga transien** (onset tidak diulang/dilebarkan saat stretch, crossfade 2 ms), pitch naik dengan **sinc berjendela
+(cutoff 0.85/rasio) sebelum decimate**, turun dengan Hermite 4 titik, soft-limiter di keluaran, dan tes bit-per-bit. Prinsip yang sama
+dipakai untuk time-stretch NewTone (bersama PSOLA untuk vokal dan phase vocoder untuk bagian tak bernada), di Web Worker.
