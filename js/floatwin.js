@@ -244,6 +244,7 @@ export function openFloat(opts) {
   // big plug-ins (opts.frac = { w, h } of the screen): open at that share, not over the whole screen; a fit window keeps its content's aspect
   if (opts.frac && !g) { const sm = A.w < 900 || A.h < 600, mw = Math.round(A.w * (sm ? Math.max(opts.frac.w, A.w < 900 ? 0.98 : 0.9) : opts.frac.w)), mh = Math.round(A.h * (sm ? Math.max(opts.frac.h, 0.96) : opts.frac.h));   // a small / short screen: (nearly) all of it, so the controls keep their size
     if (w.fit) { const k = Math.min(1, mw / w.s.w, mh / w.s.h); if (k < 1) { w.s.h = Math.round((w.s.h - w.bh - 2) * k) + w.bh + 2; w.s.w = Math.round(w.s.w * k); } }
+    else if (A.h > A.w * 1.2) { w.s.w = Math.round(A.w * 0.98); w.s.h = Math.round(A.h * 0.62); }   // portrait: the full width and most of the height (the layout grows into it)
     else { w.s.w = Math.min(w.s.w, mw); w.s.h = Math.min(w.s.h, mh); } }
   w.s.w = clamp(w.s.w, Math.min(w.minW, A.w - 8), A.w - 8); w.s.h = clamp(w.s.h, Math.min(w.minH, A.h - 8), A.h - 8);
   // opening: the whole window on screen, under the control bar when there is room (its buttons stay usable)

@@ -2297,3 +2297,44 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .m2x-mac { grid-template-rows: 1fr 1fr; align-items: center; justify-items: center; height: calc(100% - 24px); padding-top: 0; gap: 4px; }
 .m2x-p.mac { display: flex; flex-direction: column; }
 .m2x-mods { grid-template-columns: 118px 252px 1fr 150px; }
+/* Harmor v3 (owner: still empty space, knobs too small): knobs share the panel's width and grow with it (up to 64 px),
+   a panel's content sits centred in its height, chips / buttons / toggles taller */
+.hm-p .hm-row:has(> .hm-k) { flex-wrap: nowrap; justify-content: space-evenly; align-items: center; }
+.hm-p .hm-row > .hm-k { flex: 1 1 0; width: auto; min-width: 46px; max-width: 120px; }
+.hm-p .hm-k .hm-kn { width: 100%; max-width: 64px; min-width: 40px; height: auto; aspect-ratio: 1; }
+.hm-p .hm-kl, .hm-p .hm-kv { font-size: 11px; max-width: none; }
+.hm-grid > .hm-p > :not(.hm-ph) { margin-block: auto; }
+.hm .hm-chip, .hm .hm-tog { min-height: 32px; padding: 0 10px; }
+.hm .hm-dd, .hm .hm-btn { min-height: 34px; }
+.hm .hm-num { min-height: 46px; min-width: 58px; }
+.hm .hm-ph b { font-size: 10.5px; }
+/* the articulator / LFO editor rows: knobs share the width too */
+.hm-col.grow .hm-row:has(> .hm-k) { flex-wrap: nowrap; justify-content: space-evenly; align-items: center; }
+.hm-col.grow .hm-row > .hm-k { flex: 1 1 0; width: auto; min-width: 46px; max-width: 110px; }
+.hm-col.grow .hm-k .hm-kn { width: 100%; max-width: 56px; min-width: 40px; height: auto; aspect-ratio: 1; }
+/* FX rack: the closed rows share the height (no empty space under them), bigger Mix knob; an open effect's knobs fill its width */
+.hm-main:has(> .hm-fx) > .hm-fx { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
+.hm-main:has(> .hm-fx) > .hm-fx.open { flex: 0 0 auto; }
+.hm .hm-fxh .hm-kn { width: 38px; height: 38px; }
+.hm .hm-fxh .hm-kv { font-size: 11px; }
+.hm .hm-fxh b { font-size: 12px; }
+.hm .hm-fxb { display: flex; flex-wrap: wrap; justify-content: space-evenly; }
+.hm .hm-fxb > .hm-k { flex: 1 1 64px; max-width: 110px; }
+.hm .hm-fxb .hm-kn { width: 100%; max-width: 54px; height: auto; aspect-ratio: 1; }
+.hm-grid.g-mod { grid-template-columns: 1fr 1.1fr 1.1fr 1.7fr; }
+.hm .hm-opts .hm-chips > .hm-chip { flex: 1 1 0; text-align: center; }
+.hm .hm-opts .hm-chips > .hm-lab { width: 58px; flex: none; }
+/* Moisture v3: bigger knobs everywhere (the window scales the design to the screen) */
+.m2x-kn { width: 42px; height: 42px; } .m2x-k.big .m2x-kn { width: 50px; height: 50px; }
+.m2x-k { min-width: 46px; } .m2x-kl { font-size: 9.5px; }
+.m2x-row:has(> .m2x-k) { justify-content: space-evenly; }
+/* Moisture on a short, wide screen (phone landscape): a wider design, so it fills the window's width as well as its height */
+@media (max-height: 620px) and (min-aspect-ratio: 3/2) {
+  .m2x { width: 1250px; }
+  .m2x-srcs { grid-template-columns: 124px 1fr 1fr 150px 250px; }
+  .m2x-mods { grid-template-columns: 150px 300px 1fr 190px; }
+}
+/* Harmor in portrait: the app's CSS viewport is ~1190 px wide there, so the whole plug-in is zoomed 1.45x (bigger knobs, chips,
+   text; the layout reflows in the narrower width, like landscape) */
+@media (orientation: portrait) { .fw .hm { zoom: 1.45; } }
+@media (orientation: portrait) { .fw .hm .hm-chips.scroll { flex-wrap: wrap; overflow: visible; } }
