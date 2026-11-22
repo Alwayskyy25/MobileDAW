@@ -250,6 +250,15 @@ export const SCENARIOS = [
       P(25, 1); P(3, 2 / 3); P(110, 5 / 7); P(63, 1); P(107, 0.9); play(e, 1.2); P(131, 0.4); P(132, 0.2); P(134, 0.6); play(e, 1.2);
       P(131, 0); P(139, 0.2); P(145, 4 / 90); P(140, 0.3); e.bend(0, 1.5); play(e, 1.2); e.tempo(90); P(144, 1); P(120, 1); play(e, 1); e.stop(); play(e, 0.6);
     } },
+  { name: 'inst-harmor', native: true, info: 'C++ only (native/engine/harmor.cpp): Harmor (38), additive: saw / square / custom timbres, mix and morph, phase randomisation, partial count / quality, stretch, sub, voice stealing, pitch bend, release',
+    run(e) {
+      e.tempo(124); e.trackInst(0, 38);
+      const f = []; for (let k = 0; k < 20; k++) f.push(k * PPQ / 2, PPQ * (k % 3 === 0 ? 1.5 : 0.45), 40 + ((k * 5) % 26), 0.5 + (k % 4) * 0.12, 0); e.trackNotes(0, f, f.length / 5);
+      const P = (i, v) => e.instParam(0, i, v);
+      P(3, 6); P(10, 1); P(20, 2); P(30, 0.35); e.play(); play(e, 1.5, [128, 77, 256]);
+      P(31, 1); P(12, 0.7); P(32, 0.4); P(33, 0.5); P(2, 0); play(e, 1.2);
+      P(2, 2); P(1, 400); P(40, 0.05); P(43, 0.6); e.bend(0, 1.5); play(e, 1.2);
+    } },
   { name: 'inst-moisture', native: true, info: 'C++ only (native/engine/moist2.cpp): Moisture (37), the Serum-style wavetable synth: wavetables A / B, WT position, unison + detune + blend, warp modes (sync, bend, PWM, FM from B), sub, noise, the filter types, Env 1-3, LFO -> matrix routes, mono glide, pitch bend, every effect of the rack, tempo change',
     run(e) {
       e.tempo(128); e.trackInst(0, 37);

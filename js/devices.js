@@ -282,7 +282,7 @@ function instCard(i, t, o = {}) {
     const pn = def.view === 'lsampler' ? samplerPanel(i, t) : wavetablePanel(i, t);
     return h('div', { class: 'card lvcard' }, head, pn.el);
   }
-  const body = knobGrid(def, def.params.length + 1);   // +1 = the Pitch knob, which lives in the same grid
+  const body = knobGrid(def, def.params.filter((p) => !p.hidden).length + 1);   // +1 = the Pitch knob, which lives in the same grid; hidden parameters take no cell
   let envRedraw = null;
   // Live-style panels (Osc / Filter / Mod Sources / Voice) with displays; instruments without a layout keep the plain knob grid
   const syn = t.kind === 'midi' && LAYOUT[t.inst.type] ? buildSynth({
@@ -310,7 +310,7 @@ function instCard(i, t, o = {}) {
     };
     body.prepend(h('div', { class: 'envbox' }, cv, ro)); body.classList.add('wide'); envRedraw();
   }
-  if (!syn) def.params.forEach((p, k) => body.append(knob(p, () => t.inst.params[k] ?? p.def, (v) => { P.setInstParam(i, k, v); if (envRedraw) envRedraw(); }, fmtParam, C('#ffa722'),
+  if (!syn) def.params.forEach((p, k) => p.hidden || body.append(knob(p, () => t.inst.params[k] ?? p.def, (v) => { P.setInstParam(i, k, v); if (envRedraw) envRedraw(); }, fmtParam, C('#ffa722'),
     (rect) => offerAutomation(rect, { kind: 5, strip: P.stripOf(i), param: k, def: p }, `${t.name} \u2022 ${p.n}`))));
   if (!syn) body.append(pitchKnob(i, t));
   if (t.inst.type === INST.DRUM) {

@@ -1,4 +1,5 @@
 import { moistureDef, m2Text } from './moistdefs.js';
+import { harmorDef } from './harmor/schema.js';
 import { factoryPresets } from './presetlib.js';
 import { wtName, WT_COUNT } from './engine/live.js';
 import { FLM_SYNC, GMS_FX, GMS_FX_RATE, GMS_WAVES, MINI_KINDS, SS_LFO_DEST, cutHz, syncBeats, miniPhaserBeats } from './engine/flmsyn.js';
@@ -11,9 +12,9 @@ import { THREE_OSC } from './flm3osc.js';
 import { flmText, menuItem } from './fxlaw.js';
 // Instrument + device definitions. Parameter ORDER must match the C++ side
 // (app/src/main/cpp/instruments.h and devices.h).
-export const INST = { FLM_3OSC: 36, FLM_SLICER: 35, FLM_DW: 30, FLM_GMS: 31, FLM_MINI: 32, FLM_SAW: 33, MINISYNTH: 1, SUPERSAW: 2, DRUM: 3, DIRECTWAVE: 4, GMS: 5, SOUNDFONT: 6, MOISTURE: 7, OSPHERE: 8, KEYSTONE: 9, SAMPLER: 10, WAVETABLE: 11, SIMPLER: 18, IMPULSE: 28, GRANULATOR: 29 };
+export const INST = { HARMOR: 38, FLM_3OSC: 36, FLM_SLICER: 35, FLM_DW: 30, FLM_GMS: 31, FLM_MINI: 32, FLM_SAW: 33, MINISYNTH: 1, SUPERSAW: 2, DRUM: 3, DIRECTWAVE: 4, GMS: 5, SOUNDFONT: 6, MOISTURE: 7, OSPHERE: 8, KEYSTONE: 9, SAMPLER: 10, WAVETABLE: 11, SIMPLER: 18, IMPULSE: 28, GRANULATOR: 29 };
 // Instruments a synth/sampler track can switch between (drums have their own track type).
-export const INST_LIST = [30, 31, 32, 33, 34, 35, 36, 37, 18, 17, 16, 15, 14, 13, 11, 10, 28, 29, 25, 26, 27, 19, 20, 21, 22, 23, 24, 6, 12];   // FLM instruments first; the classic Mini Synth / SuperSaw / DirectWave / GMS are replaced by them
+export const INST_LIST = [30, 31, 32, 33, 34, 35, 36, 37, 38, 18, 17, 16, 15, 14, 13, 11, 10, 28, 29, 25, 26, 27, 19, 20, 21, 22, 23, 24, 6, 12];   // FLM instruments first; the classic Mini Synth / SuperSaw / DirectWave / GMS are replaced by them
 
 export const INSTRUMENTS = {
   1: { name: 'Mini Synth', params: [
@@ -1294,3 +1295,5 @@ export function migrateClassicInst(inst) {
 }
 // Moisture (37): the Serum-style wavetable synth (js/moistdefs.js, native/engine/moist2.cpp). The old Moisture (7) stays as 'Moisture Klasik'.
 INSTRUMENTS[37] = moistureDef();
+// Harmor (38): additive synthesizer (js/harmor/schema.js, native/engine/harmor.cpp)
+INSTRUMENTS[38] = harmorDef();

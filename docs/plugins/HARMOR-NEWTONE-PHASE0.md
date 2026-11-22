@@ -88,3 +88,20 @@ Rekomendasi (mengikuti pola Moisture):
 | 8 | Optimasi Android, offline, CPU/memori, kualitas audio. |
 
 Setiap fase baru dianggap selesai bila tes audionya lulus.
+
+## 4. Status
+
+### Phase 0 — selesai
+Keputusan pemilik: loop suara real-time Harmor di C++ (pola Moisture); semua bagian lain JavaScript; NewTone 100 % JavaScript.
+
+### Phase 1 — Harmor additive engine: selesai (tes lulus)
+- `native/engine/harmor.{h,cpp}` (instrumen 38): partial = oscillator rotasi kompleks (fase kontinu, tanpa tabel), sampai 516 partial per
+  voice + 2 partial sub-oktaf; Timbre 1/2 (Sine, Saw, Square, Triangle, Custom) + tabel level/fase harmonik dari bank sample (slot 13 / 23);
+  blend Mix (jumlah kompleks) / Morph (amplitudo + arah fase); acak fase per voice; stretch harmonik (k^(1+0.1 s)); jumlah partial
+  adaptif (Draft 64 / Normal 256 / High 516 dan anggaran partial×voice); peredaman 0.40–0.47 × rate, di atas Nyquist tidak dihitung;
+  koefisien diramp per 32 sampel (anti-klik); 16 voice, pencurian voice dengan fade 3 ms; pitch bend; ADSR amplitudo; soft-limit output.
+- `js/harmor/schema.js`: parameter ber-ID stabil + versi schema; `INSTRUMENTS[38]`, daftar instrumen, panel generik sementara.
+- Tes: `tools/harmor-test.mjs` (di build WebAssembly — engine yang sama dengan web/Android): frekuensi dasar 44,1 / 48 kHz,
+  distribusi harmonik saw/square/triangle/sine, fase partial, tabel gambar (level + fase, berubah saat note berbunyi), mix vs morph,
+  acak fase, jumlah partial + kualitas, tanpa aliasing (−81 dB), sub, stretch, stealing tanpa klik, release ke senyap, chord 8 voice
+  tanpa clipping, pitch bend, CPU (≈18 % satu core desktop untuk 8 voice × 256 partial). Golden `inst-harmor`: desktop = WASM identik.

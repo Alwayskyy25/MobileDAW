@@ -1717,6 +1717,7 @@ async function openStructure(text, gen) {
   for (const t of state.tracks) {
     if (!t.inst) continue;
     if (t.inst.type === 37 && t.inst.params) t.inst.params[302] = t.inst.params[303] = -1;   // Moisture wavetables: new sample ids each load
+    if (t.inst.type === 38 && t.inst.params) t.inst.params[13] = t.inst.params[23] = -1;      // Harmor harmonic tables: new sample ids each load
     if (t.inst.type === INST.SOUNDFONT && t.inst.sf) delete t.inst.sf.id;                    // the SoundFont gets a new id when it is loaded
     if (t.inst.zones) for (const z of t.inst.zones) if (z) z.sample = z.sample ? ph(z.sample) : null;
   }
