@@ -67,6 +67,15 @@ function applyFit(w) {
   w.scale = sc;
   w.fitEl.style.transform = `translate(${Math.max(0, (bw - nw * sc) / 2)}px, 0) scale(${sc})`;
 }
+// the width the title bar needs: the device header's items at full size (the name up to 150 px) + the window buttons (the track name hides
+// in a narrow window, css)
+function barNeed(w) {
+  const hd = w.headSlot.firstElementChild, bs = w.bar.querySelector('.fw-bs'); let n = 26 + (bs ? bs.offsetWidth : 0);   // 26 = bar padding + gaps + a little air
+  if (!hd) return n;
+  const gap = parseFloat(getComputedStyle(hd).columnGap) || 0;
+  for (const c of hd.children) { const cs = getComputedStyle(c); if (cs.display === 'none' || cs.position === 'absolute') continue; n += Math.min(150, Math.max(c.offsetWidth, c.scrollWidth)) + (parseFloat(cs.marginLeft) || 0) + (parseFloat(cs.marginRight) || 0) + gap; }
+  return Math.ceil(n);
+}
 function layout(w) { place(w); applyFit(w); if (w.inst && w.inst.onResize && !w.s.shade && !w.s.min) { try { w.inst.onResize(w.body.clientWidth, w.body.clientHeight); } catch (e) { console.error(e); } } }
 
 function remember(w) {
@@ -226,6 +235,10 @@ export function openFloat(opts) {
     if (w.fit) {
       w.s.w = 10; w.s.h = 10; place(w); const nw = w.fitEl.offsetWidth, nh = w.fitEl.offsetHeight;
       if (nw && nh) { const sc = Math.min(1, (A.w - 12) / (nw + 2), (A.h - 12) / (nh + w.bh + 2)); w.s.w = Math.round(nw * sc) + 2; w.s.h = Math.round(nh * sc) + w.bh + 2; }
+      // a card narrower than its own title bar (Limiter ...): the window opens wide enough for the whole bar (name, Mix, swap, menu, window
+      // buttons), the content scaled up with it (aspect kept), so nothing in the bar is cut off
+      const need = Math.min(A.w - 8, barNeed(w));
+      if (nw && nh && w.s.w < need) { const k = need / w.s.w, ch = w.s.h - w.bh - 2; w.s.w = need; w.s.h = Math.min(A.h - 8, Math.round(ch * k) + w.bh + 2); }
     }
   }
   w.s.w = clamp(w.s.w, Math.min(w.minW, A.w - 8), A.w - 8); w.s.h = clamp(w.s.h, Math.min(w.minH, A.h - 8), A.h - 8);

@@ -2185,3 +2185,43 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .hm-fxb { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 6px; border-top: 1px solid var(--hm-ln); }
 /* Harmor in its window: the plug-in takes exactly the window body (its own section scrolls if a tiny window really needs it) */
 .fw-fill > .card:has(.hm) { height: 100%; padding: 0; overflow: hidden; }
+/* ===== module window title bar (every FX / instrument window; owner's marked areas): one thin flat bar. Left = the device header as on
+   the inline card (round power, bold name, Preset / Mix as thin outlined fields, swap / menu as bare icons); right = the track name, a
+   hairline, and the window buttons as bare icons (no joined boxes): a soft round highlight when pressed, red for close ===== */
+.fw .fw-bar { height: 30px; padding: 0 4px 0 6px; gap: 4px; background: var(--lv-title); border-bottom: 1px solid var(--lv-edge); }
+.fw.focus .fw-bar { background: var(--lv-title); }
+.fw .fw-head > h4 { gap: 4px; }
+.fw .fw-head > h4 > * { flex: none; }
+.fw .fw-head > h4 > span:not(.pdot), .fw .fw-head > h4 button.dv-name { flex: 0 1 auto; min-width: 46px; }   /* the name wins over the track name */
+.fw.merged .fw-head { min-width: 0; overflow: hidden; }
+.fw .fw-head > h4 button.pw { position: relative; width: 22px; min-width: 22px; height: 22px; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.fw .fw-head > h4 button.pw::before { content: ""; position: absolute; left: 50%; top: 50%; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; box-sizing: border-box;
+  border: 1.5px solid var(--lv-edge); border-radius: 50%; background: var(--lv-trk); box-shadow: none; }
+.fw .fw-head > h4 button.pw.on::before, .fw .fw-head > h4 .pdot { background: var(--lv-or); box-shadow: 0 0 4px rgba(255, 173, 50, .45); }
+.fw .fw-head > h4 .pdot { width: 13px; height: 13px; margin: 0 4px 0 4px; box-sizing: border-box; border: 1.5px solid var(--lv-edge); border-radius: 50%; }
+.fw .fw-head > h4 > span:not(.pdot), .fw .fw-head > h4 button.dv-name span { font: 700 12.5px/1 var(--font) !important; color: var(--lv-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fw .fw-head > h4 button.dv-name { height: 24px; padding: 0 4px; border: 0 !important; border-radius: 3px; background: transparent !important; display: inline-flex; align-items: center; gap: 5px; }
+.fw .fw-head > h4 button.pre, .fw .fw-head > h4 button.dv-wet.dv-wet:not(.pw) { width: auto !important; min-width: 0; height: 20px !important; margin: 0 0 0 4px; padding: 0 8px !important;
+  border: 1px solid var(--lv-edge) !important; border-radius: 3px !important; background: transparent !important; box-shadow: none !important; color: var(--lv-ink) !important;
+  font: 500 10.5px/18px var(--font) !important; letter-spacing: .02em; }
+.fw .fw-head > h4 button.dv-wet.dv-wet.on:not(.pw) { border-color: var(--lv-or) !important; color: var(--lv-or) !important; }
+.fw .fw-head > h4 :is(.dv-swap, .fw-pop, .fold-b, button.dv-more:not(.pw)) { width: 26px !important; min-width: 26px !important; height: 26px !important; padding: 0 !important;
+  border: 0 !important; border-radius: 50% !important; background: transparent !important; box-shadow: none !important; color: var(--lv-dim) !important;
+  display: inline-flex; align-items: center; justify-content: center; font: 700 13px/1 var(--font) !important; }
+.fw .fw-head > h4 :is(.dv-swap, .fw-pop, .fold-b, button.dv-more):active, .fw .fw-head > h4 :is(button.pre, button.dv-wet):active { background: color-mix(in srgb, var(--lv-ink) 16%, transparent) !important; }
+.fw.merged .fw-sub { flex: 0 1 auto; min-width: 0; margin: 0 6px 0 8px; font: 500 10.5px/1 var(--font); color: var(--lv-dim); }
+.fw .fw-bs { gap: 0; padding: 0 0 0 4px; background: transparent; border-left: 1px solid var(--lv-edge); border-radius: 0; }
+.fw .fw-bs .fw-b { width: 26px; height: 26px; border-radius: 50%; background: transparent; color: var(--lv-dim); }
+.fw .fw-bs .fw-b:first-child, .fw .fw-bs .fw-b:last-child { border-radius: 50%; }
+.fw .fw-bs .fw-b svg { width: 14px; height: 14px; stroke-width: 1.5; }
+.fw.focus .fw-bs .fw-b { color: var(--lv-ink); }
+.fw .fw-bs .fw-b:active { background: color-mix(in srgb, var(--lv-ink) 16%, transparent); }
+.fw .fw-bs .fw-b.fw-x:active { background: var(--rec); color: #fff; }
+@media (hover: hover) { .fw .fw-bs .fw-b:hover { background: color-mix(in srgb, var(--lv-ink) 10%, transparent); } .fw .fw-bs .fw-b.fw-x:hover { background: var(--rec); color: #fff; } }
+.fw.frameless .fw-bar { height: 22px; border-bottom: 0; background: #0c0c0e; }
+.fw.frameless .fw-bs { border-left: 0; } .fw.frameless .fw-bs .fw-b { width: 24px; height: 20px; border-radius: 3px; }
+.fw { container-type: inline-size; container-name: fw; }
+@container fw (max-width: 380px) { .fw.merged .fw-sub { display: none; } }
+.fw .fw-head > h4 { align-items: center; height: 30px !important; }
+.fw .fw-head > h4 > span:not(.pdot) { display: block; line-height: 30px !important; }
+.fw .fw-head > h4 button.dv-name span { line-height: 24px !important; }
