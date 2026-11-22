@@ -81,7 +81,7 @@ function layout(w) { place(w); applyFit(w); if (w.inst && w.inst.onResize && !w.
 function remember(w) {
   const s = w.s;
   if (s.max) { geo[w.id] = { ...(geo[w.id] || {}), max: 1 }; saveGeo(); return; }
-  geo[w.id] = { x: Math.round(s.x), y: Math.round(s.y), w: Math.round(s.w), h: Math.round(s.h), shade: s.shade ? 1 : 0 };
+  geo[w.id] = { x: Math.round(s.x), y: Math.round(s.y), w: Math.round(s.w), h: Math.round(s.h), shade: s.shade ? 1 : 0, ...(w.opts.frac ? { fv: 2 } : {}) };
   saveGeo();
 }
 
@@ -196,7 +196,7 @@ export function openFloat(opts) {
   ensureLayer();
   const ex = wins.get(opts.id);
   if (ex) { if (ex.s.min) setMin(ex, false); raise(ex); return ex; }
-  const A = area(), g = geo[opts.id] || null;
+  const A = area(), g0 = geo[opts.id] || null, g = g0 && (!opts.frac || g0.fv === 2) ? g0 : null;   // opts.frac: sizes remembered before it are dropped once
   const w = {
     id: opts.id, opts, fit: opts.fit !== false, timers: [], inst: null, ro: null, nat: null, scale: 1, chip: null, prev: null,
     bh: opts.frameless ? BAR_SLIM : BAR, minW: opts.minW || (opts.fit !== false ? 120 : 160), minH: opts.minH || (opts.fit !== false ? BAR + 56 : BAR_SLIM + 70),
@@ -241,6 +241,10 @@ export function openFloat(opts) {
       if (nw && nh && w.s.w < need) { const k = need / w.s.w, ch = w.s.h - w.bh - 2; w.s.w = need; w.s.h = Math.min(A.h - 8, Math.round(ch * k) + w.bh + 2); }
     }
   }
+  // big plug-ins (opts.frac = { w, h } of the screen): open at that share, not over the whole screen; a fit window keeps its content's aspect
+  if (opts.frac && !g) { const mw = Math.round(A.w * opts.frac.w), mh = Math.round(A.h * opts.frac.h);
+    if (w.fit) { const k = Math.min(1, mw / w.s.w, mh / w.s.h); if (k < 1) { w.s.h = Math.round((w.s.h - w.bh - 2) * k) + w.bh + 2; w.s.w = Math.round(w.s.w * k); } }
+    else { w.s.w = Math.min(w.s.w, mw); w.s.h = Math.min(w.s.h, mh); } }
   w.s.w = clamp(w.s.w, Math.min(w.minW, A.w - 8), A.w - 8); w.s.h = clamp(w.s.h, Math.min(w.minH, A.h - 8), A.h - 8);
   // opening: the whole window on screen, under the control bar when there is room (its buttons stay usable)
   { const top = document.getElementById('top'), tb = top ? top.offsetHeight : 0; w.s.x = clamp(w.s.x, 4, Math.max(4, A.w - w.s.w - 4)); if (A.h - tb - 4 >= w.s.h) w.s.y = clamp(w.s.y, tb + 2, A.h - w.s.h - 4); else w.s.y = clamp(w.s.y, 0, Math.max(0, A.h - w.s.h)); }

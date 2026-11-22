@@ -501,12 +501,12 @@ function drawRuler(g) {
   const barPx = BAR * view.ppt; let k = 1; while (barPx * k < 34) k *= 2;
   const chg = new Map(P.state.sigs.map((c) => [c.bar, c]));
   const RI = currentTone() === 'light' ? '0,0,0' : '255,255,255';
-  ctx.fillStyle = `rgba(${RI},.22)`;
+  ctx.fillStyle = `rgba(${RI},.85)`;   // ticks in the theme's ink, the same black as the arrangement's grid lines
   eachGrid(view.x0 - g, view.x0 + CW / view.ppt + g, g, (t, j) => { const r = (t - P.MM.T[j]) % P.MM.bl[j]; if (r) ctx.fillRect(Math.round(tx(t)), r % P.MM.bt[j] ? LT - 4 : LT - 7, 1, r % P.MM.bt[j] ? 3 : 6); });   // Live: beat ticks taller than subdivisions
   for (let b = Math.floor(Math.max(0, P.barAt(view.x0)) / k) * k; tx(P.barStart(b)) < CW; b++) {
     const c = chg.get(b), x = Math.round(tx(P.barStart(b)));
-    if (b % k && !c) { ctx.fillStyle = `rgba(${RI},.34)`; ctx.fillRect(x, LT - 10, 1, 9); continue; }   // unlabelled bars: a longer tick
-    ctx.fillStyle = c ? C('#ffa722') : `rgba(${RI},.5)`; ctx.fillRect(x, LT - 12, 1, 11);   // Live: a short line up from the ruler's bottom edge, the number right of it
+    if (b % k && !c) { ctx.fillStyle = `rgba(${RI},.9)`; ctx.fillRect(x, LT - 10, 1, 9); continue; }   // unlabelled bars: a longer tick
+    ctx.fillStyle = c ? C('#ffa722') : `rgb(${RI})`; ctx.fillRect(x, LT - 12, 1, 11);   // Live: a short line up from the ruler's bottom edge, the number right of it
     const lab = String(b + 1); ctx.fillStyle = c ? C('#ffa722') : `rgba(${RI},.72)`; ctx.fillText(lab, x + 3, 4);
     if (c) { ctx.font = FONT(700, 9); ctx.fillText(c.n + '/' + c.d, x + 8 + ctx.measureText(lab).width, 5); ctx.font = FONT(400, 9.5); }
   }
