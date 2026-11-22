@@ -178,6 +178,9 @@ Keputusan pemilik: loop suara real-time Harmor di C++ (pola Moisture); semua bag
   track, garis pemisah tipis, tombol jendela (gulung, kecilkan, perbesar, tutup) sebagai ikon polos 26 px tanpa kotak bersambung
   (sorotan bulat saat ditekan, merah untuk tutup). Kartu yang lebih sempit dari title bar-nya (mis. Limiter) membuka jendela selebar
   bar-nya, isinya ikut diskala (rasio tetap), sehingga nama/Mix/menu tidak terpotong; nama track disembunyikan di jendela < 380 px.
+  Revisi pemilik: tombol jendela menjadi **lampu bulat berwarna ala MacBook** (gambar sendiri, CSS): merah = tutup, kuning = kecilkan,
+  hijau = perbesar, abu-abu = gulung; simbol samar di layar sentuh dan jelas saat ditekan; jendela yang tidak aktif lampunya pudar.
+  Sudut jendela membulat 10 px, field Preset / Mix 5 px.
 - Perbaikan umum: parameter berkurva log yang bisa 0 (Map Speed, 0 = peta berhenti) memakai kurva kubik (sebelumnya knob NaN).
 - Tes `tools/harmor-ui-test.mjs` (24 cek, masuk `run-tests`): Pixel 7 landscape + portrait — 10 bagian tampil, tidak meluber ke samping,
   muat tanpa scroll, display ≥ 40 px, tanpa error; knob geser 0,70 → 1,00 dan ketuk 2× kembali 0,70; devOut 998 saat akor: 2 voice,

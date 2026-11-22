@@ -2225,3 +2225,20 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .fw .fw-head > h4 { align-items: center; height: 30px !important; }
 .fw .fw-head > h4 > span:not(.pdot) { display: block; line-height: 30px !important; }
 .fw .fw-head > h4 button.dv-name span { line-height: 24px !important; }
+/* window buttons as coloured round lights (MobileDAW's own drawing, the macOS idea): red close, yellow minimise, green maximise, grey roll up;
+   the glyph is faint on touch screens and full while pressed / hovered; an unfocused window's lights fade. Windows slightly rounded. */
+.fw { border-radius: 10px; }
+.fw.frameless { border-radius: 8px; }
+.fw .fw-bs { gap: 0; padding: 0 2px 0 6px; border-left: 0; }
+.fw .fw-bs .fw-b, .fw .fw-bs .fw-b:first-child, .fw .fw-bs .fw-b:last-child { position: relative; width: 24px; height: 26px; border-radius: 0; background: transparent !important; color: rgba(0, 0, 0, .62); }
+.fw .fw-bs .fw-b::before { content: ""; position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+  background: var(--lt, #9a9aa2); box-shadow: inset 0 0 0 .5px rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255, 255, 255, .25); transition: filter var(--d3, .15s), opacity var(--d3, .15s); }
+.fw .fw-bs .fw-x { --lt: #ff5f57; order: 1; } .fw .fw-bs .fw-mn { --lt: #febc2e; order: 2; } .fw .fw-bs .fw-mx { --lt: #28c840; order: 3; } .fw .fw-bs .fw-sh { --lt: #a3a3ab; order: 4; }
+.fw .fw-bs .fw-b svg { position: relative; z-index: 1; width: 10px; height: 10px; stroke: currentColor; stroke-width: 2.2; opacity: 0; transition: opacity var(--d3, .15s); }
+@media (hover: none) { .fw .fw-bs .fw-b svg { opacity: .4; } }
+.fw .fw-bs:hover .fw-b svg, .fw .fw-bs .fw-b:active svg { opacity: 1; }
+.fw .fw-bs .fw-b:active::before { filter: brightness(.82); }
+.fw .fw-bs .fw-b.fw-x:active, .fw .fw-bs .fw-b.fw-x:hover { background: transparent !important; color: rgba(0, 0, 0, .62); }
+.fw:not(.focus) .fw-bs .fw-b::before { filter: saturate(.15); opacity: .55; }
+.fw.frameless .fw-bs .fw-b { width: 20px; height: 20px; } .fw.frameless .fw-bs .fw-b::before { width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; }
+.fw .fw-head > h4 button.pre, .fw .fw-head > h4 button.dv-wet.dv-wet:not(.pw) { border-radius: 5px !important; }
