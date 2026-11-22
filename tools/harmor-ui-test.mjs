@@ -116,15 +116,23 @@ await page.waitForTimeout(300);
 const re = await render();
 ok(re.every((x, q) => Math.abs(db(x + 1e-9, odd[q] + 1e-9)) < 0.5), `save / open: the drawn table comes back and renders the same (${re.map((x, q) => db(x + 1e-9, odd[q] + 1e-9).toFixed(2)).join(' ')} dB)`);
 
-// effects rack: ▼ on the first row moves it down (FX order parameters, the row names follow)
+// effects rack: only the effects in use are shown; + Tambah FX adds one (menu), ▼ moves it down (FX order parameters), × removes it
 await page.evaluate(async () => { const P = await import('./js/project.js'), D = await import('./js/devices.js'); D.openInstWindow(P.state.tracks[0].id); });
 await page.waitForSelector('.fw .hm'); await page.evaluate(() => document.querySelectorAll('.fw .hm-pt')[8].click()); await page.waitForTimeout(200);
-const names = () => page.evaluate(() => [...document.querySelectorAll('.fw .hm .hm-fxh b')].map((x) => x.textContent.replace(/^[▸▾] /, '')));
-const o0 = await names(); await page.evaluate(() => [...document.querySelectorAll('.fw .hm .hm-fx')[0].querySelectorAll('.hm-btn')].find((x) => x.textContent === '▼').click()); await page.waitForTimeout(150);
-const o1 = await names(), ord = [await param(page, HM.FX_ORDER), await param(page, HM.FX_ORDER + 1)];
-ok(o1[0] === o0[1] && o1[1] === o0[0] && o1.length === o0.length, `FX reorder: ${o0.slice(0, 2).join(', ')} -> ${o1.slice(0, 2).join(', ')} (order params ${ord.join(', ')})`);
-await page.evaluate(() => document.querySelectorAll('.fw .hm .hm-fxh b')[1].click()); await page.waitForTimeout(150);
-ok(await page.evaluate(() => document.querySelectorAll('.fw .hm .hm-fxb .hm-k').length) > 1, 'FX: tapping a row name opens the device\'s knobs');
+const names = () => page.evaluate(() => [...document.querySelectorAll('.fw .hm .hm-fxh b')].map((x) => x.textContent));
+const fx0 = (await names()).length;
+const addFx = async (label) => { await page.evaluate(() => document.querySelector('.fw .hm .hm-fxadd').click()); await page.waitForTimeout(500);   // a menu ignores taps for its first moments (ghost clicks)
+  await page.evaluate((l) => [...document.querySelectorAll('.menu .mi')].find((x) => x.textContent.trim() === l).click(), label); await page.waitForTimeout(150); };
+await addFx('Delay'); await addFx('Reverb');
+const o0 = await names();
+ok(fx0 === 0 && o0.join() === 'Delay,Reverb', `FX: none shown by default (${fx0}), + Tambah FX adds them in order: ${o0.join(', ')}`);
+ok(await page.evaluate(() => document.querySelectorAll('.fw .hm .hm-fx')[0].querySelectorAll('.hm-fxb .hm-k').length) > 1, 'FX: an added effect shows its knobs (Mix + its parameters)');
+await page.evaluate(() => [...document.querySelectorAll('.fw .hm .hm-fx')[0].querySelectorAll('.hm-btn')].find((x) => x.textContent === '▼').click()); await page.waitForTimeout(150);
+const o1 = await names();
+ok(o1.join() === 'Reverb,Delay', `FX reorder: ${o0.join(', ')} -> ${o1.join(', ')}`);
+await page.evaluate(() => document.querySelectorAll('.fw .hm .hm-fx')[0].querySelector('.hm-fxx').click()); await page.waitForTimeout(150);
+const o2 = await names(), rvOn = await param(page, HM.FX + HM.FX_STRIDE * 4);
+ok(o2.join() === 'Delay' && rvOn === 0, `FX remove: × turns the effect off and hides it (${o2.join(', ')}, Reverb on = ${rvOn})`);
 ok(!errs.length, `interaction: no page errors ${errs.slice(0, 2).join(' | ')}`);
 
 await b.close(); server.close();

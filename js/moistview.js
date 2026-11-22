@@ -178,15 +178,24 @@ export function moistureView(k) {
     ['REVERB', 160, () => [knob(82, 'SIZE'), knob(83, 'PRE DLY'), knob(84, 'LOW CUT'), knob(85, 'DAMP'), knob(86, 'HIGH CUT'), knob(87, 'WIDTH'), knob(81, 'MIX')]],
     ['EQ', 161, () => [pick(94, ['Shelf', 'Peak', 'Cut'], 3), knob(88, 'FREQ L'), knob(90, 'Q L'), knob(92, 'GAIN L', { bip: true }), pick(95, ['Shelf', 'Peak', 'Cut'], 3), knob(89, 'FREQ H'), knob(91, 'Q H'), knob(93, 'GAIN H', { bip: true })]],
     ['FILTER', 162, () => [pick(142, M2_FILTERS, 96), knob(143, 'CUTOFF'), knob(144, 'RES'), knob(145, 'DRIVE'), knob(146, 'VAR'), knob(268, 'PAN', { bip: true }), knob(141, 'MIX')]]];
-  const fxPage = () => FX.map(([name, on, ctl]) => h('div', { class: 'm2x-fx' }, h('div', { class: 'm2x-fxh' }, led(on, ''), h('b', {}, name)), h('div', { class: 'm2x-fxb' }, ...ctl())));
+  // only the effects in use (their on switch), in Serum's fixed chain order; + Tambah FX turns one on, × turns it off
+  const fxPage = () => {
+    const act = FX.filter(([, on]) => k.get(on) > 0.5), free = FX.filter(([, on]) => k.get(on) <= 0.5);
+    const add = h('button', { class: 'm2x-btn prim m2x-fxadd', onclick: (e) => { const r = e.currentTarget.getBoundingClientRect(); if (!free.length) return;
+      menu(free.map(([name, on]) => ({ label: name, fn: () => { k.set(on, 1); show(PAGE.get(pid) || 0); } })), r.left, r.bottom + 2); } }, '+ Tambah FX');
+    const mods = act.map(([name, on, ctl]) => h('div', { class: 'm2x-fx' }, h('div', { class: 'm2x-fxh' }, h('b', {}, name),
+      h('button', { class: 'm2x-fxx', title: 'Hapus efek', onclick: () => { k.set(on, 0); show(PAGE.get(pid) || 0); } }, '×')), h('div', { class: 'm2x-fxb' }, ...ctl())));
+    return [h('div', { class: 'm2x-fxbar' }, add, h('span', { class: 'm2x-note' }, act.length ? act.length + ' efek aktif • urutan rantai tetap (atas ke bawah)' : 'Belum ada efek. Ketuk + Tambah FX.')),
+      h('div', { class: 'm2x-fxlist' }, ...mods)];
+  };
   // ---- MATRIX page
-  const matrixPage = () => { const list = h('div', { class: 'm2x-mx' }, ...['#', 'SOURCE', 'AMOUNT', 'DESTINATION', 'OUTPUT'].map((t) => h('span', { class: 'm2x-mxh' }, t)));
+  const matrixPage = () => { const hd = () => ['#', 'SOURCE', 'AMOUNT', 'DESTINATION', 'OUTPUT'].map((t) => h('span', { class: 'm2x-mxh' }, t)), cols = [h('div', { class: 'm2x-mx' }, ...hd()), h('div', { class: 'm2x-mx' }, ...hd())], half = Math.ceil(M2.ROUTES / 2);
     for (let r = 0; r < M2.ROUTES; r++) { const sj = M2.ROUTE + 2 * r, dj = sj + 1, b = m2Bank(r);
       const dst = h('button', { class: 'm2x-dd' }); const dd = () => { const cur = Math.round(k.get(dj)), d = M2_DESTS.find(([pi]) => pi === cur); dst.textContent = (d ? d[1] : '—') + ' ▾'; };
       dst.onclick = (e) => { const rc = e.currentTarget.getBoundingClientRect(), cur = Math.round(k.get(dj)); menu([{ label: '—', check: cur < 0, fn: () => { k.set(dj, -1); dd(); } }, ...M2_DESTS.map(([pi, n]) => ({ label: n, check: pi === cur, fn: () => { k.set(dj, pi); dd(); } }))], rc.left, rc.bottom + 2); };
       dst.update = dd; dd(); k.reg(dst, dj);
-      list.append(h('span', { class: 'm2x-mxn' }, String(r + 1)), pick(sj, M2_SOURCES, 0), numBox(b, ''), dst, numBox(b + 1, '')); }
-    return [list]; };
+      cols[r < half ? 0 : 1].append(h('span', { class: 'm2x-mxn' }, String(r + 1)), pick(sj, M2_SOURCES, 0), numBox(b, ''), dst, numBox(b + 1, '')); }
+    return [h('div', { class: 'm2x-mxw' }, ...cols)]; };
   // ---- GLOBAL page
   const ev = (name, detail) => () => document.dispatchEvent(new CustomEvent(name, { detail: { i: k.ctx.i, ...detail } }));
   const tName = (o) => (o ? 'B' : 'A');

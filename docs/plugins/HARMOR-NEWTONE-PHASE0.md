@@ -224,6 +224,19 @@ Keputusan pemilik: loop suara real-time Harmor di C++ (pola Moisture); semua bag
 - **ACC IMUT KABODY** dari `imut.wav` mentah (tanpa trim): Map End 0.30 s, Map Noise imut 0.45, body 0.35. Dibanding referensi:
   LSD 4.89 dB (sebelumnya 5.75), envelope corr 0.989, 98.5 % frame nada sama, side/mid -13.8 dB (target -13.5).
 
+### Phase 6c (Harmor + Moisture) — desain ulang dari referensi pemilik: selesai (tes lulus)
+
+Acuan: screenshot dan manual dari pemilik (tata letak, kepadatan, alur kerja). Gambar, warna khas, dan aset produk komersial tidak disalin.
+- **Harmor**: satu permukaan instrumen, kelompok dipisah garis tipis (bukan kotak seragam), judul dengan garis aksen; knob tiga
+  ukuran (lg 44 / 38 / sm 30) dengan label dan nilai di bawah knob.
+- **Harmor IMG**: peta (spektrogram) mengisi halaman, dengan arsir di luar Start..End, garis Start / End, dan penanda Loop; kolom samping
+  sempit berisi Audio… / Gambar… / Hapus, Kualitas, info analisis, 8 knob kecil (Start End Speed Shift Mix Level Noise Freq Dev),
+  Loop / Interp / Formant / Fase, dan opsi gambar (hanya saat peta dari gambar).
+- **FX (Harmor dan Moisture)**: hanya efek yang aktif yang tampil sebagai modul; **+ Tambah FX** membuka menu efek yang belum dipakai;
+  × mematikan efek. Harmor: ▲▼ mengubah urutan (parameter FX order). Moisture: urutan rantai tetap. Knob FX Moisture 48 px.
+- **Moisture**: tinggi body sama di semua halaman (skala jendela tetap); MATRIX dua kolom (32 rute); GLOBAL mengisi halaman.
+- Tes: `harmor-ui-test` (FX: kosong secara default, tambah Delay + Reverb, urutan, hapus), `moisture-ui-test` (baru).
+
 ## 5. Referensi dari pemilik (untuk fase berikutnya)
 
 ### Tampilan Harmor (screenshot Harmor di Live 12) — acuan Phase 6, disederhanakan untuk HP, tidak ditiru

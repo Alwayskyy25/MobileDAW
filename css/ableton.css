@@ -2279,12 +2279,6 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .fw .fw-bs .fw-b, .fw .fw-bs .fw-b:first-child, .fw .fw-bs .fw-b:last-child { width: 18px; height: 20px; }
 .fw .fw-bs .fw-b::before { width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; }
 .fw.frameless .fw-bar { height: 20px; }
-/* Harmor: bigger knobs, easy to reach with a thumb (owner); the value / label text a little larger too */
-.hm .hm-k { width: 62px; }
-.hm .hm-kn { width: 44px; height: 44px; }
-.hm .hm-top .hm-kn { width: 32px; height: 32px; }
-.hm .hm-fxh .hm-kn { width: 30px; height: 30px; }
-.hm .hm-top .hm-k, .hm .hm-fxh .hm-k { width: auto; }
 .hm-grid.g-mod { grid-template-columns: minmax(130px, .75fr) 1fr 1fr 1.75fr; }
 @media (max-width: 640px) { .hm-grid.g-mod { grid-template-columns: 1fr 1fr; } }
 .hm .hm-fxh b { min-height: 38px; }                      /* effect rows: taller, easy to tap */
@@ -2299,28 +2293,12 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .m2x-mods { grid-template-columns: 118px 252px 1fr 150px; }
 /* Harmor v3 (owner: still empty space, knobs too small): knobs share the panel's width and grow with it (up to 64 px),
    a panel's content sits centred in its height, chips / buttons / toggles taller */
-.hm-p .hm-row:has(> .hm-k) { flex-wrap: nowrap; justify-content: space-evenly; align-items: center; }
-.hm-p .hm-row > .hm-k { flex: 1 1 0; width: auto; min-width: 46px; max-width: 120px; }
-.hm-p .hm-k .hm-kn { width: 100%; max-width: 64px; min-width: 40px; height: auto; aspect-ratio: 1; }
 .hm-p .hm-kl, .hm-p .hm-kv { font-size: 11px; max-width: none; }
 .hm-grid > .hm-p > :not(.hm-ph) { margin-block: auto; }
 .hm .hm-chip, .hm .hm-tog { min-height: 32px; padding: 0 10px; }
 .hm .hm-dd, .hm .hm-btn { min-height: 34px; }
 .hm .hm-num { min-height: 46px; min-width: 58px; }
 .hm .hm-ph b { font-size: 10.5px; }
-/* the articulator / LFO editor rows: knobs share the width too */
-.hm-col.grow .hm-row:has(> .hm-k) { flex-wrap: nowrap; justify-content: space-evenly; align-items: center; }
-.hm-col.grow .hm-row > .hm-k { flex: 1 1 0; width: auto; min-width: 46px; max-width: 110px; }
-.hm-col.grow .hm-k .hm-kn { width: 100%; max-width: 56px; min-width: 40px; height: auto; aspect-ratio: 1; }
-/* FX rack: the closed rows share the height (no empty space under them), bigger Mix knob; an open effect's knobs fill its width */
-.hm-main:has(> .hm-fx) > .hm-fx { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
-.hm-main:has(> .hm-fx) > .hm-fx.open { flex: 0 0 auto; }
-.hm .hm-fxh .hm-kn { width: 38px; height: 38px; }
-.hm .hm-fxh .hm-kv { font-size: 11px; }
-.hm .hm-fxh b { font-size: 12px; }
-.hm .hm-fxb { display: flex; flex-wrap: wrap; justify-content: space-evenly; }
-.hm .hm-fxb > .hm-k { flex: 1 1 64px; max-width: 110px; }
-.hm .hm-fxb .hm-kn { width: 100%; max-width: 54px; height: auto; aspect-ratio: 1; }
 .hm-grid.g-mod { grid-template-columns: 1fr 1.1fr 1.1fr 1.7fr; }
 .hm .hm-opts .hm-chips > .hm-chip { flex: 1 1 0; text-align: center; }
 .hm .hm-opts .hm-chips > .hm-lab { width: 58px; flex: none; }
@@ -2338,3 +2316,81 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
    text; the layout reflows in the narrower width, like landscape) */
 @media (orientation: portrait) { .fw .hm { zoom: 1.45; } }
 @media (orientation: portrait) { .fw .hm .hm-chips.scroll { flex-wrap: wrap; overflow: visible; } }
+/* ===== Harmor v4 (owner: "looks AI-made", knobs too big, map too small). One continuous instrument surface instead of a grid of identical
+   boxes: groups are separated by hairlines, titled with a short accent bar; knobs come in three sizes by importance (lg 44 / 34 / sm 28)
+   with the label UNDER the knob and the value under that; the IMG page is the map (left, full height) with a narrow side column; the FX
+   page shows only the effects in use (+ Tambah FX adds one). MobileDAW's own drawing. ===== */
+.hm { --hm-bg: #1b1a1b; --hm-p: #242223; --hm-ph: #2c2a2b; --hm-ln: #0f0e0f; --hm-rule: #353233; }
+.hm-main { gap: 0; background: var(--hm-p); border: 1px solid var(--hm-ln); border-radius: 4px; }
+.hm-main > .hm-grid, .hm-main > .hm-p { border-bottom: 1px solid var(--hm-ln); }
+.hm-grid { gap: 0; }
+.hm-grid > .hm-p + .hm-p { border-left: 1px solid var(--hm-rule); }
+.hm-p { background: transparent; border: 0; border-radius: 0; padding: 6px 8px; }
+.hm-ph b { position: relative; padding-left: 7px; font: 600 10.5px/1.2 var(--font, system-ui) !important; letter-spacing: .06em; color: #bdb8b4; }
+.hm-ph b::before { content: ""; position: absolute; left: 0; top: 1px; bottom: 1px; width: 2px; border-radius: 1px; background: var(--hm-or); }
+/* knobs: sizes by role, label + value under the knob */
+.hm .hm-k { width: 56px; gap: 1px; }
+.hm .hm-k > svg { order: 0; } .hm .hm-k > .hm-kv { order: 1; color: #f0c48a; font-size: 10px; } .hm .hm-k > .hm-kl { order: 2; font-size: 10px; color: #9b9591; }
+.hm .hm-kn { width: 34px; height: 34px; }
+.hm .hm-k.sm { width: 48px; } .hm .hm-k.sm .hm-kn { width: 28px; height: 28px; } .hm .hm-k.sm .hm-kl, .hm .hm-k.sm .hm-kv { font-size: 9.5px; }
+.hm .hm-k.lg { width: 64px; } .hm .hm-k.lg .hm-kn { width: 44px; height: 44px; }
+.hm .hm-kn circle { fill: #343031; stroke: #0b0a0a; }
+.hm .hm-top .hm-k { width: auto; } .hm .hm-top .hm-k > .hm-kl { order: 0; } .hm .hm-top .hm-kn { width: 28px; height: 28px; }
+.hm .hm-p .hm-row:has(> .hm-k) { justify-content: flex-start; gap: 2px 6px; flex-wrap: wrap; align-items: flex-start; }
+.hm .hm-chip, .hm .hm-tog { min-height: 28px; padding: 0 9px; background: #2f2c2d; border-color: #141213; }
+.hm .hm-dd, .hm .hm-btn { min-height: 28px; background: #2f2c2d; border-color: #141213; }
+.hm .hm-btn.prim { background: var(--hm-or); color: #1a1208; border-color: #a8611a; font-weight: 600; }
+.hm .hm-num { min-height: 40px; min-width: 52px; }
+.hm-disp { border-color: #0d0c0c; border-radius: 2px; }
+/* IMG: the map fills the page; the side column is narrow */
+.hm-main:has(> .hm-img) { overflow: hidden; }
+.hm-img { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 272px; gap: 0; }
+.hm-img > .hm-map { height: auto; min-height: 0; border: 0; border-right: 1px solid var(--hm-ln); border-radius: 0; }
+.hm-imgside { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.hm-imgside > .hm-imgsrc { display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--hm-rule); }
+.hm-imgside .hm-row > .hm-btn { flex: 1 1 0; text-align: center; }
+.hm-imgside .hm-report { font-size: 9.5px; color: #b9b3ad; background: #1c1a1b; }
+.hm-kgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px 0; justify-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--hm-rule); }
+.hm-tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.hm-tgrid > .hm-tog { justify-content: flex-start; }
+.hm-imgside .hm-opts { grid-template-columns: 1fr; gap: 3px; }
+.hm-imgside .hm-opts .hm-chips > .hm-lab { width: 50px; }
+.hm-imgside .hm-opts .hm-chip { min-height: 24px; padding: 0 4px; }
+/* FX: only the effects in use, as modules in a grid; + Tambah FX */
+.hm-fxbar { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--hm-ln); flex: none; }
+.hm-fxlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0; align-content: start; flex: 1 1 auto; }
+.hm-fxlist > .hm-fx { background: transparent; border: 0; border-radius: 0; border-bottom: 1px solid var(--hm-rule); border-right: 1px solid var(--hm-rule); padding: 4px 6px 6px; }
+.hm .hm-fxh { padding: 0 0 2px; gap: 4px; }
+.hm .hm-fxh b { flex: 1 1 auto; min-height: 24px; font-size: 11.5px; cursor: default; }
+.hm .hm-fxh .hm-btn.sm { min-height: 24px; min-width: 26px; padding: 0 6px; text-align: center; }
+.hm .hm-fxh .hm-fxx:active { background: #a33; }
+.hm .hm-fxb { display: flex; flex-wrap: wrap; gap: 2px 4px; padding: 2px 0 0; border: 0; }
+/* the pitch page's display: taller, the side labels apart */
+.hm-pitch { min-height: 120px; }
+.hm .hm-chip.on { background: var(--hm-or); color: #1a1208; border-color: #a8611a; font-weight: 600; }
+.hm .hm-kn { width: 38px; height: 38px; } .hm .hm-k { width: 58px; }
+.hm .hm-k.sm .hm-kn { width: 30px; height: 30px; } .hm .hm-k.sm { width: 50px; }
+.hm .hm-top .hm-kn { width: 28px; height: 28px; }
+/* ===== Moisture v4 (owner: FX knobs too small, all effects listed, empty space). Every page has the same fixed height (the window keeps
+   one scale), FX shows only the effects in use as modules with big knobs (+ Tambah FX adds one, × removes), MATRIX in two columns, GLOBAL
+   fills the page. ===== */
+.m2x-body { height: 560px; min-height: 0; }
+.m2x-body.pg-fx, .m2x-body.pg-matrix { overflow-y: auto; overscroll-behavior: contain; }
+.m2x-fxbar { display: flex; align-items: center; gap: 10px; flex: none; }
+.m2x-btn.m2x-fxadd { height: 30px; padding: 0 14px; font-weight: 700; letter-spacing: .04em; }
+.m2x-fxlist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; align-content: start; }
+.m2x-fx { flex-direction: column; align-items: stretch; gap: 4px; padding: 0 0 8px; overflow: hidden; }
+.m2x-fxh { width: auto; height: 24px; padding: 0 4px 0 8px; background: var(--m2-ph); border-bottom: 1px solid var(--m2-ln); gap: 8px; }
+.m2x-fxh b { flex: 1; font-size: 11px; letter-spacing: .07em; }
+.m2x-fxx { width: 24px; height: 20px; border: 0; border-radius: 2px; background: transparent; color: var(--m2-dim) !important; font-size: 15px !important; line-height: 1; }
+.m2x-fxx:active { background: #a33; color: #fff !important; }
+.m2x-fxb { flex-wrap: wrap; justify-content: space-evenly; gap: 6px 4px; padding: 4px 8px 0; }
+.m2x-fx .m2x-kn { width: 48px; height: 48px; } .m2x-fx .m2x-k { min-width: 56px; } .m2x-fx .m2x-kl { font-size: 10px; }
+.m2x-fx .m2x-dd { height: 24px; } .m2x-fx .m2x-led { height: 22px; }
+.m2x-mxw { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.m2x-mxw > .m2x-mx { max-height: none; grid-template-columns: 22px minmax(0, 1.4fr) 64px minmax(0, 1.6fr) 56px; gap: 3px 6px; }
+.m2x-glob { height: 100%; grid-template-rows: auto 1fr; }
+.m2x-glob > .m2x-p:first-child .m2x-kn { width: 52px; height: 52px; }
+.m2x-glob .m2x-btn { height: 34px; }
+@media (max-height: 620px) { .m2x-body { height: 450px; } }
+.m2x-glob > .m2x-p { display: flex; flex-direction: column; } .m2x-glob > .m2x-p > :not(.m2x-ph) { flex: 1; justify-content: center; }

@@ -37,7 +37,7 @@ export function harmorView(k) {
     const vt = h('span', { class: 'hm-kv' }), bip = o.bip ?? (p.min < 0 && p.max > 0);
     const draw = () => { const v = normOf(p, k.get(j)), a = A0 + (A1 - A0) * v, z = bip ? A0 + (A1 - A0) * normOf(p, 0) : A0;
       val.setAttribute('d', Math.abs(a - z) < 0.02 ? '' : arc(Math.min(a, z), Math.max(a, z))); ptr.setAttribute('x2', 20 + 9 * Math.cos(a)); ptr.setAttribute('y2', 20 + 9 * Math.sin(a)); vt.textContent = fmtParam(p, k.get(j)); };
-    const root = h('div', { class: 'hm-k' }, h('span', { class: 'hm-kl' }, label || p.n), svg, vt);
+    const root = h('div', { class: 'hm-k' + (o.size ? ' ' + o.size : '') }, h('span', { class: 'hm-kl' }, label || p.n), svg, vt);
     dragV(svg, j, (v) => valOf(p, C01(v)), () => normOf(p, k.get(j)), () => { draw(); say(j); }, p.step);
     root.update = draw; draw(); return k.reg(root, j);
   }
@@ -324,11 +324,16 @@ export function harmorView(k) {
     const hm = (t() && t().inst.hm) || null, H = () => import('./harmor.js');
     if (st.resQ == null && hm && hm.src === 'audio' && hm.opts && hm.opts.quality != null) st.resQ = hm.opts.quality;   // the quality the map was made at
     const map = disp((g, w, hh) => {
-      const m = mapView(); if (!m) { txt(g, 'Belum ada peta. Muat gambar atau audio di bawah.', w / 2, hh / 2, DIM, 11, 'center'); return; }
+      const m = mapView(); if (!m) { txt(g, 'Belum ada peta — muat audio atau gambar (kanan).', w / 2, hh / 2, DIM, 11, 'center'); return; }
       const { frames, bins, data } = m, img = g.createImageData(Math.max(1, Math.round(w)), Math.max(1, Math.round(hh))), W = img.width, Hh = img.height;
       for (let x = 0; x < W; x++) { const f = Math.min(frames - 1, Math.floor(x / W * frames)); for (let y = 0; y < Hh; y++) { const b = Math.min(bins - 1, Math.floor((1 - y / Hh) * bins)), a = data[16 + f * bins + b] || 0, db = a > 0 ? 20 * Math.log10(a) : -120, v = C01((db + 66) / 60), o = (y * W + x) * 4;
         img.data[o] = 30 + 225 * v; img.data[o + 1] = 22 + 135 * v * v; img.data[o + 2] = 18 + 30 * v; img.data[o + 3] = 255; } }
       { const c2 = document.createElement('canvas'); c2.width = W; c2.height = Hh; c2.getContext('2d').putImageData(img, 0, 0); g.imageSmoothingEnabled = false; g.drawImage(c2, 0, 0, w, hh); }   // through a canvas: putImageData ignores the display scale
+      { const xa = C01(k.get(HM.MAP_START)) * w, xb = Math.max(xa, C01(k.get(HM.MAP_END)) * w), lp = k.get(HM.MAP_LOOP) > 0.5;   // the play range: outside it dimmed, Start / End lines
+        g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 0, xa, hh); g.fillRect(xb, 0, w - xb, hh);
+        if (lp) { g.fillStyle = 'rgba(95,212,245,.55)'; g.fillRect(xa, 0, xb - xa, 2); }   // Loop: a thin bar over the looped range (the map stays readable)
+        g.fillStyle = OR; g.fillRect(Math.round(xa), 0, 2, hh); g.fillStyle = lp ? BL : '#e6e6e6'; g.fillRect(Math.round(xb) - 2, 0, 2, hh);
+        txt(g, 'Start', xa + 4, hh - 6, OR, 9); txt(g, lp ? 'Loop End' : 'End', xb - 4, hh - 6, lp ? BL : INK, 9, 'right'); }
       txt(g, (hm ? (hm.src === 'image' ? 'Gambar: ' : 'Audio: ') + hm.path.split('/').pop() : '') + '  •  ' + frames + ' frame × ' + bins + (m.layout ? ' pita log' : ' partial') + (hm && hm.src === 'image' ? '  •  geser = pan, cubit = zoom' : ''), 6, 12, INK, 10);
     }, { cls: 'hm-map grow', touch: hm && hm.src === 'image' ? { down: (x, y) => ({ x, y, o: { ...(t().inst.hm.opts || {}) } }), move: (x, y, s) => { s.dx = x - s.x; s.dy = y - s.y; },
       up: (s) => { if (!s || (!s.dx && !s.dy)) return; const [w, hh] = map.size(), o = s.o, cw = (o.x1 ?? 1) - (o.x0 ?? 0), chh = (o.y1 ?? 1) - (o.y0 ?? 0), mx = -s.dx / w * cw, my = s.dy / hh * chh;
@@ -340,30 +345,42 @@ export function harmorView(k) {
     const mapView = () => { const id = Math.round(k.get(HM.MAP_A)); if (!(id >= 0)) return null; const b = eng.sampleBuffers && eng.sampleBuffers(id); if (!b || !b.l || Math.abs(b.l[0] - 4096.5) > 1e-3) return null; return { frames: Math.round(b.l[1]), bins: Math.round(b.l[2]), layout: Math.round(b.l[4]), data: b.l }; };
     const imgOpts = () => (hm && hm.src === 'image' ? hm.opts || {} : {});
     const optBtn = (label, key, vals, names) => { const cur = imgOpts()[key] ?? vals[0]; return h('div', { class: 'hm-chips' }, h('span', { class: 'hm-lab' }, label), ...vals.map((v, q) => h('button', { class: 'hm-chip' + (cur === v ? ' on' : ''), onclick: () => { if (!hm || hm.src !== 'image') { toast('Muat gambar dulu.'); return; } applyImg({ ...imgOpts(), [key]: v }).then(showEd); } }, names[q]))); };
-    const imgP = panel('IMAGE SYNTHESIS', colm(row(h('button', { class: 'hm-btn prim', onclick: async () => { const f = await eng.importFiles('image/*,.png,.jpg,.jpeg,.webp,.bmp,.gif'); if (!f.length) return; toast('Membuat peta…', 6000); const r = await (await H()).harmorLoadImage(i(), f[0], { seconds: 2 }); toast(r.error || 'Gambar dimuat.'); show(); } }, 'Muat gambar…')),
-      h('div', { class: 'hm-opts' }, optBtn('Peta', 'layout', [0, 1], ['Harmonik', 'Frekuensi']), optBtn('Gamma', 'gamma', [1, 0.5, 2], ['1', '0.5', '2']), optBtn('Rentang', 'rangeDb', [60, 40, 90], ['60', '40', '90 dB']),
-      optBtn('Durasi', 'seconds', [2, 1, 4, 8], ['2', '1', '4', '8 s']), optBtn('Stereo', 'stereo', [false, true], ['Mono', 'Warna']))), { cls: 'img' });
+    // the map takes the room (left, full height); a narrow side column holds the source, the play controls and the options (small knobs)
+    const loadAudio = async () => { const f = await eng.importFiles('audio/*,.wav,.mp3,.flac,.ogg,.aif,.aiff,.m4a'); if (!f.length) return; const q = Math.round(st.resQ ?? 1);
+      const r = await (await H()).harmorLoadAudio(i(), f[0], { quality: q }, (x) => { status.textContent = 'Menganalisis ' + Math.round(x * 100) + ' %'; }); if (r.error) toast(r.error, 5000); show(); };
+    const loadImage = async () => { const f = await eng.importFiles('image/*,.png,.jpg,.jpeg,.webp,.bmp,.gif'); if (!f.length) return; toast('Membuat peta…', 6000); const r = await (await H()).harmorLoadImage(i(), f[0], { seconds: 2 }); toast(r.error || 'Gambar dimuat.'); show(); };
     const rp = hm && hm.src === 'audio' && hm.report;
-    const resP = panel('AUDIO RESYNTHESIS', colm(row(h('button', { class: 'hm-btn prim', onclick: async () => { const f = await eng.importFiles('audio/*,.wav,.mp3,.flac,.ogg,.aif,.aiff,.m4a'); if (!f.length) return; const q = Math.round(st.resQ ?? 1);
-        const r = await (await H()).harmorLoadAudio(i(), f[0], { quality: q }, (x) => { status.textContent = 'Menganalisis ' + Math.round(x * 100) + ' %'; }); if (r.error) toast(r.error, 5000); show(); } }, 'Muat audio…'),
-      h('div', { class: 'hm-chips' }, h('span', { class: 'hm-lab' }, 'Kualitas'), ...HM_QUALITY.map((n, q) => h('button', { class: 'hm-chip' + ((st.resQ ?? 1) === q ? ' on' : ''), onclick: () => { st.resQ = q; show(); } }, n)))),
-      h('div', { class: 'hm-report' }, rp ? (rp.pitched ? `Nada ${noteName(Math.round(rp.note))} (${rp.hz.toFixed(1)} Hz) • ${rp.partials} partial • ${Math.round(rp.voiced * 100)} % bernada • ${rp.frames} frame` : `Tanpa nada: ${rp.why} — peta spektrum frekuensi`) : 'Audio vokal / instrumen bernada tunggal paling akurat.'),
-      row(tog(HM.MAP_FORMANT, 'Formant'), knob(HM.MAP_FDEV, 'Freq Dev'), tog(HM.MAP_PHASE, 'Fase'))), { cls: 'res' });
-    const common = panel('PETA', row(knob(HM.MAP_MIX, 'Mix'), knob(HM.MAP_LEVEL, 'Level'), knob(HM.MAP_SHIFT, 'Shift'), knob(HM.MAP_SPEED, 'Speed'), knob(HM.MAP_NOISE, 'Noise'), knob(HM.MAP_START, 'Start'), knob(HM.MAP_END, 'End'), colm(tog(HM.MAP_LOOP, 'Loop'), tog(HM.MAP_INTERP, 'Interp')),
-      h('button', { class: 'hm-btn sm', onclick: async () => { (await H()).harmorClearMap(i()); show(); } }, 'Hapus')), { cls: 'wide' });
-    return [map, h('div', { class: 'hm-grid g-2' }, imgP, resP), common];
+    const info = h('div', { class: 'hm-report' }, rp ? (rp.pitched ? `${noteName(Math.round(rp.note))} ${rp.hz.toFixed(1)} Hz • ${rp.partials} partial • ${Math.round(rp.voiced * 100)} % bernada` : `Tanpa nada: ${rp.why}`) : hm && hm.src === 'image' ? 'Peta dari gambar' : 'Vokal / instrumen bernada tunggal paling akurat');
+    const src = h('div', { class: 'hm-imgsrc' },
+      row(h('button', { class: 'hm-btn prim', onclick: loadAudio }, 'Audio…'), h('button', { class: 'hm-btn', onclick: loadImage }, 'Gambar…'), h('button', { class: 'hm-btn', onclick: async () => { (await H()).harmorClearMap(i()); show(); } }, 'Hapus')),
+      h('div', { class: 'hm-chips' }, h('span', { class: 'hm-lab' }, 'Kualitas'), ...HM_QUALITY.map((n, q) => h('button', { class: 'hm-chip' + ((st.resQ ?? 1) === q ? ' on' : ''), onclick: () => { st.resQ = q; show(); } }, n))), info);
+    const S = { size: 'sm' };
+    const play = h('div', { class: 'hm-kgrid' }, knob(HM.MAP_START, 'Start', S), knob(HM.MAP_END, 'End', S), knob(HM.MAP_SPEED, 'Speed', S), knob(HM.MAP_SHIFT, 'Shift', S),
+      knob(HM.MAP_MIX, 'Mix', S), knob(HM.MAP_LEVEL, 'Level', S), knob(HM.MAP_NOISE, 'Noise', S), knob(HM.MAP_FDEV, 'Freq Dev', S));
+    const tg = h('div', { class: 'hm-tgrid' }, tog(HM.MAP_LOOP, 'Loop', { after: () => map.paint() }), tog(HM.MAP_INTERP, 'Interp'), tog(HM.MAP_FORMANT, 'Formant'), tog(HM.MAP_PHASE, 'Fase'));
+    const imgOpt = hm && hm.src === 'image' ? h('div', { class: 'hm-opts' }, optBtn('Peta', 'layout', [0, 1], ['Harm', 'Frek']), optBtn('Gamma', 'gamma', [1, 0.5, 2], ['1', '.5', '2']), optBtn('Rentang', 'rangeDb', [60, 40, 90], ['60', '40', '90']),
+      optBtn('Durasi', 'seconds', [2, 1, 4, 8], ['2', '1', '4', '8 s']), optBtn('Stereo', 'stereo', [false, true], ['Mono', 'Warna'])) : null;
+    const side = h('div', { class: 'hm-imgside' }, src, play, tg, imgOpt);
+    return [h('div', { class: 'hm-img' }, map, side)];
   };
 
-  // ---------------------------------------------------------------- editor: effects rack, advanced
+  // ---------------------------------------------------------------- editor: effects rack (only the effects in use; + adds one), advanced
   const fxTab = () => {
     const order = () => { const o = [], used = new Set(); for (let s = 0; s < HM_FX.length; s++) { const q = Math.round(k.get(HM.FX_ORDER + s)); if (q >= 0 && q < HM_FX.length && !used.has(q)) { used.add(q); o.push(q); } } for (let q = 0; q < HM_FX.length; q++) if (!used.has(q)) o.push(q); return o; };
-    const move = (q, d) => { const o = order(), a = o.indexOf(q), b = a + d; if (b < 0 || b >= o.length) return; [o[a], o[b]] = [o[b], o[a]]; o.forEach((x, s) => k.set(HM.FX_ORDER + s, x)); show(); };
-    return order().map((q, s) => {
-      const [name, type] = HM_FX[q], open = st.fxOpen === q, dp = (DEVICES[type] && DEVICES[type].params) || [];
-      const head = h('div', { class: 'hm-fxh' }, h('span', { class: 'hm-fxn' }, String(s + 1)), tog(FXP(q, 0), '', { cls: 'led' }), h('b', { onclick: () => { st.fxOpen = open ? -1 : q; show(); } }, (open ? '▾ ' : '▸ ') + name), knob(FXP(q, 1), 'Mix'),
-        h('button', { class: 'hm-btn sm', onclick: () => move(q, -1) }, '▲'), h('button', { class: 'hm-btn sm', onclick: () => move(q, 1) }, '▼'));
-      return h('div', { class: 'hm-fx' + (open ? ' open' : '') }, head, open ? h('div', { class: 'hm-fxb' }, ...dp.map((pp, j) => (pp.hidden ? null : knob(FXP(q, 2 + j), pp.n))).filter(Boolean)) : null);
+    const on = (q) => k.get(FXP(q, 0)) > 0.5;
+    const move = (q, d) => { const o = order(), act = o.filter(on), a = act.indexOf(q), b = a + d; if (a < 0 || b < 0 || b >= act.length) return; const ia = o.indexOf(act[a]), ib = o.indexOf(act[b]); [o[ia], o[ib]] = [o[ib], o[ia]]; o.forEach((x, s) => k.set(HM.FX_ORDER + s, x)); show(); };
+    const add = (q) => { const o = order().filter((x) => x !== q), last = o.filter(on).pop(); o.splice(last == null ? 0 : o.indexOf(last) + 1, 0, q); o.forEach((x, s) => k.set(HM.FX_ORDER + s, x)); k.set(FXP(q, 0), 1); show(); };   // a new effect goes after the last one in use
+    const act = order().filter(on), free = order().filter((q) => !on(q));
+    const addBtn = h('button', { class: 'hm-btn prim hm-fxadd', onclick: (e) => { const r = e.currentTarget.getBoundingClientRect(); if (!free.length) { toast('Semua efek sudah dipakai.'); return; } menu(free.map((q) => ({ label: HM_FX[q][0], fn: () => add(q) })), r.left, r.bottom + 2); } }, '+ Tambah FX');
+    const mods = act.map((q, s) => {
+      const [name, type] = HM_FX[q], dp = (DEVICES[type] && DEVICES[type].params) || [];
+      const head = h('div', { class: 'hm-fxh' }, h('span', { class: 'hm-fxn' }, String(s + 1)), h('b', {}, name),
+        h('button', { class: 'hm-btn sm', title: 'Naik', onclick: () => move(q, -1) }, '▲'), h('button', { class: 'hm-btn sm', title: 'Turun', onclick: () => move(q, 1) }, '▼'),
+        h('button', { class: 'hm-btn sm hm-fxx', title: 'Hapus efek', onclick: () => { k.set(FXP(q, 0), 0); show(); } }, '×'));
+      return h('div', { class: 'hm-fx' }, head, h('div', { class: 'hm-fxb' }, knob(FXP(q, 1), 'Mix', { size: 'sm' }), ...dp.map((pp, j) => (pp.hidden ? null : knob(FXP(q, 2 + j), pp.n, { size: 'sm' }))).filter(Boolean)));
     });
+    return [h('div', { class: 'hm-fxbar' }, addBtn, h('span', { class: 'hm-hint' }, act.length ? act.length + ' efek aktif • urutan = jalur sinyal (atas ke bawah)' : 'Belum ada efek. Ketuk + Tambah FX.')),
+      h('div', { class: 'hm-fxlist' }, ...mods)];
   };
   // the plain volume ADSR (used while the Volume articulator is off): a held note of 1 s, then the release
   const adsrDisp = () => disp((g, w, hh) => {
