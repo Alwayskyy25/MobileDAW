@@ -20,12 +20,19 @@
 // spectral Phaser (notches spaced in octaves sweeping across the spectrum).
 // Effects: a rack of 7 MobileDAW effects (the same C++ devices a track uses) after the voices, in a chosen order, each with on / mix;
 // the instrument stays active while their tail sounds.
+// Partial map (image synthesis / audio resynthesis): per step the voice reads its frame (time since the note x speed, from the start
+// point, held or looped, frames interpolated or not) and gives each partial the map's amplitude, mixed with the timbres by Map Mix.
+// Harmonic layout: bin = partial number (with Formant on, read at the partial's frequency relative to the analysed note, so the
+// spectral envelope stays in place when the note changes); log-frequency layout: bin = the partial's frequency (pitch independent).
+// Frequency deviations (resynthesis) move each partial off its harmonic place (vibrato, inharmonicity); a stereo map pans every
+// partial (its own left / right coefficients); the map's phases can start the note. Image Freq / Image Gain articulators shift / scale it.
 #include "harmor.h"
 #include "dsp.h"
 #include "os.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <vector>
 
 namespace mdaw {
 namespace {
@@ -85,6 +92,8 @@ struct Voice {
   float c[HM_UNI][NX], s[HM_UNI][NX], cr[HM_UNI][NX], sr[HM_UNI][NX];
   float X[NX], Y[NX], u[NX], e1x[NX], e1y[NX], e2x[NX], e2y[NX];
   float soC = 1, soS = 0, soX = 0;                    // self-oscillation: a sine at the filter 1 resonance
+  float XR[NX], YR[NX], ldm[NX], emx[NX], emy[NX];   // map: right-channel coefficients (stereo map), log2 frequency deviation, phase vectors
+  bool devPrev = false, stPrev = false;
 };
 
 class Harmor : public Instrument {
@@ -101,6 +110,7 @@ class Harmor : public Instrument {
     for (int e = 0; e < HM_ENVS; e++) { int b0 = HM_ENV + HM_ENV_STRIDE * e; p[b0 + 1] = e == HM_E_VOL ? 1 : 0.5; p[b0 + 3] = -1; p[b0 + 4] = -1; p[b0 + 5] = 0.01; p[b0 + 7] = 0.4; p[b0 + 8] = e == HM_E_VOL ? 0.8 : 0; p[b0 + 9] = 0.3; }
     for (int k = 0; k < HM_MAXP; k++) l2k[k] = (float)std::log2((double)(k + 1));
     l2k[HM_MAXP] = -1; l2k[HM_MAXP + 1] = -2;
+    p[HM_MAP_A] = p[HM_MAP_B] = -1; p[HM_MAP_SPEED] = 1; p[HM_MAP_LOOP] = 1; p[HM_MAP_INTERP] = 1; p[HM_MAP_FDEV] = 1; p[HM_MAP_LEVEL] = 1; p[HM_MAP_PHASE] = 1;
     p[HM_PLUCK_TIME] = 1; p[HM_PLUCK_DAMP] = 0.5; p[HM_SPH_DENS] = 1; p[HM_SPH_SPEED] = 0.2; p[HM_SPH_SHARP] = 0.5;
     for (int k = 0; k < HM_FX_N; k++) { p[HM_FX_ORDER + k] = k; p[HM_FX + HM_FX_STRIDE * k + 1] = 1; fx[k] = makeDevice(HM_FX_TYPES[k], sr, nullptr); }
     upOrder();
@@ -124,6 +134,8 @@ class Harmor : public Instrument {
       case HM_T_TABLE: case HM_T_TABLE + 10: loadTable(i == HM_T_TABLE ? 0 : 1, (int)v); break;
       case HM_T_PRND: case HM_T_PRND + 10: for (int k = 0; k < HM_POLY; k++) voices[k].dirty = true; break;
       case HM_ATT: case HM_DEC: case HM_SUS: case HM_REL: upEnv(); break;
+      case HM_MAP_A: case HM_MAP_B: loadMap(i == HM_MAP_A ? 0 : 1, (int)v); break;
+      case HM_MAP_PHASE: for (int k = 0; k < HM_POLY; k++) voices[k].dirty = true; break;
       default:
         if (i >= HM_F_ON && i < HM_F_ON + 20) { int f = (i - HM_F_ON) / 10, k = (i - HM_F_ON) % 10; if (k == 9) loadFilterTable(f, (int)v); else if (k == 1 || k == 3 || k == 4 || k == 5 || k == 6) buildFilter(f); }
         break;
@@ -209,6 +221,38 @@ class Harmor : public Instrument {
   float ft[2][FT_N]; float fcustom[2][256]; bool fcHas[2] = { false, false };
   float fmt[FM_N]; double fmtVowel = -1, fmtRes = -1;
   EnvDef ed[HM_ENVS];
+  struct Map { int frames = 0, bins = 0, layout = 0; double hop = 0.01, base = 0, flo = 20, fhi = 20000; std::vector<float> aL, aR, dev, ph; bool stereo = false, hasDev = false, hasPh = false; } mp;
+  float bufR[HM_UNI][SUB];
+  // slot A (amplitude) / B (deviation, phase): copied out of the bank, as the bank's sample can be replaced at any time
+  bool mapHeader(const Sample* s, int& fr, int& bn) const {
+    if (!s || s->frames < HM_MAP_HDR || std::fabs(s->l[0] - HM_MAP_MAGIC) > 1e-3) return false;
+    fr = (int)std::lround(s->l[1]); bn = (int)std::lround(s->l[2]);
+    return fr >= 1 && bn >= 1 && bn <= HM_MAXP && fr <= 8192 && (long)fr * bn + HM_MAP_HDR <= s->frames;
+  }
+  void loadMap(int which, int id) {
+    const Sample* s = id >= 0 && id < 256 && bank ? bank->s[id] : nullptr; int fr = 0, bn = 0;
+    if (which == 0) {
+      if (!mapHeader(s, fr, bn)) { mp.frames = 0; mp.aL.clear(); mp.aR.clear(); mp.hasDev = mp.hasPh = false; }
+      else {
+        mp.frames = fr; mp.bins = bn; mp.hop = std::max(1e-4, (double)s->l[3]); mp.layout = (int)std::lround(s->l[4]); mp.base = s->l[5]; mp.flo = std::max(1.0, (double)s->l[6]); mp.fhi = std::max(mp.flo * 1.01, (double)s->l[7]);
+        const size_t n = (size_t)fr * bn; mp.aL.assign(s->l + HM_MAP_HDR, s->l + HM_MAP_HDR + n);
+        mp.stereo = s->r && s->r != s->l; if (mp.stereo) mp.aR.assign(s->r + HM_MAP_HDR, s->r + HM_MAP_HDR + n); else mp.aR.clear();
+        if ((int)mp.dev.size() != (int)n) { mp.dev.clear(); mp.ph.clear(); mp.hasDev = mp.hasPh = false; }
+      }
+    } else {
+      if (!mapHeader(s, fr, bn) || fr != mp.frames || bn != mp.bins) { mp.dev.clear(); mp.ph.clear(); mp.hasDev = mp.hasPh = false; }
+      else { const size_t n = (size_t)fr * bn; mp.dev.assign(s->l + HM_MAP_HDR, s->l + HM_MAP_HDR + n); mp.hasDev = true; mp.hasPh = s->r && s->r != s->l; if (mp.hasPh) mp.ph.assign(s->r + HM_MAP_HDR, s->r + HM_MAP_HDR + n); else mp.ph.clear(); }
+    }
+    for (int k = 0; k < HM_POLY; k++) voices[k].dirty = true;
+  }
+  // a map value at (frame position, bin position), both interpolated
+  static float mapAt(const std::vector<float>& a, int bins, int f0, int f1, double ff, double b) {
+    if (b < 0 || b > bins - 1) return 0;
+    const int j0 = (int)b, j1 = std::min(bins - 1, j0 + 1); const double jf = b - j0;
+    const float* r0 = a.data() + (size_t)f0 * bins; const float* r1 = a.data() + (size_t)f1 * bins;
+    const double v0 = r0[j0] + (r0[j1] - r0[j0]) * jf, v1 = r1[j0] + (r1[j1] - r1[j0]) * jf;
+    return (float)(v0 + (v1 - v0) * ff);
+  }
   int held[128] = {}, nHeld = 0;                     // mono: the keys held, in order
 
   static float soft(float x) { float a = std::fabs(x); if (a <= 0.7f) return x; float y = 0.7f + 0.3f * std::tanh((a - 0.7f) / 0.3f); return x < 0 ? -y : y; }
@@ -341,7 +385,8 @@ class Harmor : public Instrument {
       for (int u = 0; u < v.nu; u++) for (int k = 0; k < NX; k++) { if (u == 0 || ph <= 0) { v.c[u][k] = 1; v.s[u][k] = 0; } else { double a = ph * TAU * rnd(); v.c[u][k] = (float)std::cos(a); v.s[u][k] = (float)std::sin(a); } }
       for (int k = 0; k < NX; k++) { v.X[k] = v.Y[k] = 0; v.u[k] = rnd(); }
       for (int u = 0; u < HM_UNI; u++) v.rotF[u] = -1;
-      v.rotS = -9; v.n = 0; v.volPrev = 0; v.soC = 1; v.soS = 0; v.soX = 0;
+      v.rotS = -9; v.n = 0; v.volPrev = 0; v.soC = 1; v.soS = 0; v.soX = 0; v.devPrev = v.stPrev = false;
+      for (int k = 0; k < NX; k++) { v.XR[k] = v.YR[k] = 0; v.ldm[k] = 0; }
       v.env.v = 0;
     }
     v.env.start();
@@ -383,6 +428,10 @@ class Harmor : public Instrument {
       float* ex = t ? v.e2x : v.e1x; float* ey = t ? v.e2y : v.e1y;
       for (int k = 0; k < HM_MAXP; k++) { double ph = T.ph[k] + r * v.u[k]; ex[k] = (float)std::cos(ph); ey[k] = (float)std::sin(ph); }
     }
+    // the map's phases at its start frame (resynthesis), else timbre 1's
+    const bool mph = mp.frames > 0 && mp.hasPh && p[HM_MAP_PHASE] > 0.5 && mp.layout == HM_MAP_HARM;
+    const int f0 = mph ? std::max(0, std::min(mp.frames - 1, (int)std::lround(clampd(p[HM_MAP_START], 0, 1) * (mp.frames - 1)))) : 0;
+    for (int k = 0; k < HM_MAXP; k++) { if (mph && k < mp.bins) { const double ph = TAU * mp.ph[(size_t)f0 * mp.bins + k]; v.emx[k] = (float)std::cos(ph); v.emy[k] = (float)std::sin(ph); } else { v.emx[k] = v.e1x[k]; v.emy[k] = v.e1y[k]; } }
     v.dirty = false;
   }
   double lfo(Voice& v, int l, double dt) {
@@ -428,11 +477,29 @@ class Harmor : public Instrument {
       v.rotS = stretch; rebuild = true;
     }
     int top = std::max(v.n, want);
+    // partial map: the frame for this step, the deviation of every partial (moves its frequency: the rotation is rebuilt)
+    const bool mapOn = mp.frames > 0 && p[HM_MAP_MIX] > 0;
+    int mf0 = 0, mf1 = 0; double mff = 0, mshift = 0, mMix = 0, mLev = 0, fbase = 0;
+    if (mapOn) {
+      const double tm = (v.t - dt) * clampd(p[HM_MAP_SPEED], 0, 16);
+      double fp = clampd(p[HM_MAP_START], 0, 1) * (mp.frames - 1) + tm / mp.hop;
+      const bool loop = p[HM_MAP_LOOP] > 0.5 && mp.frames > 1;
+      if (loop) fp = std::fmod(fp, (double)mp.frames); else fp = clampd(fp, 0, mp.frames - 1);
+      mf0 = (int)fp; mff = p[HM_MAP_INTERP] > 0.5 ? fp - mf0 : 0; mf1 = loop ? (mf0 + 1) % mp.frames : std::min(mf0 + 1, mp.frames - 1);
+      mMix = clampd(p[HM_MAP_MIX], 0, 1);
+      mLev = std::max(0.0, p[HM_MAP_LEVEL]) * (ed[HM_E_IMGGAIN].on ? (1 - clampd(ed[HM_E_IMGGAIN].depth, 0, 1)) + clampd(ed[HM_E_IMGGAIN].depth, 0, 1) * ev[HM_E_IMGGAIN] : 1);
+      mshift = clampd(p[HM_MAP_SHIFT], -48, 48) / 12 + (ed[HM_E_IMGFREQ].on ? ev[HM_E_IMGFREQ] * ed[HM_E_IMGFREQ].depth * 4 : 0);
+      fbase = mp.base > 0 ? 440.0 * std::pow(2.0, (mp.base - 69) / 12.0) : 0;
+    }
+    const bool devOn = mapOn && mp.hasDev && mp.layout == HM_MAP_HARM && p[HM_MAP_FDEV] > 0;
+    if (devOn) { const double fd = clampd(p[HM_MAP_FDEV], 0, 1) / 1200; for (int k = 0; k < HM_MAXP; k++) v.ldm[k] = k < mp.bins && k < top ? (float)(fd * mapAt(mp.dev, mp.bins, mf0, mf1, mff, k)) : 0.f; }
+    else if (v.devPrev) for (int k = 0; k < HM_MAXP; k++) v.ldm[k] = 0;
+    const bool devRe = devOn || v.devPrev; v.devPrev = devOn;
     for (int u = 0; u < v.nu; u++) {
       const double fu = f0 * v.um[u];
-      if (!rebuild && std::fabs(fu - v.rotF[u]) <= 1e-9 * fu) continue;
+      if (!rebuild && !devRe && std::fabs(fu - v.rotF[u]) <= 1e-9 * fu) continue;
       const double k0 = TAU * fu / sr;
-      for (int k = 0; k < NX; k++) { if (k >= top && k < HM_MAXP) { k = HM_MAXP - 1; continue; } const double d = k0 * v.vm[k]; if (d < PI) rot(d, v.cr[u][k], v.sr[u][k]); else { v.cr[u][k] = 1; v.sr[u][k] = 0; } }
+      for (int k = 0; k < NX; k++) { if (k >= top && k < HM_MAXP) { k = HM_MAXP - 1; continue; } const double d = k0 * v.vm[k] * (k < HM_MAXP && devRe ? pexp2(v.ldm[k]) : 1.0); if (d < PI) rot(d, v.cr[u][k], v.sr[u][k]); else { v.cr[u][k] = 1; v.sr[u][k] = 0; } }
       v.rotF[u] = fu;
     }
     // per-partial gain: timbres, filters (relative to the moved cutoffs), harmonic tilt and phase, Nyquist taper (the highest copy)
@@ -455,13 +522,17 @@ class Harmor : public Instrument {
     const double plA = clampd(p[HM_PLUCK_AMT], 0, 1), plT = std::max(0.01, p[HM_PLUCK_TIME]), plD = clampd(p[HM_PLUCK_DAMP], 0, 1);
     const double blA = std::max(0.0, p[HM_BLUR_ATT]), blR = std::max(0.0, p[HM_BLUR_REL]), blH = clampd(p[HM_BLUR_HARM], 0, 1); const bool blur = blA > 0 || blR > 0;
     const double spD = clampd(p[HM_SPH_DEPTH], 0, 1), spN = clampd(p[HM_SPH_DENS], 0.1, 8), spO = p[HM_SPH_OFS]; const int spP = 1 + (int)std::lround(clampd(p[HM_SPH_SHARP], 0, 1) * 15);
-    for (int u = 0; u < v.nu; u++) std::memset(buf[u], 0, sizeof(float) * m);
+    const bool st = mapOn && mp.stereo;
+    if (st && !v.stPrev) for (int k = 0; k < NX; k++) { v.XR[k] = v.X[k]; v.YR[k] = v.Y[k]; }
+    v.stPrev = st;
+    for (int u = 0; u < v.nu; u++) { std::memset(buf[u], 0, sizeof(float) * m); if (st) std::memset(bufR[u], 0, sizeof(float) * m); }
+    const double lflo = mapOn ? std::log2(mp.flo) : 0, lfspan = mapOn ? std::log2(mp.fhi) - lflo : 1;
     const float inv = 1.0f / m; int last = 0;
     for (int k = 0; k < NX; k++) {
       if (k >= top && k < HM_MAXP) { k = HM_MAXP - 1; continue; }   // jump to the sub partials
-      const double lf = l2f0 + v.lvm[k], f = f0 * v.vm[k], fh = f * umax;
+      const double dv = devOn && k < HM_MAXP ? v.ldm[k] : 0, lf = l2f0 + v.lvm[k] + dv, f = f0 * v.vm[k] * (dv != 0 ? pexp2(dv) : 1.0), fh = f * umax;
       double g = fh >= 0.47 * sr ? 0 : fh > 0.40 * sr ? (0.47 * sr - fh) / (0.07 * sr) : 1;
-      float tx = 0, ty = 0;
+      float tx = 0, ty = 0, txR = 0, tyR = 0;
       if (g > 0 && ((k < HM_MAXP && k < want) || (k >= HM_MAXP && sub > 0))) {
         for (int fi = 0; fi < 2; fi++) if (fOn[fi]) { const double h = ftype[fi] == HM_FORMANT ? fmtAt(lf) : flt(fi, lf - fx0[fi]); g *= 1 - fmix[fi] + fmix[fi] * h; }
         if (tilt != 0 && k < HM_MAXP) g *= pexp2(tilt / 6.0206 * l2k[k]);
@@ -476,27 +547,45 @@ class Harmor : public Instrument {
             if (l < 1e-6) { dx = v.e1x[k]; dy = v.e1y[k]; l = 1; }
             x = A * dx / l; y = A * dy / l;
           }
-          if (hph != 0) { double a = std::fmod(std::fabs(hph) * PI * l2k[k], TAU); float cc, ss; if (a >= PI) a -= TAU; rot(std::fabs(a), cc, ss); if ((a < 0) != (hph < 0)) ss = -ss; double x2 = x * cc - y * ss; y = x * ss + y * cc; x = x2; }
-          tx = (float)(g * x); ty = (float)(g * y);
-        } else tx = (float)(sub * (k == HM_MAXP ? 0.5 : 0.25) * g);
+          double xR = x, yR = y;
+          if (mapOn) {                                   // the map's amplitude at this partial (left / right), mixed with the timbres
+            double b;
+            if (mp.layout == HM_MAP_LOGF) b = (lf - mshift - lflo) / lfspan * (mp.bins - 1);
+            else b = (fbase > 0 && p[HM_MAP_FORMANT] > 0.5 ? (k + 1) * f0 / fbase : (double)(k + 1)) * pexp2(-mshift) - 1;
+            const double aL = mapAt(mp.aL, mp.bins, mf0, mf1, mff, b) * mLev, aR = st ? mapAt(mp.aR, mp.bins, mf0, mf1, mff, b) * mLev : aL;
+            x = (1 - mMix) * x + mMix * aL * v.emx[k]; y = (1 - mMix) * y + mMix * aL * v.emy[k];
+            xR = (1 - mMix) * xR + mMix * aR * v.emx[k]; yR = (1 - mMix) * yR + mMix * aR * v.emy[k];
+          }
+          if (hph != 0) { double a = std::fmod(std::fabs(hph) * PI * l2k[k], TAU); float cc, ss; if (a >= PI) a -= TAU; rot(std::fabs(a), cc, ss); if ((a < 0) != (hph < 0)) ss = -ss; double x2 = x * cc - y * ss; y = x * ss + y * cc; x = x2; x2 = xR * cc - yR * ss; yR = xR * ss + yR * cc; xR = x2; }
+          tx = (float)(g * x); ty = (float)(g * y); txR = (float)(g * xR); tyR = (float)(g * yR);
+        } else { tx = (float)(sub * (k == HM_MAXP ? 0.5 : 0.25) * g); txR = tx; }
       }
-      if (f >= nyq) tx = ty = 0;
+      if (f >= nyq) tx = ty = txR = tyR = 0;
       if (blur) {                                      // Blur: the coefficients follow their target slowly (rising: attack, falling: release)
-        if (v.fresh) { v.X[k] = v.Y[k] = 0; }
+        if (v.fresh) { v.X[k] = v.Y[k] = v.XR[k] = v.YR[k] = 0; }
         const double cur = (double)v.X[k] * v.X[k] + (double)v.Y[k] * v.Y[k], tg = (double)tx * tx + (double)ty * ty, tau = (tg > cur ? blA : blR) * (1 + 3 * blH * std::max(0.0f, l2k[k]));
-        if (tau > 0) { const float al = (float)(1 - pexp2(-dt / tau * 1.4426950408889634)); tx = v.X[k] + (tx - v.X[k]) * al; ty = v.Y[k] + (ty - v.Y[k]) * al; }
-      } else if (v.fresh) { v.X[k] = tx; v.Y[k] = ty; }
-      const float x0 = v.X[k], y0 = v.Y[k];
-      if (x0 == 0 && y0 == 0 && tx == 0 && ty == 0) continue;
+        if (tau > 0) { const float al = (float)(1 - pexp2(-dt / tau * 1.4426950408889634)); tx = v.X[k] + (tx - v.X[k]) * al; ty = v.Y[k] + (ty - v.Y[k]) * al; txR = v.XR[k] + (txR - v.XR[k]) * al; tyR = v.YR[k] + (tyR - v.YR[k]) * al; }
+      } else if (v.fresh) { v.X[k] = tx; v.Y[k] = ty; v.XR[k] = txR; v.YR[k] = tyR; }
+      const float x0 = v.X[k], y0 = v.Y[k], xr0 = v.XR[k], yr0 = v.YR[k];
+      if (x0 == 0 && y0 == 0 && tx == 0 && ty == 0 && (!st || (xr0 == 0 && yr0 == 0 && txR == 0 && tyR == 0))) continue;
       if (k < HM_MAXP) last = k + 1;
       const float dx = (tx - x0) * inv, dy = (ty - y0) * inv;
-      for (int u = 0; u < v.nu; u++) {
+      if (!st) for (int u = 0; u < v.nu; u++) {
         float c = v.c[u][k], s = v.s[u][k], x = x0, y = y0; const float cr = v.cr[u][k], sn = v.sr[u][k]; float* bu = buf[u];
         for (int i = 0; i < m; i++) { bu[i] += s * x + c * y; const float c2 = c * cr - s * sn; s = s * cr + c * sn; c = c2; x += dx; y += dy; }
         const float g2 = 1.5f - 0.5f * (c * c + s * s);   // keep the oscillator on the unit circle
         v.c[u][k] = c * g2; v.s[u][k] = s * g2;
       }
-      v.X[k] = tx; v.Y[k] = ty;
+      else {                                           // stereo map: one oscillator, left and right coefficients
+        const float dxr = (txR - xr0) * inv, dyr = (tyR - yr0) * inv;
+        for (int u = 0; u < v.nu; u++) {
+          float c = v.c[u][k], s = v.s[u][k], x = x0, y = y0, xr = xr0, yr = yr0; const float cr = v.cr[u][k], sn = v.sr[u][k]; float* bu = buf[u]; float* br = bufR[u];
+          for (int i = 0; i < m; i++) { bu[i] += s * x + c * y; br[i] += s * xr + c * yr; const float c2 = c * cr - s * sn; s = s * cr + c * sn; c = c2; x += dx; y += dy; xr += dxr; yr += dyr; }
+          const float g2 = 1.5f - 0.5f * (c * c + s * s);
+          v.c[u][k] = c * g2; v.s[u][k] = s * g2;
+        }
+      }
+      v.X[k] = tx; v.Y[k] = ty; v.XR[k] = txR; v.YR[k] = tyR;
     }
     // self-oscillation: a sine at filter 1's resonance frequency (cutoff + resonance offset)
     float so[SUB]; bool soOn = false;
@@ -515,8 +604,8 @@ class Harmor : public Instrument {
       double e = menv ? vStart + (vEnd - vStart) * (i + 1) / m : v.env.next(ap);
       e *= gain;
       float l = 0, r = 0;
-      for (int u = 0; u < v.nu; u++) { l += buf[u][i] * v.gl[u]; r += buf[u][i] * v.gr[u]; }
-      if (v.nu == 1) { l = r = buf[0][i]; }
+      if (!st) { for (int u = 0; u < v.nu; u++) { l += buf[u][i] * v.gl[u]; r += buf[u][i] * v.gr[u]; } if (v.nu == 1) { l = r = buf[0][i]; } }
+      else { for (int u = 0; u < v.nu; u++) { l += buf[u][i] * v.gl[u]; r += bufR[u][i] * v.gr[u]; } if (v.nu == 1) { l = buf[0][i]; r = bufR[0][i]; } }
       if (soOn) { l += so[i]; r += so[i]; }
       if (v.fade > 0) {
         e *= (double)v.fade / (sr * 0.003 + 1); v.fade--;

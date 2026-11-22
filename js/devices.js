@@ -49,6 +49,25 @@ function knobGrid(def, count) {
   return h('div', { class: 'knobs', style: `max-width:${cols * 60}px` });
 }
 
+// ---- Harmor (38): its partial map from a picture (image synthesis) or an audio file (resynthesis), made in a worker (js/harmor/harmor.js)
+function harmorMenu(i, t) {
+  const H = () => import('./harmor/harmor.js'), name = (p) => p.split('/').pop();
+  return [
+    { label: 'Image synthesis: muat gambar\u2026', fn: async () => {
+      const f = await eng.importFiles('image/*,.png,.jpg,.jpeg,.webp,.bmp,.gif'); if (!f.length) return;
+      toast('Membuat peta dari ' + name(f[0]) + '\u2026', 8000); const r = await (await H()).harmorLoadImage(i, f[0]);
+      toast(r.error || 'Gambar menjadi peta partial Harmor (Map Mix 100 %).', r.error ? 5000 : 3000); } },
+    { label: 'Resynthesis: muat audio\u2026', fn: async () => {
+      const f = await eng.importFiles('audio/*,.wav,.mp3,.flac,.ogg,.aif,.aiff,.m4a'); if (!f.length) return;
+      toast('Menganalisis ' + name(f[0]) + '\u2026', 20000);
+      const r = await (await H()).harmorLoadAudio(i, f[0], { quality: 1 }, (x) => toast('Menganalisis ' + name(f[0]) + ' ' + Math.round(x * 100) + ' %', 4000));
+      if (r.error) { toast(r.error, 5000); return; }
+      const rp = r.report;
+      toast(rp ? (rp.pitched ? `Resintesis: nada ${noteName(Math.round(rp.note))} (${rp.hz.toFixed(1)} Hz), ${rp.partials} partial, ${Math.round(rp.voiced * 100)} % bernada.` : `Resintesis tanpa nada: ${rp.why}. Peta spektrum frekuensi dipakai.`) : 'Resintesis dimuat (dari cache).', 5000); } },
+    { label: 'Hapus peta partial', dim: !t.inst.hm, fn: async () => (await H()).harmorClearMap(i) },
+  ];
+}
+
 // ---- sampler zones (DirectWave: one zone, Keystone: up to 16) ----------------------------------
 function zoneEditor(i, k) {
   const t = state.tracks[i], z = t.inst.zones[k], multi = t.inst.type === INST.KEYSTONE || t.inst.type === INST.FLM_DW;
@@ -274,6 +293,7 @@ function instCard(i, t, o = {}) {
     menu([...(o.floating ? [] : [{ label: 'Buka di jendela mengambang', fn: () => openInstWindow(t.id) }, { label: 'Lipat', fn: () => setFolded(fk, true) }, { sep: true }]),
       ...(t.kind === 'midi' ? [{ label: 'Ganti instrumen\u2026', fn: () => instPick(r) }] : []),
       ...(def.zones ? [{ label: 'Zona sample\u2026', fn: () => zonesMenu(i, r) }] : []),
+      ...(t.inst.type === 38 ? harmorMenu(i, t) : []),
       ...(t.kind === 'midi' ? [{ label: 'Simpan preset\u2026', fn: () => ask('Nama preset', '', (n) => { const x = PRS.saveInstrumentPreset(i, n); toast(x.error || 'Preset tersimpan di Presets/Instruments.'); }) }] : [])], r.left - 120, r.bottom); } }, '\u22EF'));
   if (!o.floating) head.append(foldBtn(fk, false));
   if (def.view === 'kit') { const kv = instKitView(i, t, o.every || every); if (kv) return h('div', { class: 'card lkcard lvcard' + (def.flm ? ' flm-card flm-t' + t.inst.type : '') }, head, def.zones && t.inst.type !== INST.FLM_DW ? h('div', { class: 'inst-row' }, h('div', { class: 'inst-side' }, zonePanel(i, t)), kv.el) : kv.el); }   // FLM DirectWave: zone list + panel   // Live 12 instruments (fxkit.js VI)

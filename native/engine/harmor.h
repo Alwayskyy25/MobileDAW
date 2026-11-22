@@ -43,6 +43,14 @@ constexpr int HM_SPH_DEPTH = 103, HM_SPH_DENS = 104, HM_SPH_SPEED = 105, HM_SPH_
 constexpr int HM_FX_ORDER = 712, HM_FX = 720, HM_FX_STRIDE = 48, HM_FX_N = 7;
 constexpr int HM_FX_TYPES[HM_FX_N] = { 3, 20, 21, 17, 7, 4, 31 };   // Distortion (Saturator), Chorus-Ensemble, Phaser-Flanger, Delay, Reverb, Compressor, EQ Eight
 constexpr int HM_FX_NP[HM_FX_N] = { 6, 13, 15, 20, 8, 12, 42 };      // their parameter counts (js/defs.js DEVICES): only these are passed on
+// partial map (phase 3): image synthesis and audio resynthesis both give the voices a map of frames (time) x bins (partials, or
+// log-frequency bands) of amplitude (left / right), frequency deviation (cents) and phase. A map lives in a sample-bank slot and
+// describes itself: the first 16 values of the slot's left channel are a header (HM_MAP_MAGIC, frames, bins, hop s, layout,
+// base MIDI note, lowest Hz, highest Hz), the data follows (frame-major). Slot A: left / right amplitude; slot B: deviation / phase.
+constexpr int HM_MAP_MIX = 1060, HM_MAP_A = 1061, HM_MAP_B = 1062, HM_MAP_SPEED = 1069, HM_MAP_START = 1070, HM_MAP_LOOP = 1071, HM_MAP_INTERP = 1072;
+constexpr int HM_MAP_FORMANT = 1073, HM_MAP_FDEV = 1074, HM_MAP_LEVEL = 1075, HM_MAP_SHIFT = 1076, HM_MAP_PHASE = 1077;
+constexpr int HM_MAP_HDR = 16; constexpr double HM_MAP_MAGIC = 4096.5;
+enum { HM_MAP_HARM = 0, HM_MAP_LOGF = 1 };
 // waveforms of a timbre
 enum { HM_SINE = 0, HM_SAW = 1, HM_SQUARE = 2, HM_TRI = 3, HM_CUSTOM = 4 };
 

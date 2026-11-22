@@ -136,6 +136,29 @@ Keputusan pemilik: loop suara real-time Harmor di C++ (pola Moisture); semua bag
   identik bit-per-bit (−240 dB) dengan efek yang sama di track**; urutan efek berpengaruh; mix 50 % tepat di tengah; ekor delay terdengar
   setelah voice selesai. Golden `inst-harmor` mencakup 2b (desktop vs WASM −204 dBFS).
 
+### Phase 3 — Image Synthesis + Audio Resynthesis: selesai (tes lulus)
+- **Engine — peta partial** (`harmor.cpp`): frame (waktu) × bin, amplitudo kiri/kanan, deviasi frekuensi (cent), fase; disimpan di slot bank
+  sample dengan header sendiri. Dibaca per langkah: speed, start, loop/hold, interpolasi frame; layout **Harmonik** (bin = nomor partial;
+  **Formant** = dibaca pada frekuensi partial relatif nada yang dianalisis, sehingga envelope spektrum tetap di Hz) atau **Log-frekuensi**
+  (bin = frekuensi, tidak bergantung nada); deviasi frekuensi per partial (vibrato, inharmonik); peta stereo memberi tiap partial koefisien
+  kiri/kanan sendiri; fase awal dari peta; Map Mix / Level / Shift; articulator Image Freq dan Image Gain aktif.
+- **Image Synthesis** (`js/harmor/imagemap.js`, JS): horizontal = waktu, vertikal = partial (bawah = partial 1) atau frekuensi (log),
+  kecerahan = amplitudo (gamma + rentang dB); crop/zoom/pan/posisi = wilayah gambar; interpolasi bilinear; warna = stereo (merah kiri,
+  biru kanan); dinormalisasi ke kenyaringan saw.
+- **Audio Resynthesis** (`js/harmor/resynth.js`, JS, di Web Worker): nada = median YIN (`js/audiokit/pitch.js`, dipakai juga NewTone);
+  STFT (Draft/Normal/High), tiap harmonik dicari di sekitar k × f0 frame, frekuensi presisi (parabola), amplitudo dari energi lobus
+  (tahan vibrato), fase; kiri/kanan terpisah. Sumber tanpa nada yang dapat dipercaya (drum, noise, akor) → peta log-frekuensi + alasannya
+  di laporan (tidak memaksakan nada).
+- **Aplikasi** (`js/harmor/harmor.js`): menu kartu Harmor "Image synthesis: muat gambar…", "Resynthesis: muat audio…", "Hapus peta";
+  analisis di worker; hasil di cache render; proyek menyimpan sumbernya, peta dibuat ulang/diambil dari cache saat dibuka.
+- Tes: `tools/harmor-map-test.mjs` (23) + `tools/harmor-app-test.mjs` (4): YIN ≤ 0,14 cent (82–988 Hz), fundamental hilang 200,00 Hz,
+  noise tak bernada; frame/interpolasi/speed/loop/level/mix/shift/articulator image; log-frekuensi tak bergantung nada; peta stereo;
+  deviasi +100 cent tepat 233,08 Hz; gambar (baris → partial, kolom → waktu, crop, warna → stereo); resintesis saw: nada 56,99,
+  harmonik 0/−6,02/−9,54/−13,98/−18,06 dB tepat, partial 1 = 0,300, hasil sintesis ulang ≤ 0,25 dB dari sumber, vibrato ±27,5 cent
+  (sumber ±30; jendela analisis 85 ms meratakan sedikit), stereo −6,02 dB tepat; formant tetap ~880 Hz satu oktaf di atas (tanpa
+  Formant pindah ke 1540 Hz); noise → peta log dengan kemiringan terjaga; di aplikasi: gambar, resintesis (nada 57,00), simpan + buka
+  ulang identik (93 ms). Golden `inst-harmor` + peta: desktop vs WASM −205 dBFS.
+
 ## 5. Referensi dari pemilik (untuk fase berikutnya)
 
 ### Tampilan Harmor (screenshot Harmor di Live 12) — acuan Phase 6, disederhanakan untuk HP, tidak ditiru

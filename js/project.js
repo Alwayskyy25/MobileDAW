@@ -972,6 +972,8 @@ function instVal(t, pi) {
   const pad = t.kind === 'drum' && t.inst.pads && pi >= 0 && pi < MAX_PADS * 3 ? t.inst.pads[(pi / 3) | 0] : null;
   return pad ? [pad.gain, pad.pit, pad.dec][pi % 3] : undefined;
 }
+// an instrument parameter that is data, not an edit (a Harmor map's slot): no undo step, no automation recording
+export function setInstParamQuiet(i, pi, v) { const t = state.tracks[i]; if (!t || !t.inst) return; t.inst.params[pi] = v; eng.instParam(i, pi, v); }
 export function setInstParam(i, pi, v) {
   const ar = autoRec(i, 5, pi, null, v);
   const t = state.tracks[i]; if (t.frozen) unfreezeTrack(i, true);
@@ -1717,7 +1719,7 @@ async function openStructure(text, gen) {
   for (const t of state.tracks) {
     if (!t.inst) continue;
     if (t.inst.type === 37 && t.inst.params) t.inst.params[302] = t.inst.params[303] = -1;   // Moisture wavetables: new sample ids each load
-    if (t.inst.type === 38 && t.inst.params) t.inst.params[13] = t.inst.params[23] = -1;      // Harmor harmonic tables: new sample ids each load
+    if (t.inst.type === 38 && t.inst.params) t.inst.params[13] = t.inst.params[23] = t.inst.params[1061] = t.inst.params[1062] = -1;   // Harmor harmonic tables / partial map: new sample ids each load
     if (t.inst.type === INST.SOUNDFONT && t.inst.sf) delete t.inst.sf.id;                    // the SoundFont gets a new id when it is loaded
     if (t.inst.zones) for (const z of t.inst.zones) if (z) z.sample = z.sample ? ph(z.sample) : null;
   }
@@ -1767,7 +1769,7 @@ async function loadAssets({ missing }, gen, onProgress) {
     if (t.inst && t.inst.zones) for (const z of t.inst.zones) if (z) see(z.sample, -1);
     if (t.kind === 'drum' && t.inst && t.inst.pads) for (const q of t.inst.pads) { see(q.sample, -1); if (q.chain && q.chain.inst) see(q.chain.inst.sample, -1); if (q.sample && padWarp(q)) renders++; }
   }
-  const tjobs = state.tracks.filter((t) => t.inst && ((t.inst.type === INST.SOUNDFONT && t.inst.sf && t.inst.sf.path) || (t.inst.type === 37 && t.inst.wt && t.inst.wt.some(Boolean))));
+  const tjobs = state.tracks.filter((t) => t.inst && ((t.inst.type === INST.SOUNDFONT && t.inst.sf && t.inst.sf.path) || (t.inst.type === 37 && t.inst.wt && t.inst.wt.some(Boolean)) || (t.inst.type === 38 && t.inst.hm && t.inst.hm.path)));
   const dwps = state.tracks.filter((t) => t.inst && t.inst.type === INST.FLM_DW && t.inst.dwp);
   const total = Math.max(1, uses.size + renders + tjobs.length + dwps.length);
   let done = 0, lastP = 0, what = 'Memuat sample\u2026';
@@ -1819,6 +1821,9 @@ async function loadAssets({ missing }, gen, onProgress) {
     if (i >= 0 && t.inst.type === INST.SOUNDFONT) {
       say('Memuat SoundFont: ' + (t.name || ''));
       const r = await loadSoundFontFor(i, t.inst.sf.path, t.inst.sf.preset); if (r && r.error) missing.push(t.inst.sf.path);
+    } else if (i >= 0 && t.inst.type === 38) {
+      say((t.inst.hm.src === 'image' ? 'Membuat peta gambar Harmor: ' : 'Resintesis Harmor: ') + t.inst.hm.path.split('/').pop());
+      const r = await (await import('./harmor/harmor.js')).restoreHarmorMap(t); if (r && r.error) missing.push(t.inst.hm.path);
     } else if (i >= 0) {
       say('Memuat wavetable: ' + (t.name || ''));
       for (let o = 0; o < 2 && live(); o++) { const w = t.inst.wt && t.inst.wt[o]; i = state.tracks.indexOf(t); if (!w || i < 0) continue; const r = await loadMoistureTable(i, o, w.path); if (r && r.error) missing.push(w.path); }
@@ -2058,6 +2063,11 @@ function rcPut({ k, path }, l, r) {
     Promise.resolve(eng.saveBytes(path, ab)).catch(() => {});
   } catch (_) { /* no cache: the render was still used */ }
 }
+// a free engine sample slot (-1 when the 256 are used): Harmor's maps
+export function allocSampleSlot() { return state.nextSample < SAMPLE_MAX ? state.nextSample++ : -1; }
+// a generic entry of the render cache (key: any text): { l, r } or null / write
+export const cacheGet = (key) => rcGet({ k: key, path: RC_DIR + fnv(key, 2166136261).toString(16).padStart(8, '0') + fnv(key, 33554467).toString(16).padStart(8, '0') + '.f32' });
+export const cachePut = (key, l, r) => rcPut({ k: key, path: RC_DIR + fnv(key, 2166136261).toString(16).padStart(8, '0') + fnv(key, 33554467).toString(16).padStart(8, '0') + '.f32' }, l, r);
 const dLoads = new Map();          // gen|key -> the render in flight
 export function deriveSample(base, warp) {
   deriveErr = '';

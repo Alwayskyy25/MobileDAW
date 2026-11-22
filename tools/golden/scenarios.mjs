@@ -267,6 +267,14 @@ export const SCENARIOS = [
       // phase 2b: Prism, Pluck, Blur, spectral phaser, the effects rack (reordered, mix)
       P(7, 0); P(81, 0.4); P(83, 0.7); P(84, 0.6); P(86, 0.05); P(87, 0.2); P(88, 0.5); P(103, 0.8); P(105, 1.5); play(e, 1.2);
       P(82, 1); P(720, 1); P(722, 9); P(768, 1); P(816, 1); P(864, 1); P(873, 0.4); P(912, 1); P(913, 0.5); P(960, 1); P(1008, 1); P(1013, 1); P(1016, 4); P(712, 4); P(713, 0); play(e, 1.5);
+      // phase 3: a partial map (stereo amplitude + deviation / phase): frames in time, interpolated, looped, formant, shift
+      { const fr = 6, bn = 24, hdr = (a, lay) => { a[0] = 4096.5; a[1] = fr; a[2] = bn; a[3] = 0.2; a[4] = lay; a[5] = 57; a[6] = 40; a[7] = 16000; return a; };
+        const L = hdr(new Float32Array(16 + fr * bn), 0), R = hdr(new Float32Array(16 + fr * bn), 0), D = hdr(new Float32Array(16 + fr * bn), 0), H = hdr(new Float32Array(16 + fr * bn), 0);
+        for (let f = 0; f < fr; f++) for (let j = 0; j < bn; j++) { const o = 16 + f * bn + j; L[o] = j % (f + 2) === 0 ? 0.3 / (j + 1) : 0; R[o] = j % (f + 3) === 0 ? 0.3 / (j + 1) : 0; D[o] = 20 * Math.sin(f + j); H[o] = ((f * 7 + j * 3) % 10) / 10; }
+        e.loadSample(40, L, R); e.loadSample(41, D, H);
+        P(720, 0); P(768, 0); P(816, 0); P(864, 0); P(912, 0); P(960, 0); P(1008, 0); P(81, 0); P(83, 0); P(86, 0); P(87, 0); P(103, 0);
+        P(1061, 40); P(1062, 41); P(1060, 0.8); P(1073, 1); P(1076, 5); P(1069, 1.5); play(e, 1.5);
+        P(1072, 0); P(1071, 0); P(1060, 1); P(1074, 0.5); play(e, 1.0); }
     } },
   { name: 'inst-moisture', native: true, info: 'C++ only (native/engine/moist2.cpp): Moisture (37), the Serum-style wavetable synth: wavetables A / B, WT position, unison + detune + blend, warp modes (sync, bend, PWM, FM from B), sub, noise, the filter types, Env 1-3, LFO -> matrix routes, mono glide, pitch bend, every effect of the rack, tempo change',
     run(e) {
