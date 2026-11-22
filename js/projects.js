@@ -4,7 +4,7 @@ import { h, modal, toast, ask } from './ui.js';
 import { eng } from './engine.js';
 import * as P from './project.js';
 import * as QS from './quicksave.js';
-import { openWithLoading } from './loadprog.js';
+import { openWithLoading, openInBackground } from './loadprog.js';
 import { prefs, savePrefs } from './prefs.js';
 import { flmUpgradable, upgradeFlmJson } from './import/fxmap.js';
 
@@ -33,13 +33,22 @@ export async function offerFlmUpgrade() {
       toast(`${r.devices} modul memakai DSP FL Studio Mobile` + (r.lanes ? `, ${r.lanes} lane otomasi dipindah` : '') + (r.dropped.length ? `; ${r.dropped.length} lane otomasi tidak bisa dipindah dan dihapus` : '') + '. Simpan untuk menyimpannya.', 5000);
     } }]);
 }
+// resolves as soon as the project is on screen and usable ({ ok, done }); done: the promise of its samples loading behind it (the files
+// that could not be found)
 export async function openProject(name) {
   try {
-    const miss = await openWithLoading(eng.readText(pathOf(name)), 'Membuka ' + name);
+    const { done } = await openInBackground(eng.readText(pathOf(name)), 'Membuka ' + name);
     QS.markOpened(name); noteRecent(name);
-    setTimeout(offerFlmUpgrade, 500);
-    return { ok: true, miss };
+    done.then(() => setTimeout(offerFlmUpgrade, 500), () => {});
+    return { ok: true, done };
   } catch (e) { return { error: 'Proyek rusak atau tidak bisa dibaca' + (e && e.message ? ': ' + e.message : '.') }; }
+}
+
+// the toast after openProject: "opened" at once, the missing files once the samples have loaded behind it
+export function openedToast(r, what = 'Proyek dibuka.') {
+  if (r.error) { toast(r.error, 4500); return; }
+  toast(what);
+  r.done.then((miss) => { if (miss && miss.length) toast(miss.length + ' file sample/SoundFont tidak ditemukan.', 3500); }, (e) => toast('Sample gagal dimuat: ' + ((e && e.message) || e), 4000));
 }
 
 // FL Studio Mobile: the time signature is chosen when a project is created (it can still be changed later per bar from the ruler)
@@ -71,7 +80,7 @@ export function newProjectDialog(after) {
 // per-project actions (long-press a project in Browser -> Proyek)
 export function projectActions(name, done) {
   return [
-    { label: 'Buka', fn: async () => { const r = await openProject(name); toast(r.error || (r.miss.length ? r.miss.length + ' file sample/SoundFont tidak ditemukan.' : 'Proyek dibuka.'), r.error ? 4000 : 2000); if (done) done(r); } },
+    { label: 'Buka', fn: async () => { const r = await openProject(name); openedToast(r); if (done) done(r); } },
     { label: 'Duplikat', fn: () => { let k = 2, n2 = name + ' ' + k; while (exists(n2)) n2 = name + ' ' + ++k; eng.writeText(pathOf(n2), eng.readText(pathOf(name))); toast('Disalin sebagai "' + n2 + '".'); if (done) done(); } },
     { label: 'Ganti nama…', fn: () => ask('Nama baru', name, async (v) => {
       const n2 = clean(v); if (!n2 || n2 === name) return;

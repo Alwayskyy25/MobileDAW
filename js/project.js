@@ -330,6 +330,17 @@ export function clipEnvFlat(c) {
   for (const t of ts) o.push(t, envAt(g, t, c.genvRef > 0 ? c.genvRef : c.gain) * k, envAt(p, t, c.pan || 0));
   return o;
 }
+const lateSet = new Set();
+function lateDerive(c) {
+  if (lateSet.has(c) || !c.sample || !(c.sample.id >= 0)) return;
+  lateSet.add(c); const gen = loading.gen;
+  deriveSample(c.sample, c.warp).then((ds) => {
+    lateSet.delete(c);
+    if (gen !== loading.gen || c.dsample !== undefined) return;
+    c.dsample = ds && ds !== c.sample ? ds : null;
+    const i = state.tracks.findIndex((t) => t.clips.includes(c)); if (i >= 0) { syncClips(i); emit('clips'); }
+  }, () => lateSet.delete(c));
+}
 export function syncClips(i) {
   const t = state.tracks[i];
   if (!t) return;
@@ -344,8 +355,10 @@ export function syncClips(i) {
       const ce = clipEnvFlat(c), e0 = env.length / 3, en = ce.length / 3;
       const bk = bakeCurrent(c);       // grid-locked clip on a tempo map / with swing: one pre-warped buffer that starts at the clip start
       if (bk) { const o = c.offset || 0; for (let q = 0; q < ce.length; q += 3) env.push(ce[q] - o, ce[q + 1], ce[q + 2]); f.push(c.start, c.len, bk.sample.id, c.gain, 0, c.fadeIn || 0, c.fadeOut || 0, c.pan || 0, e0, en); n++; continue; }
-      env.push(...ce);
       const es = c.dsample || c.sample;
+      if (!es || !(es.id >= 0)) continue;                          // its audio is still loading (or could not be loaded)
+      if (c.dsample === undefined && warpNeeded(c.warp)) { lateDerive(c); continue; }   // stretched / pitched, its render not made yet: never the raw file
+      env.push(...ce);
       const segs = loopSegs(c);       // clip dragged longer than its audio: the audio repeats instead of leaving silence
       segs.forEach((g, k) => { f.push(c.start + g.o, g.len, es.id, c.gain, (c.offset || 0) + g.s / PPQ * 60 / state.bpm * (c.lps || 1), k === 0 ? c.fadeIn || 0 : 0, k === segs.length - 1 ? c.fadeOut || 0 : 0, c.pan || 0, e0, en); n++; });
     }
@@ -990,10 +1003,11 @@ function sendPad(i, k) {
   const ps = padsOf(i), q = ps[k], b = 200 + k * 16, solo = padSolo(ps);
   if (!q) { eng.instParam(i, b + 11, -1); eng.instParam(i, b, -1); return; }
   eng.instParam(i, k * 3, q.gain); eng.instParam(i, k * 3 + 1, q.pit); eng.instParam(i, k * 3 + 2, q.dec);
-  eng.instParam(i, b, q.sample ? (q.dsample || q.sample).id : -1);   // an FLM pad's stretch / pitch render (q.warp) plays in place of its file eng.instParam(i, b + 1, q.kind); eng.instParam(i, b + 2, q.pan);
+  const wait = !!q.sample && (!(q.sample.id >= 0) || (padWarp(q) && q.dsample === undefined));   // still loading: silent, never the synth drum or the raw file
+  eng.instParam(i, b, q.sample && !wait ? (q.dsample || q.sample).id : -1);   // an FLM pad's stretch / pitch render (q.warp) plays in place of its file eng.instParam(i, b + 1, q.kind); eng.instParam(i, b + 2, q.pan);
   eng.instParam(i, b + 3, q.start); eng.instParam(i, b + 4, q.end); eng.instParam(i, b + 5, q.rev ? 1 : 0);
   eng.instParam(i, b + 6, q.a); eng.instParam(i, b + 7, q.d); eng.instParam(i, b + 8, q.s); eng.instParam(i, b + 9, q.r);
-  eng.instParam(i, b + 10, q.mute || (solo && !q.solo) ? 1 : 0); eng.instParam(i, b + 11, q.pitch);
+  eng.instParam(i, b + 10, q.mute || wait || (solo && !q.solo) ? 1 : 0); eng.instParam(i, b + 11, q.pitch);
   eng.instParam(i, b + 12, q.cut || 0); eng.instParam(i, b + 13, q.poly === false ? 0 : 1); eng.instParam(i, b + 14, q.hold || 0); eng.instParam(i, b + 15, q.shift || 0); eng.instParam(i, 500 + k, 1);   // Seq: cut group, poly, hold, shift (projects before these had none: defaults)
 }
 export function syncPads(i) {
@@ -1342,15 +1356,25 @@ export function addClip(i, start, len) {
   return c;
 }
 
-export async function loadSampleObj(path) {
-  if (state.samples[path]) return state.samples[path];
-  if (state.nextSample >= SAMPLE_MAX) { deriveErr = SAMPLE_FULL; return null; }   // the engine bank has 256 slots: a higher id would be silently ignored
-  const id = state.nextSample++;
-  const r = await eng.loadSample(id, path);
-  if (!r || r.error) return null;
-  const s = { id, path, name: path.split('/').pop(), duration: r.duration, peaks: r.peaks, pyr: r.pyr };
-  state.samples[path] = s;
-  return s;
+const sLoads = new Map();          // gen|path -> the decode in flight (a file used by many clips is decoded once)
+export function loadSampleObj(path) {
+  const have = state.samples[path];
+  if (have && !have.pending) return Promise.resolve(have);
+  const gen = loading.gen, key = gen + '|' + path;
+  if (sLoads.has(key)) return sLoads.get(key);
+  const p = (async () => {
+    if (state.nextSample >= SAMPLE_MAX) { deriveErr = SAMPLE_FULL; return null; }   // the engine bank has 256 slots: a higher id would be silently ignored
+    const id = state.nextSample++;
+    const r = await eng.loadSample(id, path);
+    if (gen !== loading.gen) return null;
+    const ph = state.samples[path] && state.samples[path].pending ? state.samples[path] : null;   // a placeholder of the project being opened: completed in place
+    if (!r || r.error) { if (ph) delete state.samples[path]; return null; }
+    const s = Object.assign(ph || {}, { id, path, name: path.split('/').pop(), duration: r.duration, peaks: r.peaks, pyr: r.pyr });
+    delete s.pending; state.samples[path] = s;
+    return s;
+  })();
+  sLoads.set(key, p); p.then(() => sLoads.delete(key));
+  return p;
 }
 
 // A sample file moved or renamed in the file browser: the open project keeps pointing at the right file.
@@ -1546,6 +1570,7 @@ export function newProject(demo = true) {
   try { return newProjectInner(demo); } finally { HK.on = true; HK.barrier(); }
 }
 function newProjectInner(demo) {
+  loading.gen++; loading.busy = false;                               // a project still loading in the background stops
   for (const k of Object.keys(state.samples)) delete state.samples[k];
   state.nextSample = 16; bakes.clear(); freeSlots.length = 0;
   state.tracks = []; state.master = { vol: 1, devices: [] }; state.returns = makeReturns();
@@ -1608,11 +1633,29 @@ function migrateClassic(tracks) {
     if (ni >= 0) { tg.param = ni; tg.def = { ...INSTRUMENTS[m.to].params[ni] }; } else tracks.splice(k, 1);
   }
 }
-export async function deserialize(text, onProgress) {
+// ---- opening a project: two stages, so a big project no longer freezes the app while it loads. openStructure puts the whole project in
+// place at once (tracks, clips, devices, automation; the engine synced) and the UI is usable straight away; loadAssets then decodes the
+// samples and renders the stretch / pitch clips behind it, LOAD_PAR at a time, instruments first and then the audio nearest the song start,
+// re-syncing each track the moment its audio is in. A sample not loaded yet is a placeholder object ({ id: -1, pending }) shared by
+// everything that uses it and completed in place, so a copy made while loading (duplicate, paste, undo) gets the audio too; the engine
+// gets -1 (silence) for it. deserialize resolves when everything is loaded (the missing files); onReady(): the project is on screen.
+export const loading = { gen: 0, busy: false };
+const LOAD_PAR = 4;
+let loadIdle = Promise.resolve();
+const warpNeeded = (w) => !!(w && ((w.ratio || 1) !== 1 || w.rev || w.pitch));
+const padWarp = (q) => !!(q.warp && ((q.warp.ratio || 1) !== 1 || q.warp.pitch));
+export async function deserialize(text, onProgress, onReady) {
+  const gen = ++loading.gen;
+  await loadIdle;                                       // the previous project's loads still in flight finish their engine writes first
+  if (gen !== loading.gen) return [];                   // a newer project was opened meanwhile
+  let ctx;
   HK.on = false;
-  try { return await deserializeInner(text, onProgress); } finally { HK.on = true; HK.barrier(); }
+  try { ctx = await openStructure(text, gen); } finally { HK.on = true; HK.barrier(); }
+  if (onReady) { try { onReady(); } catch (e) { console.error(e); } }
+  let fin; loadIdle = new Promise((r) => { fin = r; }); loading.busy = true;
+  try { return await loadAssets(ctx, gen, onProgress); } finally { if (gen === loading.gen) loading.busy = false; fin(); }
 }
-async function deserializeInner(text, onProgress) {
+async function openStructure(text, gen) {
   const o = JSON.parse(text);
   if (!o || typeof o !== 'object' || !Array.isArray(o.tracks)) throw new Error('Berkas proyek tidak valid (tidak ada daftar track).');
   if (o.tracks.length > MAX_TRACKS) throw new Error('Proyek memiliki terlalu banyak track.');
@@ -1638,72 +1681,46 @@ async function deserializeInner(text, onProgress) {
   for (const r of state.returns) r.devices = Array.isArray(r.devices) ? r.devices : [];
   for (const t of state.tracks) t.out = Number.isInteger(t.out) && t.out >= 0 && t.out < state.returns.length ? t.out : -1;   // projects from before routing existed: everything goes to the Master
   const missing = [];
-  // progress: every sample to decode / render is one step (audio clips, their stretch / pitch renders, instrument samples, SoundFonts,
-  // wavetables, DirectWave programs, drum pads); onProgress(fraction, label, done, total)
-  const isIn = (t) => t.inst && (t.inst.type === INST.SOUNDFONT || t.inst.type === 37 || (t.inst.type === INST.FLM_DW && t.inst.dwp));
-  const totalA = Math.max(1, state.tracks.reduce((n, t) => n + (t.kind === 'audio' ? (t.clips || []).length : 0) + (t.frozen ? 1 : 0) + (isIn(t) ? 1 : 0) + ((t.inst && t.inst.zones) || []).length + (t.kind === 'drum' && t.inst && Array.isArray(t.inst.pads) ? t.inst.pads.length : 0), 0));
-  let doneA = 0, lastP = 0, what = 'Memuat sample\u2026';
-  const say = (label) => { what = label; if (onProgress) { lastP = Date.now(); onProgress(Math.min(0.99, doneA / totalA), what, doneA, totalA); } };
-  const tick = () => { doneA++; const now = Date.now(); if (onProgress && now - lastP > 60) { lastP = now; onProgress(Math.min(0.99, doneA / totalA), what, doneA, totalA); } };
+  // samples: placeholders now, decoded by loadAssets (the file keeps path, name and duration, so the clips are drawn at their size)
+  const ph = (ref) => {
+    const p = ref && typeof ref.path === 'string' && ref.path ? ref.path : null; if (!p) return null;
+    return state.samples[p] || (state.samples[p] = { id: -1, path: p, name: p.split('/').pop(), duration: +ref.duration || 0, pending: true });
+  };
   for (const t of state.tracks) {
     if (t.kind !== 'audio') continue;
     t.clips = t.clips.filter((c) => c && c.sample && c.sample.path);   // a clip without a sample reference cannot be played
-    for (const c of t.clips) {
-      say('Memuat sample klip: ' + (c.sample.path.split('/').pop() || ''));
-      const s = await loadSampleObj(c.sample.path);
-      if (s) {
-        c.sample = s;
-        if (c.warp && (c.warp.ratio !== 1 || c.warp.rev || c.warp.pitch)) { say('Merender stretch / pitch: ' + (c.name || s.name)); c.dsample = await deriveSample(s, c.warp); }
-      } else missing.push(c.sample.path);
-      tick();
-    }
-    t.clips = t.clips.filter((c) => !missing.includes(c.sample.path) || state.samples[c.sample.path]);
+    for (const c of t.clips) { c.sample = ph(c.sample); delete c.dsample; }
   }
-  frozenSmp.clear();
-  for (const t of state.tracks) {                                  // frozen tracks: their audio from the library; missing = the track plays live again
-    if (!t.frozen || !t.frozen.path) { delete t.frozen; continue; }
-    what = 'Memuat audio track beku: ' + (t.name || ''); const s = await loadSampleObj(t.frozen.path); tick(); if (s) frozenSmp.set(t.id, s); else delete t.frozen;
-  }
-  const chains = [state.master, ...state.returns, ...state.tracks];
-  for (let i = 0; i < state.tracks.length; i++) {
-    const t = state.tracks[i];
-    if (isIn(t) && !(t.inst.type === INST.FLM_DW)) { say((t.inst.type === 37 ? 'Memuat wavetable: ' : 'Memuat SoundFont: ') + (t.name || '')); tick(); }
-    if (t.inst && t.inst.type === INST.SOUNDFONT && t.inst.sf) { const r = await loadSoundFontFor(i, t.inst.sf.path, t.inst.sf.preset); if (r && r.error) missing.push(t.inst.sf.path); }
-    if (t.inst && t.inst.type === 37) { t.inst.params[302] = t.inst.params[303] = -1; for (let o = 0; o < 2; o++) { const w = t.inst.wt && t.inst.wt[o]; if (!w) continue; const r = await loadMoistureTable(i, o, w.path); if (r && r.error) missing.push(w.path); } }   // Moisture wavetables: new sample ids each load
-  }
+  frozenSmp.clear();                                               // frozen tracks: their audio first (missing = the track plays live again)
+  await Promise.all(state.tracks.map(async (t) => {
+    if (!t.frozen || !t.frozen.path) { delete t.frozen; return; }
+    const s = await loadSampleObj(t.frozen.path); if (s) frozenSmp.set(t.id, s); else delete t.frozen;
+  }));
+  if (gen !== loading.gen) return { missing };
   for (const t of state.tracks) {
-    if (!t.inst || !t.inst.zones) continue;
-    for (const z of t.inst.zones) {
-      tick(); if (!z.sample) continue;
-      what = 'Memuat sample instrumen: ' + (t.name || '');
-      const sm = await loadSampleObj(z.sample.path);
-      if (sm) z.sample = sm; else { missing.push(z.sample.path); z.sample = null; }
-    }
-  }
-  for (let i = 0; i < state.tracks.length; i++) {                 // DirectWave with a library program (.dwp) still to load (an FLM import)
-    const t = state.tracks[i]; if (!t.inst || t.inst.type !== INST.FLM_DW || !t.inst.dwp || (t.inst.zones || []).some((z) => z.sample)) continue;
-    say('Memuat program DirectWave: ' + t.inst.dwp.split('/').pop()); tick();
-    const r = await loadDwpProgram(i, t.inst.dwp); if (r.error) missing.push(t.inst.dwp); else delete t.inst.dwp;
+    if (!t.inst) continue;
+    if (t.inst.type === 37 && t.inst.params) t.inst.params[302] = t.inst.params[303] = -1;   // Moisture wavetables: new sample ids each load
+    if (t.inst.type === INST.SOUNDFONT && t.inst.sf) delete t.inst.sf.id;                    // the SoundFont gets a new id when it is loaded
+    if (t.inst.zones) for (const z of t.inst.zones) if (z) z.sample = z.sample ? ph(z.sample) : null;
   }
   for (const t of state.tracks) {
     if (t.kind !== 'drum' || !t.inst) continue;
     if (!Array.isArray(t.inst.pads)) { delete t.inst.pads; continue; }
     t.inst.pads = t.inst.pads.filter((q) => q && Number.isFinite(q.pitch)).slice(0, MAX_PADS).map((q) => newPad(q));
-    what = 'Memuat pad drum: ' + (t.name || '');
     for (const q of t.inst.pads) {
-      tick();
       if (q.chain) {                                                          // Drum Rack chain: instrument (+ its sample) and effects
         const c = q.chain; c.devices = fixChain(c.devices).filter((d) => !DEVICES[d.type].hidden);
         for (const d of c.devices) { if (!Array.isArray(d.params)) d.params = []; fillParams(d, DEVICES); d.bypass = !!d.bypass; }
         if (c.inst && !INSTRUMENTS[c.inst.type]) c.inst = null;
-        if (c.inst) { c.inst.params = c.inst.params || {}; if (c.inst.sample) { const sm = c.inst.sample.path ? await loadSampleObj(c.inst.sample.path) : null; if (!sm && c.inst.sample.path) missing.push(c.inst.sample.path); c.inst.sample = sm; } }
+        if (c.inst) { c.inst.params = c.inst.params || {}; if (c.inst.sample) c.inst.sample = ph(c.inst.sample); }
         if (!c.inst && !c.devices.length) q.chain = null;
       }
       if (!q.sample) continue;
-      const sm = q.sample.path ? await loadSampleObj(q.sample.path) : null;
-      if (sm) { q.sample = sm; if (q.warp && ((q.warp.ratio || 1) !== 1 || q.warp.pitch)) { say('Merender stretch / pitch pad: ' + (q.name || sm.name)); const ds = await deriveSample(sm, q.warp); q.dsample = ds && ds !== sm ? ds : null; } flmPadTime(q); } else { if (q.sample.path) missing.push(q.sample.path); q.sample = null; if (q.kind < 0) q.mute = true; }
+      q.sample = ph(q.sample); delete q.dsample;
+      if (!q.sample && q.kind < 0) q.mute = true;
     }
   }
+  const chains = [state.master, ...state.returns, ...state.tracks];
   let maxId = 0;
   for (const t of state.tracks) { maxId = Math.max(maxId, t.id || 0); for (const c of t.clips) maxId = Math.max(maxId, c.id || 0); for (const x of subsOf(t)) maxId = Math.max(maxId, +x.id || 0); }
   for (const c of chains) for (const d of c.devices) maxId = Math.max(maxId, d.id || 0);
@@ -1714,7 +1731,96 @@ async function deserializeInner(text, onProgress) {
   state.sel = { track: 0, clip: null };
   syncAll();
   emit('all');
-  return missing;
+  return { missing };
+}
+async function pool(jobs, n, live) {
+  let k = 0;
+  const run = async () => { while (k < jobs.length && live()) { const j = jobs[k++]; try { await j(); } catch (e) { console.error('load', e); } } };
+  await Promise.all(Array.from({ length: Math.min(n, jobs.length) }, run));
+}
+// progress: every sample to decode, every stretch / pitch render, SoundFont, wavetable pair and DirectWave program is one step;
+// onProgress(fraction, label, done, total)
+async function loadAssets({ missing }, gen, onProgress) {
+  const live = () => gen === loading.gen, failed = new Set(), uses = new Map();   // placeholder -> the earliest tick it is heard (-1: an instrument)
+  const see = (s, at) => { if (s && s.pending) uses.set(s, Math.min(uses.has(s) ? uses.get(s) : Infinity, at)); };
+  let renders = 0;
+  for (const t of state.tracks) {
+    if (t.kind === 'audio') for (const c of t.clips) { see(c.sample, c.start); if (warpNeeded(c.warp)) renders++; }
+    if (t.inst && t.inst.zones) for (const z of t.inst.zones) if (z) see(z.sample, -1);
+    if (t.kind === 'drum' && t.inst && t.inst.pads) for (const q of t.inst.pads) { see(q.sample, -1); if (q.chain && q.chain.inst) see(q.chain.inst.sample, -1); if (q.sample && padWarp(q)) renders++; }
+  }
+  const tjobs = state.tracks.filter((t) => t.inst && ((t.inst.type === INST.SOUNDFONT && t.inst.sf && t.inst.sf.path) || (t.inst.type === 37 && t.inst.wt && t.inst.wt.some(Boolean))));
+  const dwps = state.tracks.filter((t) => t.inst && t.inst.type === INST.FLM_DW && t.inst.dwp);
+  const total = Math.max(1, uses.size + renders + tjobs.length + dwps.length);
+  let done = 0, lastP = 0, what = 'Memuat sample\u2026';
+  const report = (force) => { const now = Date.now(); if (onProgress && live() && (force || now - lastP > 80)) { lastP = now; onProgress(Math.min(0.99, done / total), what, done, total); } };
+  const say = (label) => { what = label; report(); };
+  const step = () => { done++; report(); };
+  const dirty = new Set(); let flushT = 0;
+  const flush = () => {
+    clearTimeout(flushT); flushT = 0; if (!live() || !dirty.size) return;
+    for (const t of dirty) { const i = state.tracks.indexOf(t); if (i < 0) continue; if (t.kind === 'audio') syncClips(i); else { syncZones(i); syncPads(i); } }
+    dirty.clear(); emit('clips'); emit('devices');
+  };
+  const touch = (t) => { dirty.add(t); if (!flushT) flushT = setTimeout(flush, 150); };
+  const sampleJob = (s) => async () => {
+    say('Memuat sample: ' + s.name);
+    const r = await loadSampleObj(s.path);
+    if (!live()) return;
+    step();
+    if (!r) { failed.add(s); missing.push(s.path); }
+    for (const t of [...state.tracks]) {                         // everything that uses it: its stretch / pitch renders, then a re-sync
+      let hit = false;
+      if (t.kind === 'audio') for (const c of [...t.clips]) {
+        if (c.sample !== s) continue; hit = true;
+        if (!r || !warpNeeded(c.warp) || c.dsample !== undefined) continue;
+        say('Merender stretch / pitch: ' + (c.name || s.name));
+        const ds = await deriveSample(r, c.warp); if (!live()) return;
+        if (c.dsample === undefined) c.dsample = ds && ds !== r ? ds : null;
+        step();
+      }
+      if (t.inst && t.inst.zones) for (const z of t.inst.zones) if (z && z.sample === s) { hit = true; if (!r) z.sample = null; }
+      if (t.kind === 'drum' && t.inst && t.inst.pads) for (const q of [...t.inst.pads]) {
+        if (q.chain && q.chain.inst && q.chain.inst.sample === s) { hit = true; if (!r) q.chain.inst.sample = null; }
+        if (q.sample !== s) continue; hit = true;
+        if (!r) { q.sample = null; if (q.kind < 0) q.mute = true; continue; }
+        if (padWarp(q) && q.dsample === undefined) {
+          say('Merender stretch / pitch pad: ' + (q.name || s.name));
+          const ds = await deriveSample(r, q.warp); if (!live()) return;
+          q.dsample = ds && ds !== r ? ds : null; step();
+        }
+        flmPadTime(q);
+      }
+      if (hit) touch(t);
+    }
+  };
+  const instJob = (t) => async () => {
+    let i = state.tracks.indexOf(t);
+    if (i >= 0 && t.inst.type === INST.SOUNDFONT) {
+      say('Memuat SoundFont: ' + (t.name || ''));
+      const r = await loadSoundFontFor(i, t.inst.sf.path, t.inst.sf.preset); if (r && r.error) missing.push(t.inst.sf.path);
+    } else if (i >= 0) {
+      say('Memuat wavetable: ' + (t.name || ''));
+      for (let o = 0; o < 2 && live(); o++) { const w = t.inst.wt && t.inst.wt[o]; i = state.tracks.indexOf(t); if (!w || i < 0) continue; const r = await loadMoistureTable(i, o, w.path); if (r && r.error) missing.push(w.path); }
+    }
+    if (live()) step();
+  };
+  const dwpJob = (t) => async () => {                            // DirectWave with a library program (.dwp) still to load (an FLM import)
+    const i = state.tracks.indexOf(t);
+    if (i >= 0 && t.inst && t.inst.dwp && !(t.inst.zones || []).some((z) => z && z.sample)) {
+      say('Memuat program DirectWave: ' + t.inst.dwp.split('/').pop());
+      const r = await loadDwpProgram(i, t.inst.dwp); if (r.error) missing.push(t.inst.dwp); else delete t.inst.dwp;
+    }
+    if (live()) step();
+  };
+  report(true);
+  await pool([...tjobs.map(instJob), ...[...uses.entries()].sort((x, y) => x[1] - y[1]).map(([s]) => sampleJob(s))], LOAD_PAR, live);
+  if (live()) await pool(dwps.map(dwpJob), 2, live);
+  if (!live()) { clearTimeout(flushT); return []; }
+  if (failed.size) for (const t of state.tracks) if (t.kind === 'audio') { const n = t.clips.length; t.clips = t.clips.filter((c) => !failed.has(c.sample)); if (t.clips.length !== n) touch(t); }   // a clip without its audio is removed, as before
+  flush();
+  if (onProgress) onProgress(1, 'Selesai', total, total);
+  return [...new Set(missing)];
 }
 
 // ------------------------------------------------------------------ automation
@@ -1861,47 +1967,68 @@ export function autoLabel(t) {
 // mode = warp algorithm (audioops.js): 'beats' WSOLA (default, also every clip saved before modes existed), 'tones' phase vocoder, 'repitch'.
 const SAMPLE_MAX = 256, SAMPLE_FULL = 'Slot sample penuh (256). Simpan proyek lalu buka ulang untuk membersihkan hasil stretch lama.';
 let deriveErr = '';
-// Offline audio rendering (reverse / pitch / stretch) runs in a module Worker so the UI stays smooth; if workers are not
-// available it falls back to the main thread. Jobs run one after another (a drag can queue several).
-let worker = null, workerDead = false, jobId = 0;
-const jobs = new Map();
-function getWorker() {
-  if (worker || workerDead || typeof Worker === 'undefined') return worker;
-  try {
-    worker = new Worker(new URL('./engine/stretchworker.js', import.meta.url), { type: 'module' });
-    worker.onmessage = (e) => { const j = jobs.get(e.data.id); if (!j) return; jobs.delete(e.data.id); if (e.data.error) j.rej(new Error(e.data.error)); else j.res({ l: e.data.l, r: e.data.mono ? e.data.l : e.data.r }); };
-    worker.onerror = () => { workerDead = true; const w = worker; worker = null; try { w.terminate(); } catch (_) { /* ignore */ } for (const [k, j] of jobs) { jobs.delete(k); j.rej(new Error('worker')); } };
-  } catch (_) { workerDead = true; worker = null; }
-  return worker;
+// Offline audio rendering (reverse / pitch / stretch) runs in module Workers so the UI stays smooth: a small pool (one per spare core, up
+// to 4) so a project with many stretched clips renders them side by side; each job goes to the least busy worker. If workers are not
+// available it falls back to the main thread.
+const RENDER_W = Math.max(1, Math.min(4, ((typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 2) - 1));
+const workers = []; let workerDead = false, noSpawn = false, jobId = 0;   // noSpawn: a worker failed once, the pool does not grow again
+function spawnWorker() {
+  let w;
+  try { w = new Worker(new URL('./engine/stretchworker.js', import.meta.url), { type: 'module' }); } catch (_) { return null; }
+  const me = { w, jobs: new Map() };
+  w.onmessage = (e) => { const j = me.jobs.get(e.data.id); if (!j) return; me.jobs.delete(e.data.id); if (e.data.error) j.rej(new Error(e.data.error)); else j.res({ l: e.data.l, r: e.data.mono ? e.data.l : e.data.r }); };
+  w.onerror = () => {                                              // a worker that dies: its jobs fall back to the main thread, it leaves the pool
+    const k = workers.indexOf(me); if (k >= 0) workers.splice(k, 1);
+    try { w.terminate(); } catch (_) { /* ignore */ }
+    for (const [id, j] of me.jobs) { me.jobs.delete(id); j.rej(Object.assign(new Error('worker'), { dead: true })); }
+    noSpawn = true; if (!workers.length) workerDead = true;
+  };
+  workers.push(me);
+  return me;
+}
+function pickWorker() {
+  if (workerDead || typeof Worker === 'undefined') return null;
+  let best = null; for (const x of workers) if (!best || x.jobs.size < best.jobs.size) best = x;
+  if ((!best || best.jobs.size > 0) && workers.length < RENDER_W && !noSpawn) best = spawnWorker() || best;
+  if (!best && !workers.length) workerDead = true;
+  return best;
 }
 async function renderAudio(l, r, opts) {
-  const w = getWorker(), mono = r === l;
-  if (w) {
+  const x = pickWorker(), mono = r === l;
+  if (x) {
     try {
-      return await new Promise((res, rej) => { const id = ++jobId; jobs.set(id, { res, rej }); w.postMessage({ id, l, r: mono ? null : r, mono, opts }); });
-    } catch (e) { if (!workerDead) throw e; }                    // the worker itself failed (not the audio): do it here instead
+      return await new Promise((res, rej) => { const id = ++jobId; x.jobs.set(id, { res, rej }); x.w.postMessage({ id, l, r: mono ? null : r, mono, opts }); });
+    } catch (e) { if (!(e && e.dead)) throw e; }                    // the worker itself failed (not the audio): do it here instead
   }
   await new Promise((res) => setTimeout(res, 0));
   return processBuffers(l, r, opts);
 }
-export async function deriveSample(base, warp) {
+const dLoads = new Map();          // gen|key -> the render in flight
+export function deriveSample(base, warp) {
   deriveErr = '';
   const ratio = warp.ratio || 1, rev = !!warp.rev, pitch = warp.pitch || 0, mode = WARP_MODES.includes(warp.mode) ? warp.mode : 'beats';
-  if (ratio === 1 && !rev && !pitch) return base;
+  if (ratio === 1 && !rev && !pitch) return Promise.resolve(base);
   const key = `${base.path}|${ratio.toFixed(5)}|${rev ? 1 : 0}|${pitch}` + (mode !== 'beats' ? '|' + mode : '');
-  if (state.samples[key]) return state.samples[key];
-  const b = eng.sampleBuffers(base.id);
-  if (!b) return null;
-  let l, r;
-  try { ({ l, r } = await renderAudio(b.l, b.r || b.l, { rev, pitch, ratio, mode })); }
-  catch (e) { deriveErr = 'Gagal memproses audio: ' + (e && e.message || e); return null; }
-  if (state.nextSample >= SAMPLE_MAX) { deriveErr = SAMPLE_FULL; return null; }
-  const id = state.nextSample++;
-  const m = await eng.putSampleBuffers(id, l, r);
-  if (!m || m.error) return null;
-  const s = { id, path: base.path, name: base.name, duration: m.duration, peaks: m.peaks, pyr: m.pyr, derived: true };
-  state.samples[key] = s;
-  return s;
+  if (state.samples[key]) return Promise.resolve(state.samples[key]);
+  const gen = loading.gen, k = gen + '|' + key;
+  if (dLoads.has(k)) return dLoads.get(k);
+  const p = (async () => {
+    const b = eng.sampleBuffers(base.id);
+    if (!b) return null;
+    let l, r;
+    try { ({ l, r } = await renderAudio(b.l, b.r || b.l, { rev, pitch, ratio, mode })); }
+    catch (e) { deriveErr = 'Gagal memproses audio: ' + (e && e.message || e); return null; }
+    if (gen !== loading.gen) return null;
+    if (state.nextSample >= SAMPLE_MAX) { deriveErr = SAMPLE_FULL; return null; }
+    const id = state.nextSample++;
+    const m = await eng.putSampleBuffers(id, l, r);
+    if (!m || m.error || gen !== loading.gen) return null;
+    const s = { id, path: base.path, name: base.name, duration: m.duration, peaks: m.peaks, pyr: m.pyr, derived: true };
+    state.samples[key] = s;
+    return s;
+  })();
+  dLoads.set(k, p); p.then(() => dLoads.delete(k));
+  return p;
 }
 export const WARP_MODES = ['beats', 'tones', 'repitch'];
 export const canWarp = () => !!eng.sampleBuffers(0) || state.nextSample > 16;
@@ -2168,9 +2295,10 @@ export async function applySerumPreset(i, path) {
   return { ok: true, name: r.name, params: n, tables, notes };
 }
 async function loadSoundFontFor(i, path, preset = 0) {
+  const t = state.tracks[i];
   const r = await eng.loadSoundFont(path);
   if (!r || r.error) return r || { error: 'SoundFont tidak bisa dimuat' };
-  const t = state.tracks[i];
+  i = state.tracks.indexOf(t); if (i < 0 || !t.inst || t.inst.type !== INST.SOUNDFONT) return r;   // the track was removed / changed while the file loaded
   const fp = t0Flm(i);   // an FLM import: the SF2D patch is a file-order index, MobileDAW lists the presets by bank / program
   if (fp != null && Array.isArray(r.order)) { const k = r.order.indexOf(fp); if (k >= 0) preset = k; }
   t.inst.sf = { path, id: r.id, preset: Math.min(preset, r.presets.length - 1), presets: r.presets };

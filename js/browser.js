@@ -576,12 +576,12 @@ function tabProjects(list) {
       if (demoBusy) return;
       demoBusy = true;
       try {
-        const miss = await openDemo(d, (k, n) => toast('Menyiapkan demo\u2026 ' + k + '/' + n, 1500));
-        closeBrowser(); toast(miss.length ? miss.length + ' file sample/SoundFont tidak ditemukan.' : d.title + ' dibuka. Tekan Play.');
+        const miss = await openDemo(d, (k, n) => toast('Menyiapkan demo\u2026 ' + k + '/' + n, 1500), () => { closeBrowser(); toast(d.title + ' dibuka.'); demoBusy = false; });
+        if (miss.length) toast(miss.length + ' file sample/SoundFont tidak ditemukan.', 3500);
       } catch (e) { toast('Demo gagal dibuka: ' + ((e && e.message) || e), 4500); }
       demoBusy = false;
     }, d.time)),
-    ...(() => { const R = PM.recent(); return R.length ? [head('Terakhir dibuka'), ...R.map((n) => row(n, async () => { const r = await PM.openProject(n); if (r.error) return toast(r.error, 4500); closeBrowser(); toast(r.miss.length ? r.miss.length + ' file sample/SoundFont tidak ditemukan.' : 'Proyek dibuka.'); }, n === state.projectName ? 'terbuka' : '', '', (rect) => projMenu(n, rect)))] : []; })(),
+    ...(() => { const R = PM.recent(); return R.length ? [head('Terakhir dibuka'), ...R.map((n) => row(n, async () => { const r = await PM.openProject(n); if (!r.error) closeBrowser(); PM.openedToast(r); }, n === state.projectName ? 'terbuka' : '', '', (rect) => projMenu(n, rect)))] : []; })(),
     head('Proyek tersimpan (tekan lama: duplikat / ganti nama / hapus)')].filter(Boolean));
   const d = eng.listDir(dir);
   const files = ((d && d.items) || []).filter((x) => !x.dir && /\.mdaw$/i.test(x.name) && !isAutosave(x.name) && !QS.isHiddenProject(x.name));
@@ -592,8 +592,7 @@ function tabProjects(list) {
     const nm = f.name.replace(/\.mdaw$/i, '');
     list.append(row(nm, async () => {
       const r = await PM.openProject(nm);
-      if (r.error) return toast(r.error, 4500);
-      closeBrowser(); toast(r.miss.length ? r.miss.length + ' file sample/SoundFont tidak ditemukan.' : 'Proyek dibuka.');
+      if (!r.error) closeBrowser(); PM.openedToast(r);
     }, kb(f.size), '', (rect) => projMenu(nm, rect, full)));
   }
   if (backups.length) {                                  // Quick Save keeps the version it overwrote: open one to get it back (Simpan cepat then restores it)
@@ -601,7 +600,7 @@ function tabProjects(list) {
     for (const f of backups) {
       const full = dir + '/' + f.name;
       list.append(row(f.name.replace(QS.BACKUP_PREFIX, '').replace(/\.mdaw$/i, '') + ' (cadangan)', async () => {
-        try { const { openWithLoading } = await import('./loadprog.js'); const miss = await openWithLoading(eng.readText(full), 'Membuka cadangan'); closeBrowser(); toast('Cadangan dibuka.' + (miss.length ? ' ' + miss.length + ' file sample/SoundFont tidak ditemukan.' : '') + ' Simpan cepat untuk memulihkannya.', 3500); }
+        try { const { openInBackground } = await import('./loadprog.js'); const { done } = await openInBackground(eng.readText(full), 'Membuka cadangan'); closeBrowser(); PM.openedToast({ done }, 'Cadangan dibuka. Simpan cepat untuk memulihkannya.'); }
         catch (e) { toast('Cadangan tidak bisa dibaca.', 3500); }
       }, kb(f.size), '', WEB ? (rect) => fileMenu(full, rect) : null));
     }

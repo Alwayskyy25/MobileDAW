@@ -20,7 +20,7 @@ async function getBytes(url) {
 }
 
 // Returns the list of files the project could not find (empty = everything loaded). Throws a readable Error on failure.
-export async function openDemo(d, onStep) {
+export async function openDemo(d, onStep, onReady) {   // onReady(): the demo is on screen (its samples may still be loading); resolves with the missing files once all is loaded
   if (backend !== 'web') throw new Error('Demo song hanya tersedia di versi web/PWA.');
   try { for (const p of OLD) if (eng.fileSize(p)) await eng.deleteFile(p); } catch (e) { /* cleanup is best-effort */ }
   const need = [];
@@ -34,5 +34,5 @@ export async function openDemo(d, onStep) {
   }
   const text = await (await fetch(d.file)).text();
   eng.writeText('/Projects/' + d.name.replace(/[^\w\- ]+/g, '') + '.mdaw', text);
-  return openWithLoading(text, 'Membuka demo ' + d.name);
+  return openWithLoading(text, 'Membuka demo ' + d.name, { onReady });
 }

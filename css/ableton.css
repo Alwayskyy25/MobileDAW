@@ -2086,3 +2086,14 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .modal:has(.tut-list) { width: min(460px, 94%); top: 50%; transform: translate(-50%, -50%); max-height: 94%; display: flex; flex-direction: column; }
 .modal:has(.tut-list) > h3, .modal:has(.tut-list) > .acts { flex: none; }
 .modal:has(.tut-list) > div:not(.acts) { flex: 1 1 auto; min-height: 0; overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; padding-bottom: 2px; }
+/* project loading: a small bar under the transport (play) buttons; the app stays usable, it never takes a tap */
+#top-c { position: relative; }
+.ldm { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); z-index: 90; width: min(300px, 70vw); padding: 4px 8px 5px; pointer-events: none;
+  background: var(--panel2, #2a2a2a); border: 1px solid var(--line, #1b1b1b); border-radius: var(--r-1, 3px); box-shadow: 0 4px 14px rgba(0, 0, 0, .35); color: var(--text, #ddd); font-size: 11px; animation: ldm-in .18s ease-out; }
+.ldm-row { display: flex; gap: 8px; align-items: baseline; }
+.ldm-l { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim, #9a9a9a); }
+.ldm-p { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--accent, #ffad56); }
+.ldm-bar { height: 3px; margin-top: 4px; background: var(--bg, #1e1e1e); border-radius: 2px; overflow: hidden; }
+.ldm-bar i { display: block; height: 100%; width: 0; background: var(--accent, #ffad56); transition: width .15s linear; }
+@keyframes ldm-in { from { opacity: 0; transform: translate(-50%, -3px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.reduce-motion .ldm { animation: none; }
