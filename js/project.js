@@ -402,7 +402,8 @@ export function slideLane(c, f) {
     const plain = c.notes.filter((q) => !q.sl).sort((a, b) => a.t - b.t);
     const slides = c.notes.filter((q) => q.sl && q.t >= g.s && q.t < e).sort((a, b) => a.t - b.t);
     let base = null, cur = dflt.slice();
-    const back = () => { const x = at(base.t + base.d); for (let k = 0; k < 3; k++) if (cur[k] !== dflt[k]) L[k].push(x, cur[k], x + 1, dflt[k]); };
+    // back to the note's own pitch: not at the note's end (its release would jump back) but when the next plain note starts (or 2 bars on)
+    const back = () => { const end = base.t + base.d, nx = plain.find((q) => q.t >= end), x = at(nx ? nx.t : end + 7680), x0 = Math.max(at(end), x - 1); for (let k = 0; k < 3; k++) if (cur[k] !== dflt[k]) L[k].push(x0, cur[k], Math.max(x0 + 1, x), dflt[k]); };
     for (const s of slides) {
       let b = null; for (const q of plain) { if (q.t > s.t) break; if (q.t + q.d > s.t) b = q; }
       if (!b) continue;

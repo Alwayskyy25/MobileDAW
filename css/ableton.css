@@ -2158,7 +2158,7 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .hm-chip.on { background: var(--hm-or); color: #161616; border-color: var(--hm-or); }
 .hm-chip.lit:not(.on) { box-shadow: inset 0 -2px 0 var(--hm-or); }
 .hm-lab { color: var(--hm-dim); font-size: 10px; min-width: 44px; }
-.hm-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 3px 8px; }
+.hm-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 3px 8px; }
 .hm-dd, .hm-btn { min-height: 30px; padding: 0 9px; border: 1px solid var(--hm-ln); background: #3c3c3c; border-radius: 2px; text-align: left; white-space: nowrap; }
 .hm-btn.sm { min-height: 26px; padding: 0 8px; }
 .hm-btn.prim { background: var(--hm-or); color: #161616; border-color: var(--hm-or); font-weight: 600; }
@@ -2253,3 +2253,47 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .fw .fw-bs:hover .fw-b svg, .fw .fw-bs .fw-b:active svg { opacity: .9; }
 .fw.merged .fw-sub { display: none; }
 .fw.frameless .fw-bs .fw-b { width: 18px; height: 20px; } .fw.frameless .fw-bs .fw-b::before { width: 10px; height: 10px; margin: -5px 0 0 -5px; }
+/* Settings: CPU meter / FPS switched off (beats the top bar's display !important) */
+.fpsbox.off, .cpubox.off, #top .perf .fpsbox.off, #top .perf .cpubox.off, #top .perf.off, .perf.off { display: none !important; }
+/* Moisture on a short screen (phone landscape): a shorter design, so the window scales it up ~25 % (bigger knobs and text) */
+@media (max-height: 620px) {
+  .m2x-top { height: 44px; }
+  .m2x-body { min-height: 450px; }
+  .m2x-srcs { height: 272px; }
+  .m2x-mods { height: 176px; }
+  .m2x-p.osc .m2x-disp { min-height: 56px; } .m2x-p.fil .m2x-disp { min-height: 50px; }
+  .m2x-mx { max-height: 450px; }
+}
+/* owner (marked the title bar again): thinner still — a 22 px bar, everything on it 18-20 px */
+.fw .fw-bar { height: 22px; padding: 0 2px 0 4px; }
+.fw .fw-head > h4 { height: 22px !important; gap: 2px; }
+.fw .fw-head > h4 > span:not(.pdot) { line-height: 22px !important; }
+.fw .fw-head > h4 > span:not(.pdot), .fw .fw-head > h4 button.dv-name span { font-size: 11.5px !important; }
+.fw .fw-head > h4 button.dv-name { height: 20px; }
+.fw .fw-head > h4 button.dv-name span { line-height: 20px !important; }
+.fw .fw-head > h4 button.pw { width: 20px; min-width: 20px; height: 20px; }
+.fw .fw-head > h4 button.pw::before, .fw .fw-head > h4 .pdot { width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; }
+.fw .fw-head > h4 .pdot { margin: 0 3px; }
+.fw .fw-head > h4 button.pre, .fw .fw-head > h4 button.dv-wet.dv-wet:not(.pw) { height: 16px !important; padding: 0 6px !important; font: 500 9.5px/14px var(--font) !important; }
+.fw .fw-head > h4 :is(.dv-swap, .fw-pop, .fold-b, button.dv-more:not(.pw)) { width: 20px !important; min-width: 20px !important; height: 20px !important; font-size: 11.5px !important; }
+.fw .fw-bs .fw-b, .fw .fw-bs .fw-b:first-child, .fw .fw-bs .fw-b:last-child { width: 18px; height: 20px; }
+.fw .fw-bs .fw-b::before { width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; }
+.fw.frameless .fw-bar { height: 20px; }
+/* Harmor: bigger knobs, easy to reach with a thumb (owner); the value / label text a little larger too */
+.hm .hm-k { width: 62px; }
+.hm .hm-kn { width: 44px; height: 44px; }
+.hm .hm-top .hm-kn { width: 32px; height: 32px; }
+.hm .hm-fxh .hm-kn { width: 30px; height: 30px; }
+.hm .hm-top .hm-k, .hm .hm-fxh .hm-k { width: auto; }
+.hm-grid.g-mod { grid-template-columns: minmax(130px, .75fr) 1fr 1fr 1.75fr; }
+@media (max-width: 640px) { .hm-grid.g-mod { grid-template-columns: 1fr 1fr; } }
+.hm .hm-fxh b { min-height: 38px; }                      /* effect rows: taller, easy to tap */
+.hm .hm-fxh .hm-tog, .hm .hm-fxh button { min-height: 30px; }
+/* Moisture: bigger knobs (thumb-sized once the window scales the design), macros fill their panel, SUB / NOISE show their sound */
+.m2x-kn { width: 38px; height: 38px; } .m2x-k.big .m2x-kn { width: 44px; height: 44px; }
+.m2x-k { min-width: 42px; }
+.m2x-kl { font-size: 9px; }
+.m2x-disp.side { min-height: 40px; flex: 1 1 auto; }
+.m2x-mac { grid-template-rows: 1fr 1fr; align-items: center; justify-items: center; height: calc(100% - 24px); padding-top: 0; gap: 4px; }
+.m2x-p.mac { display: flex; flex-direction: column; }
+.m2x-mods { grid-template-columns: 118px 252px 1fr 150px; }

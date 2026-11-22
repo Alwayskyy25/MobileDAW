@@ -210,6 +210,20 @@ Keputusan pemilik: loop suara real-time Harmor di C++ (pola Moisture); semua bag
   menghapus; goresan harmonik → partial 1 −27,7 dB, preset Ganjil → partial 2 −6,0 → −112,5 dB, partial 3 −9,5 dB (1/3 tepat); simpan +
   buka ulang identik (≤ 0,03 dB); urutan FX Distortion, Chorus → Chorus, Distortion. Golden 134 skenario identik.
 
+### Phase 6b (Harmor) — Map End, tata letak padat: selesai (tes lulus)
+
+- **Map End (param 1066, 0..1, default 1)**: peta diputar dari Map Start sampai Map End. Loop off = setelah End, frame End ditahan
+  (vokal bertahan seperti file yang dipotong, tanpa memotong file). Loop on = berulang Start..End. Berlaku untuk harmonik, pita noise,
+  dan residu waveform (C++ `mapPos()`; WASM + native). Proyek lama: param tidak ada = 1 = perilaku lama.
+  Tes: `harmor-resynth-test` (End di tengah not 1 + Loop off menahan nada 57 di not 2-4, level +0.1 dB; Loop on mengulang segmen 1).
+- **Jendela**: bilah judul 22 px. Di layar kecil / pendek (lebar < 900 atau tinggi < 600 CSS px) jendela Harmor / Moisture memakai
+  ~90-98 % layar, jadi kontrol tidak mengecil. Moisture di layar pendek memakai desain lebih pendek (skala ±0.80 bukan 0.64).
+- **Harmor**: knob 44 px; tab PITCH punya grafik pitch-waktu (glide + vibrato), MOD menampilkan partial hasil modul, ADV menampilkan
+  ADSR volume; panel IMG dua kolom; PHASER satu baris.
+- **Moisture**: knob 38 px (makro 44 px, mengisi panel MACROS), SUB menampilkan bentuk gelombangnya, NOISE menampilkan jejak noise.
+- **ACC IMUT KABODY** dari `imut.wav` mentah (tanpa trim): Map End 0.30 s, Map Noise imut 0.45, body 0.35. Dibanding referensi:
+  LSD 4.89 dB (sebelumnya 5.75), envelope corr 0.989, 98.5 % frame nada sama, side/mid -13.8 dB (target -13.5).
+
 ## 5. Referensi dari pemilik (untuk fase berikutnya)
 
 ### Tampilan Harmor (screenshot Harmor di Live 12) — acuan Phase 6, disederhanakan untuk HP, tidak ditiru

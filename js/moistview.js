@@ -142,8 +142,15 @@ export function moistureView(k) {
       row(pick(wm, M2_WARPS, M2_WARPS.length, { cls: 'warp' }), knob(warp, 'WARP', { col: OR }), knob(pos, 'WT POS'))), { cls: 'osc' });
   }
   const oscPage = () => {
-    const sub = panel('SUB', 215, col(row(pick(170, M2_SUB, 6, { cls: 'wide' })), row(numBox(171, 'OCT')), h('div', { class: 'm2x-grow' }), row(knob(34, 'PAN', { bip: true }), knob(33, 'LEVEL'))), { cls: 'sm' });
-    const noise = panel('NOISE', 214, col(h('div', { class: 'm2x-grow' }), row(knob(29, 'FINE', { bip: true }), knob(30, 'PAN', { bip: true })), row(knob(28, 'PITCH'), knob(27, 'LEVEL'))), { cls: 'sm' });
+    // SUB: its shape (two cycles, height = level); NOISE: a noise trace (brightness = pitch, height = level) — they fill the narrow columns
+    const subD = disp((g, w, hh) => { const on = k.get(215) > 0.5, sh = Math.round(k.get(170)), lv = C01(k.get(33)), mid = hh / 2, amp = (hh / 2 - 6) * (0.25 + 0.75 * lv);
+      const f = (x) => { const p = x - Math.floor(x); return sh === 0 ? Math.sin(2 * Math.PI * p) : sh === 1 ? Math.max(-1, Math.min(1, 1.6 * Math.sin(2 * Math.PI * p))) : sh === 2 ? 1 - 4 * Math.abs(p - 0.5) : sh === 3 ? 2 * p - 1 : sh === 4 ? (p < 0.5 ? 1 : -1) : (p < 0.2 ? 1 : -1); };
+      g.beginPath(); for (let x = 0; x <= w; x++) { const y = mid - f(2 * x / w) * amp; x ? g.lineTo(x, y) : g.moveTo(x, y); } g.strokeStyle = on ? AC : '#4a5664'; g.lineWidth = 1.6; g.stroke(); }, { cls: 'side' });
+    const noiseD = disp((g, w, hh) => { const on = k.get(214) > 0.5, lv = C01(k.get(27)), pt = C01(k.get(28)), mid = hh / 2, amp = (hh / 2 - 6) * (0.25 + 0.75 * lv); let s0 = 9781, y = 0;
+      const sm = 0.15 + 0.8 * (1 - pt); g.beginPath(); for (let x = 0; x <= w; x++) { s0 = (Math.imul(s0, 1664525) + 1013904223) >>> 0; y = y * sm + (s0 / 4294967296 * 2 - 1) * (1 - sm) * 2.2; const Y = mid - Math.max(-1, Math.min(1, y)) * amp; x ? g.lineTo(x, Y) : g.moveTo(x, Y); }
+      g.strokeStyle = on ? AC2 : '#4a5664'; g.lineWidth = 1; g.stroke(); }, { cls: 'side' });
+    const sub = panel('SUB', 215, col(row(pick(170, M2_SUB, 6, { cls: 'wide' })), row(numBox(171, 'OCT')), subD, row(knob(34, 'PAN', { bip: true }), knob(33, 'LEVEL'))), { cls: 'sm' });
+    const noise = panel('NOISE', 214, col(noiseD, row(knob(29, 'FINE', { bip: true }), knob(30, 'PAN', { bip: true })), row(knob(28, 'PITCH'), knob(27, 'LEVEL'))), { cls: 'sm' });
     const fil = panel('FILTER', 216, col(row(pick(44, M2_FILTERS, 96, { cls: 'wide' })), filt(), row(led(40, 'A'), led(41, 'B'), led(42, 'N'), led(43, 'S')),
       row(knob(45, 'CUTOFF'), knob(46, 'RES'), knob(50, 'PAN', { bip: true })), row(knob(47, 'DRIVE'), knob(48, 'FAT'), knob(49, 'MIX'))), { cls: 'fil' });
     const top = h('div', { class: 'm2x-srcs' }, sub,
@@ -155,7 +162,7 @@ export function moistureView(k) {
     const envKn = () => { const o = [[35, 36, 37, 38, 39], [51, 52, 53, 54, 55], [56, 57, 58, 59, 60]][et.get()]; envRow.replaceChildren(knob(o[0], 'ATK'), knob(o[1], 'HOLD'), knob(o[2], 'DEC'), knob(o[3], 'SUS'), knob(o[4], 'REL')); };
     const lfoKn = () => { const j = lt.get(), rk = j < 4 ? 61 + j : 260 + j - 4; lfoRow.replaceChildren(col(pick(M2.LFO_SHAPE + j, M2_LFO_SHAPES, 0), pick(M2.LFO_MODE + j, ['Trig', 'Env', 'Free'], 0)), led(M2.LFO_SYNC + j, 'BPM'), knob(rk, 'RATE'), knob(273 + j, 'RISE'), knob(281 + j, 'DELAY'), knob(j < 4 ? 223 + j : 264 + j - 4, 'SMOOTH')); };
     envKn(); lfoKn();
-    const macros = panel('MACROS', null, h('div', { class: 'm2x-mac' }, knob(218, '1'), knob(219, '2'), knob(220, '3'), knob(221, '4')), { cls: 'mac' });
+    const macros = panel('MACROS', null, h('div', { class: 'm2x-mac' }, knob(218, 'MACRO 1', { big: true }), knob(219, 'MACRO 2', { big: true }), knob(220, 'MACRO 3', { big: true }), knob(221, 'MACRO 4', { big: true })), { cls: 'mac' });
     const env = h('div', { class: 'm2x-p mod' }, et.el, envBox, envRow), lfo = h('div', { class: 'm2x-p mod wide' }, lt.el, lfoBox, lfoRow);
     const voi = panel('VOICING', null, col(row(led(M2.MONO, 'MONO'), numBox(M2.VOICES, 'POLY')), row(led(M2.LEGATO, 'LEGATO')), row(knob(65, 'PORTA'), knob(66, 'CURVE', { bip: true })), row(numBox(166, 'BEND +'), numBox(167, 'BEND -'))), { cls: 'voi' });
     return [top, h('div', { class: 'm2x-mods' }, macros, env, lfo, voi)];

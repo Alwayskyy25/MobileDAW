@@ -65,8 +65,10 @@ async function holdWake() {
   try { if (prefs.keepAwake && navigator.wakeLock && !document.hidden && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch (_) { wake = null; /* denied or unsupported */ }
 }
 export function applyUiPrefs() {
-  const box = document.querySelector('.cpubox'); if (box) box.style.display = prefs.showCpu ? '' : 'none';
-  const fb = document.querySelector('.fpsbox'); if (fb) fb.style.display = prefs.showFps ? '' : 'none';
+  // a class, not style.display: the top bar's css shows these boxes with !important
+  const box = document.querySelector('.cpubox'); if (box) box.classList.toggle('off', !prefs.showCpu);
+  const fb = document.querySelector('.fpsbox'); if (fb) fb.classList.toggle('off', !prefs.showFps);
+  const pf = (box || fb) && (box || fb).closest('.perf'); if (pf) pf.classList.toggle('off', !prefs.showCpu && !prefs.showFps);
   document.documentElement.classList.toggle('reduce-motion', !!prefs.reduceMotion);
   document.documentElement.style.setProperty('--anim', String(prefs.animScale ?? 1));
   if (prefs.keepAwake) holdWake(); else if (wake) { wake.release().catch(() => {}); wake = null; }

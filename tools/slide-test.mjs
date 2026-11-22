@@ -17,7 +17,8 @@ const pts = []; for (let k = 0; k < f.length; k += 3) pts.push([f[k], f[k + 1], 
 ok(n === pts.length && pts.every((q) => q[1] === 4), `slide notes -> lane kind 4 (${n} points)`);
 ok(pts[0][0] === 480 && pts[0][2] === 0 && pts[1][0] === 960 && pts[1][2] === 7, 'first slide: from the note pitch (0) at its start to +7 at its end');
 ok(pts[2][0] === 1200 && pts[2][2] === 7 && pts[3][0] === 1440 && pts[3][2] === -5, 'second slide continues from +7 to -5 (55 - 60)');
-ok(pts[4][0] === 1920 && pts[4][2] === -5 && pts[5][0] === 1921 && pts[5][2] === 0, 'back to 0 when the sounding note ends');
+ok(pts[4][0] === 3839 && pts[4][2] === -5 && pts[5][0] === 3840 && pts[5][2] === 0, `the slid pitch holds through the note's release, back to 0 at the next note / clip end (${pts[4]} ${pts[5]})`);
+{ const c4 = P.addClip(i, P.BAR, P.BAR); c4.notes.push({ t: 0, d: 960, p: 60, v: 0.8 }, { t: 480, d: 240, p: 64, v: 0.8, sl: true }, { t: 1440, d: 480, p: 62, v: 0.8 }); const q = []; P.slideLane(c4, q); ok(q.length >= 12 && q[q.length - 3] - c4.start === 1440 && q[q.length - 1] === 0 && q[q.length - 4] === 4, 'with a next note: back to 0 exactly when it starts'); }
 const ev = P.clipNoteEvents(c, 'midi', []), fe = []; P.clipNoteEvents(c, 'midi', fe);
 ok(fe.length === 5, 'slide notes are not played as notes of their own (only the plain note is an event)');
 // ---- audible: a classic synth glides 220 Hz -> 440 Hz

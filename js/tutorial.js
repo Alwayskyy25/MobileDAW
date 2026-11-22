@@ -186,15 +186,19 @@ function place(r) {
     // the animated finger: the gesture this control takes, at its centre (in its left part for a wide target)
     if (s.gest && !cur.doneAt) { const gx = r.width > 220 ? r.left + Math.min(140, r.width * 0.25) : r.left + r.width / 2, gy = r.top + r.height / 2; g.className = 'tut-g ' + s.gest; g.style.cssText = `display:block;left:${gx}px;top:${gy}px`; } else g.style.display = 'none';
   }
-  const cw = Math.min(s.live || s.tips ? 400 : 360, W - 16), ch = card.offsetHeight || 160;
+  const cw = Math.min(s.live || s.tips ? 400 : 360, W - 16); card.style.maxHeight = (H - 16) + 'px'; const ch = card.offsetHeight || 160; let maxH = H - 16;
   let left = r ? r.left + r.width / 2 - cw / 2 : (W - cw) / 2, top = r ? (r.top + r.height + 12 + ch < H ? r.top + r.height + 12 : r.top - 12 - ch) : (H - ch) / 2;
   if (r && (top < 8 || (top + ch > H - 8))) {                       // no room above or below: beside the target (the wider side), else at the far edge
     const lw = r.left - 12, rw = W - (r.left + r.width) - 12;
     if (Math.max(lw, rw) >= cw) { left = lw >= rw ? r.left - 12 - cw : r.left + r.width + 12; top = Math.max(8, Math.min(H - ch - 8, r.top + r.height / 2 - ch / 2)); }
-    else top = Math.max(8, Math.min(H - ch - 8, r.top < H / 2 ? H - ch - 12 : 12));
+    else {                                                           // a short screen: the larger gap above / below the target, the card scrolls inside it
+      const up = r.top - 20, dn = H - (r.top + r.height) - 20;
+      if (Math.max(up, dn) >= 110) { maxH = Math.max(up, dn); top = dn >= up ? r.top + r.height + 12 : Math.max(8, r.top - 12 - Math.min(ch, maxH)); }
+      else top = Math.max(8, Math.min(H - ch - 8, r.top < H / 2 ? H - ch - 12 : 12));
+    }
   }
   left = Math.max(8, Math.min(W - cw - 8, left));
-  card.style.left = left + 'px'; card.style.top = Math.max(8, top) + 'px'; card.style.width = cw + 'px'; card.style.maxHeight = (H - 16) + 'px';
+  card.style.left = left + 'px'; card.style.top = Math.max(8, top) + 'px'; card.style.width = cw + 'px'; card.style.maxHeight = maxH + 'px';
 }
 // the live song map: the markers as coloured sections, a playhead that follows the song, the section under it lit
 function liveMap() {

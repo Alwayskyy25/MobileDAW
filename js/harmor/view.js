@@ -151,7 +151,7 @@ export function harmorView(k) {
     txt(g, noteName(Math.round(69 + 12 * Math.log2(live.f0 / 440))) + '  ' + live.on + ' voice', 6, hh - 6, INK, 10);
   }, { cls: 'hm-parts' });
   k.every(50, () => { const o = eng.devOut(i(), 998); if (!o || o.length < 5) { if (live.f0) { live = { ...live, f0: 0, parts: new Float32Array(0), on: 0 }; partials.paint(); } live.pk = [0, 0]; meter.paint(); return; }
-    live.pk = [o[0], o[1]]; live.hold = live.hold.map((x, c) => Math.max(o[c], x * 0.92)); live.on = o[2]; live.f0 = o[3]; const K = Math.min(o[4] | 0, o.length - 5); live.parts = Float32Array.from(o.slice(5, 5 + K)); meter.paint(); if (st.sec === 0) partials.paint(); });
+    live.pk = [o[0], o[1]]; live.hold = live.hold.map((x, c) => Math.max(o[c], x * 0.92)); live.on = o[2]; live.f0 = o[3]; const K = Math.min(o[4] | 0, o.length - 5); live.parts = Float32Array.from(o.slice(5, 5 + K)); meter.paint(); if (st.sec === 0 || st.sec === 4) partials.paint(); });
 
   // ---------------------------------------------------------------- sound pages
   const waveThumb = (tt) => disp((g, w, hh) => {
@@ -167,7 +167,19 @@ export function harmorView(k) {
     const mixP = panel('MIX', colm(chips(HM.BLEND, ['Mix', 'Morph']), row(knob(HM.MIX, 'A ↔ B'), knob(HM.STRETCH, 'Stretch'), knob(HM.SUB, 'Sub'))), { cls: 'mix' });
     return [h('div', { class: 'hm-grid g-timbre' }, tb(0), mixP, tb(1)), panel('PARTIAL', partials, { cls: 'wide grow' })];
   };
-  const pitchPage = () => [h('div', { class: 'hm-grid' },
+  // pitch over time for one note (2 s): the glide from a note 2 semitones below, then the vibrato after its delay (cents, ±depth)
+  const pitchDisp = () => disp((g, w, hh) => {
+    const T = 2, gl = k.get(HM.GLIDE), rt = k.get(HM.VIB_RATE), dp = k.get(HM.VIB_DEPTH), dl = k.get(HM.VIB_DELAY), rng = Math.max(250, dp * 1.25), mid = hh / 2, Y = (c) => mid - c / rng * (mid - 14), X = (tt) => 8 + tt / T * (w - 16);
+    for (let tt = 0; tt <= T + 1e-9; tt += 0.25) { g.fillStyle = tt % 1 ? GRID : GRID2; g.fillRect(Math.round(X(tt)), 0, 1, hh); if (!(tt % 0.5)) txt(g, tt + ' s', X(tt) + 3, hh - 4, DIM, 9); }
+    for (const c of [-200, -100, 100, 200]) if (Math.abs(c) <= rng) { g.fillStyle = GRID; g.fillRect(0, Math.round(Y(c)), w, 1); txt(g, (c > 0 ? '+' : '') + c + ' ct', 4, Y(c) - 3, DIM, 9); }
+    g.fillStyle = GRID2; g.fillRect(0, Math.round(mid), w, 1);
+    if (dl > 0 && dl < T) { g.fillStyle = 'rgba(95,212,245,.10)'; g.fillRect(X(0), 0, X(dl) - X(0), hh); txt(g, 'Delay', X(dl) - 4, 12, BL, 9, 'right'); }
+    g.beginPath(); for (let x = 0; x <= w - 16; x += 1.5) { const tt = x / (w - 16) * T, gc = gl > 0 ? -200 * Math.exp(-tt / Math.max(1e-3, gl / 3)) : 0, vc = tt > dl ? dp * Math.min(1, (tt - dl) / 0.15) * Math.sin(2 * Math.PI * rt * (tt - dl)) : 0, y = Y(gc + vc); x ? g.lineTo(8 + x, y) : g.moveTo(8 + x, y); }
+    g.strokeStyle = OR; g.lineWidth = 2; g.stroke();
+    const co = Math.round(k.get(HM.PITCH)), fi = k.get(HM.FINE);
+    txt(g, `Glide ${Math.round(gl * 1000)} ms  •  Vibrato ${rt.toFixed(2)} Hz ±${Math.round(dp)} ct  •  ${co >= 0 ? '+' : ''}${co} st ${fi >= 0 ? '+' : ''}${fi.toFixed(0)} ct`, w - 8, 14, INK, 10, 'right');
+  }, { cls: 'hm-pitch' });
+  const pitchPage = () => [panel('PITCH  •  WAKTU', pitchDisp(), { cls: 'wide grow' }), h('div', { class: 'hm-grid' },
     panel('PITCH', row(knob(HM.PITCH, 'Coarse'), knob(HM.FINE, 'Fine'), knob(HM.GLIDE, 'Glide'))),
     panel('VOICE', colm(row(tog(HM.MONO, 'Mono'), tog(HM.LEGATO, 'Legato')), row(num(HM.POLY, 'Voices')))),
     panel('VIBRATO', row(knob(HM.VIB_RATE, 'Rate'), knob(HM.VIB_DEPTH, 'Depth'), knob(HM.VIB_DELAY, 'Delay'))),
@@ -199,11 +211,11 @@ export function harmorView(k) {
   }, { cls: 'hm-uni' });
   const unisonPage = () => [panel('UNISON', uniDisp(), { cls: 'wide grow' }), h('div', { class: 'hm-grid' }, panel('SALINAN', row(num(HM.U_VOICES, 'Unison'), knob(HM.U_DETUNE, 'Detune'), knob(HM.U_PITCH, 'Pitch'))),
     panel('STEREO', row(knob(HM.U_SPREAD, 'Spread'), knob(HM.U_PHASE, 'Phase'), knob(HM.U_VOLDIST, 'Vol Dist'))))];
-  const modulesPage = () => [h('div', { class: 'hm-grid' },
+  const modulesPage = () => [h('div', { class: 'hm-grid g-mod' },
     panel('PRISM', row(knob(HM.PRISM_AMT, 'Amount'), chips(HM.PRISM_MODE, ['Scatter', 'Shift']))),
     panel('PLUCK', row(knob(HM.PLUCK_AMT, 'Amount'), knob(HM.PLUCK_TIME, 'Time'), knob(HM.PLUCK_DAMP, 'Damp'))),
     panel('BLUR', row(knob(HM.BLUR_ATT, 'Attack'), knob(HM.BLUR_REL, 'Release'), knob(HM.BLUR_HARM, 'Harm'))),
-    panel('PHASER', row(knob(HM.SPH_DEPTH, 'Depth'), knob(HM.SPH_DENS, 'Notches'), knob(HM.SPH_SPEED, 'Speed'), knob(HM.SPH_SHARP, 'Sharp'), knob(HM.SPH_OFS, 'Offset'))))];
+    panel('PHASER', row(knob(HM.SPH_DEPTH, 'Depth'), knob(HM.SPH_DENS, 'Notches'), knob(HM.SPH_SPEED, 'Speed'), knob(HM.SPH_SHARP, 'Sharp'), knob(HM.SPH_OFS, 'Offset')))), panel('PARTIAL  •  HASIL MODUL', partials, { cls: 'wide grow' })];
 
   // ---------------------------------------------------------------- editor: articulators (multi-point) + LFOs
   const envPts = (e) => {                               // the articulator's points [t (s, absolute), level, curve], sustain, loop (AHDSR made into points)
@@ -337,7 +349,7 @@ export function harmorView(k) {
       h('div', { class: 'hm-chips' }, h('span', { class: 'hm-lab' }, 'Kualitas'), ...HM_QUALITY.map((n, q) => h('button', { class: 'hm-chip' + ((st.resQ ?? 1) === q ? ' on' : ''), onclick: () => { st.resQ = q; show(); } }, n)))),
       h('div', { class: 'hm-report' }, rp ? (rp.pitched ? `Nada ${noteName(Math.round(rp.note))} (${rp.hz.toFixed(1)} Hz) • ${rp.partials} partial • ${Math.round(rp.voiced * 100)} % bernada • ${rp.frames} frame` : `Tanpa nada: ${rp.why} — peta spektrum frekuensi`) : 'Audio vokal / instrumen bernada tunggal paling akurat.'),
       row(tog(HM.MAP_FORMANT, 'Formant'), knob(HM.MAP_FDEV, 'Freq Dev'), tog(HM.MAP_PHASE, 'Fase'))), { cls: 'res' });
-    const common = panel('PETA', row(knob(HM.MAP_MIX, 'Mix'), knob(HM.MAP_LEVEL, 'Level'), knob(HM.MAP_SHIFT, 'Shift'), knob(HM.MAP_SPEED, 'Speed'), knob(HM.MAP_NOISE, 'Noise'), knob(HM.MAP_START, 'Start'), tog(HM.MAP_LOOP, 'Loop'), tog(HM.MAP_INTERP, 'Interp'),
+    const common = panel('PETA', row(knob(HM.MAP_MIX, 'Mix'), knob(HM.MAP_LEVEL, 'Level'), knob(HM.MAP_SHIFT, 'Shift'), knob(HM.MAP_SPEED, 'Speed'), knob(HM.MAP_NOISE, 'Noise'), knob(HM.MAP_START, 'Start'), knob(HM.MAP_END, 'End'), colm(tog(HM.MAP_LOOP, 'Loop'), tog(HM.MAP_INTERP, 'Interp')),
       h('button', { class: 'hm-btn sm', onclick: async () => { (await H()).harmorClearMap(i()); show(); } }, 'Hapus')), { cls: 'wide' });
     return [map, h('div', { class: 'hm-grid g-2' }, imgP, resP), common];
   };
@@ -353,11 +365,22 @@ export function harmorView(k) {
       return h('div', { class: 'hm-fx' + (open ? ' open' : '') }, head, open ? h('div', { class: 'hm-fxb' }, ...dp.map((pp, j) => (pp.hidden ? null : knob(FXP(q, 2 + j), pp.n))).filter(Boolean)) : null);
     });
   };
+  // the plain volume ADSR (used while the Volume articulator is off): a held note of 1 s, then the release
+  const adsrDisp = () => disp((g, w, hh) => {
+    const A = k.get(HM.ATT), D = k.get(HM.DEC), S = C01(k.get(HM.SUS)), R = k.get(HM.REL), hold = Math.max(A + D, 1), T = (hold + R) * 1.08, top = 18, bot = hh - 16, X = (tt) => 10 + tt / T * (w - 20), Y = (v) => bot - (bot - top) * v;
+    const step = [0.05, 0.1, 0.25, 0.5, 1, 2, 5].find((s2) => (w - 20) * s2 / T > 60) || 5;
+    for (let tt = 0; tt < T; tt += step) { g.fillStyle = GRID; g.fillRect(Math.round(X(tt)), top, 1, bot - top); txt(g, tt < 1 ? Math.round(tt * 1000) + ' ms' : tt.toFixed(1) + ' s', X(tt) + 2, hh - 4, DIM, 9); }
+    g.fillStyle = 'rgba(95,212,245,.08)'; g.fillRect(X(0), top, X(hold) - X(0), bot - top); txt(g, 'nada ditahan', X(hold) - 4, top + 12, BL, 9, 'right');
+    const lv = (tt) => (tt < A ? tt / Math.max(1e-4, A) : tt < A + D ? 1 - (1 - S) * (tt - A) / Math.max(1e-4, D) : tt < hold ? S : S * Math.max(0, 1 - (tt - hold) / Math.max(1e-4, R)));
+    g.beginPath(); for (let x = 0; x <= w - 20; x += 1.5) { const v = lv(x / (w - 20) * T), y = Y(v); x ? g.lineTo(10 + x, y) : g.moveTo(10 + x, y); } g.strokeStyle = OR; g.lineWidth = 2; g.stroke();
+    g.lineTo(w - 10, bot); g.lineTo(10, bot); g.closePath(); g.fillStyle = OR2; g.fill();
+    txt(g, `A ${Math.round(A * 1000)} ms  •  D ${Math.round(D * 1000)} ms  •  S ${Math.round(S * 100)} %  •  R ${Math.round(R * 1000)} ms`, w - 8, 12, INK, 10, 'right');
+  }, { cls: 'hm-adsr' });
   const advTab = () => [h('div', { class: 'hm-grid' },
     panel('KUALITAS', colm(chips(HM.QUALITY, HM_QUALITY), row(num(HM.PARTIALS, 'Partial'), num(HM.POLY, 'Voices')),
       h('div', { class: 'hm-hint' }, 'Draft 64 / Normal 256 / High 516 partial per voice. Saat banyak voice berbunyi, partial tertinggi dikurangi otomatis agar CPU HP aman.'))),
     panel('VOLUME (saat artikulator Volume off)', row(knob(HM.ATT, 'A'), knob(HM.DEC, 'D'), knob(HM.SUS, 'S'), knob(HM.REL, 'R'))),
-    panel('VELOCITY', row(knob(HM.VELS, 'Vel > Vol'), knob(HM.VEL_FLT, 'Vel > Cut'))))];
+    panel('VELOCITY', row(knob(HM.VELS, 'Vel > Vol'), knob(HM.VEL_FLT, 'Vel > Cut')))), panel('VOLUME  •  ADSR', adsrDisp(), { cls: 'wide grow' })];
 
   // ---------------------------------------------------------------- frame: ONE row of tabs (sound pages, then editors), one section at a time
   // filling the window (a phone in landscape has ~490 px under the window bar: nothing is stacked, nothing is cut off at the bottom)

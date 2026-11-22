@@ -9,7 +9,7 @@ export const HM = { VOL: 0, PARTIALS: 1, QUALITY: 2, POLY: 3, PITCH: 4, FINE: 5,
   L: 91, L_STRIDE: 6, ENV: 110, ENV_STRIDE: 60, ENV_PTS: 16,
   PRISM_AMT: 81, PRISM_MODE: 82, PLUCK_AMT: 83, PLUCK_TIME: 84, PLUCK_DAMP: 85, BLUR_ATT: 86, BLUR_REL: 87, BLUR_HARM: 88,
   SPH_DEPTH: 103, SPH_DENS: 104, SPH_SPEED: 105, SPH_SHARP: 106, SPH_OFS: 107, FX_ORDER: 712, FX: 720, FX_STRIDE: 48,
-  MAP_MIX: 1060, MAP_A: 1061, MAP_B: 1062, MAP_N: 1063, MAP_NOISE: 1064, MAP_W: 1065, MAP_SPEED: 1069, MAP_START: 1070, MAP_LOOP: 1071, MAP_INTERP: 1072, MAP_FORMANT: 1073, MAP_FDEV: 1074, MAP_LEVEL: 1075, MAP_SHIFT: 1076, MAP_PHASE: 1077 };
+  MAP_MIX: 1060, MAP_A: 1061, MAP_B: 1062, MAP_N: 1063, MAP_NOISE: 1064, MAP_W: 1065, MAP_END: 1066, MAP_SPEED: 1069, MAP_START: 1070, MAP_LOOP: 1071, MAP_INTERP: 1072, MAP_FORMANT: 1073, MAP_FDEV: 1074, MAP_LEVEL: 1075, MAP_SHIFT: 1076, MAP_PHASE: 1077 };
 // the effects rack: Harmor runs these MobileDAW effects (DEVICES types) inside itself; effect k's parameter j is HM.FX + 48 k + 2 + j
 export const HM_FX = [['Distortion', 3], ['Chorus', 20], ['Phaser', 21], ['Delay', 17], ['Reverb', 7], ['Compressor', 4], ['EQ', 31]];
 // filter slots (HM.F + 10 f + k), LFO slots (HM.L + 6 l + k), articulator slots (HM.ENV + 60 e + k): see native/engine/harmor.h
@@ -95,7 +95,7 @@ export function harmorDef(DEVICES) {
   at(HM.MAP_MIX, q('Map Mix', 0, 1, 0, { unit: '%' }));
   at(HM.MAP_A, q('Map Slot', -1, 255, -1, { step: 1, hidden: true })); at(HM.MAP_B, q('Map Slot B', -1, 255, -1, { step: 1, hidden: true }));
   at(HM.MAP_N, q('Map Slot N', -1, 255, -1, { step: 1, hidden: true })); at(HM.MAP_NOISE, q('Noise', 0, 4, 1, { unit: 'x' })); at(HM.MAP_W, q('Map Slot W', -1, 255, -1, { step: 1, hidden: true }));   // resynthesis residual (filtered noise)
-  at(HM.MAP_SPEED, q('Map Speed', 0, 16, 1, { curve: 'log', unit: 'x' })); at(HM.MAP_START, q('Map Start', 0, 1, 0, { unit: '%' }));
+  at(HM.MAP_SPEED, q('Map Speed', 0, 16, 1, { curve: 'log', unit: 'x' })); at(HM.MAP_START, q('Map Start', 0, 1, 0, { unit: '%' })); at(HM.MAP_END, q('Map End', 0, 1, 1, { unit: '%' }));   // play Start .. End, then hold End (Loop off) or loop Start .. End
   at(HM.MAP_LOOP, onoff('Map Loop', 1)); at(HM.MAP_INTERP, onoff('Map Interp', 1)); at(HM.MAP_FORMANT, onoff('Formant', 0));
   at(HM.MAP_FDEV, q('Freq Dev', 0, 1, 1, { unit: '%' })); at(HM.MAP_LEVEL, q('Map Level', 0, 4, 1, { unit: 'x' })); at(HM.MAP_SHIFT, q('Map Shift', -48, 48, 0, { unit: 'st' }));
   at(HM.MAP_PHASE, onoff('Map Phase', 1));

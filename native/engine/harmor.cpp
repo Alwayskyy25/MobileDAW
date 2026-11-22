@@ -111,7 +111,7 @@ class Harmor : public Instrument {
     for (int e = 0; e < HM_ENVS; e++) { int b0 = HM_ENV + HM_ENV_STRIDE * e; p[b0 + 1] = e == HM_E_VOL ? 1 : 0.5; p[b0 + 3] = -1; p[b0 + 4] = -1; p[b0 + 5] = 0.01; p[b0 + 7] = 0.4; p[b0 + 8] = e == HM_E_VOL ? 0.8 : 0; p[b0 + 9] = 0.3; }
     for (int k = 0; k < HM_MAXP; k++) l2k[k] = (float)std::log2((double)(k + 1));
     l2k[HM_MAXP] = -1; l2k[HM_MAXP + 1] = -2;
-    p[HM_MAP_A] = p[HM_MAP_B] = p[HM_MAP_N] = p[HM_MAP_W] = -1; p[HM_MAP_NOISE] = 1; p[HM_MAP_SPEED] = 1; p[HM_MAP_LOOP] = 1; p[HM_MAP_INTERP] = 1; p[HM_MAP_FDEV] = 1; p[HM_MAP_LEVEL] = 1; p[HM_MAP_PHASE] = 1;
+    p[HM_MAP_A] = p[HM_MAP_B] = p[HM_MAP_N] = p[HM_MAP_W] = -1; p[HM_MAP_NOISE] = 1; p[HM_MAP_END] = 1; p[HM_MAP_SPEED] = 1; p[HM_MAP_LOOP] = 1; p[HM_MAP_INTERP] = 1; p[HM_MAP_FDEV] = 1; p[HM_MAP_LEVEL] = 1; p[HM_MAP_PHASE] = 1;
     p[HM_PLUCK_TIME] = 1; p[HM_PLUCK_DAMP] = 0.5; p[HM_SPH_DENS] = 1; p[HM_SPH_SPEED] = 0.2; p[HM_SPH_SHARP] = 0.5;
     for (int k = 0; k < HM_FX_N; k++) { p[HM_FX_ORDER + k] = k; p[HM_FX + HM_FX_STRIDE * k + 1] = 1; fx[k] = makeDevice(HM_FX_TYPES[k], sr, nullptr); }
     upOrder();
@@ -241,6 +241,12 @@ class Harmor : public Instrument {
   // the analysis measured
   struct NMap { int frames = 0, bands = 0; double hop = 0.01, flo = 40, fhi = 20000; std::vector<float> aL, aR; bool stereo = false, ms = false; } nm;
   float nb0[HM_NB_MAX] = {}, na1[HM_NB_MAX] = {}, na2[HM_NB_MAX] = {}, nPg[HM_NB_MAX] = {}; bool nOn[HM_NB_MAX] = {};
+  // the map's play range: from Map Start to Map End (frames); past the end it holds the end frame, or loops back to the start
+  double mapPos(double fp, int frames, bool loop) const {
+    const double a = clampd(p[HM_MAP_START], 0, 1) * (frames - 1), z = std::max(a, clampd(p[HM_MAP_END], 0, 1) * (frames - 1));
+    if (loop && frames > 1) { const double len = std::max(1.0, z - a + 1); if (fp > z) fp = a + std::fmod(fp - a, len); return clampd(fp, 0, frames - 1); }
+    return clampd(fp, 0, z);
+  }
   struct WMap { int n = 0; double sr = 48000; std::vector<float> l, r; } wv;
   void loadWave(int id) {
     const Sample* s = id >= 0 && id < 256 && bank ? bank->s[id] : nullptr;
@@ -553,7 +559,7 @@ class Harmor : public Instrument {
       const double tm = (v.t - dt) * clampd(p[HM_MAP_SPEED], 0, 16);
       double fp = clampd(p[HM_MAP_START], 0, 1) * (mp.frames - 1) + tm / mp.hop;
       const bool loop = p[HM_MAP_LOOP] > 0.5 && mp.frames > 1;
-      if (loop) fp = std::fmod(fp, (double)mp.frames); else fp = clampd(fp, 0, mp.frames - 1);
+      fp = mapPos(fp, mp.frames, loop);
       mf0 = (int)fp; mff = p[HM_MAP_INTERP] > 0.5 ? fp - mf0 : 0; mf1 = loop ? (mf0 + 1) % mp.frames : std::min(mf0 + 1, mp.frames - 1);
       mMix = clampd(p[HM_MAP_MIX], 0, 1);
       mLev = std::max(0.0, p[HM_MAP_LEVEL]) * (ed[HM_E_IMGGAIN].on ? (1 - clampd(ed[HM_E_IMGGAIN].depth, 0, 1)) + clampd(ed[HM_E_IMGGAIN].depth, 0, 1) * ev[HM_E_IMGGAIN] : 1);
@@ -671,8 +677,9 @@ class Harmor : public Instrument {
       const float lev = (float)(std::max(0.0, p[HM_MAP_NOISE]) * mMix * mLev); const bool loop = p[HM_MAP_LOOP] > 0.5;
       const double t0 = clampd(p[HM_MAP_START], 0, 1) * std::max(0, mp.frames - 1) * mp.hop + (v.t - dt), step = wv.sr / sr; double pos = t0 * wv.sr;
       const float* wl = wv.l.data(); const float* wr = wv.r.empty() ? wl : wv.r.data();
+      const double mDur = std::max(0, mp.frames - 1) * mp.hop, wBeg = clampd(p[HM_MAP_START], 0, 1) * mDur * wv.sr, wEnd = std::max(wBeg + 1, clampd(p[HM_MAP_END], 0, 1) * mDur * wv.sr);   // Map Start .. Map End
       for (int i = 0; i < m; i++, pos += step) {
-        double q = pos; if (loop) { q = std::fmod(q, (double)wv.n); if (q < 0) q += wv.n; } else if (q >= wv.n - 1 || q < 0) { nzL[i] = nzR[i] = 0; continue; }
+        double q = pos; if (loop) { if (q > wEnd) q = wBeg + std::fmod(q - wBeg, std::max(1.0, wEnd - wBeg)); if (q < 0) q = 0; } if (q >= std::min((double)wv.n - 1, wEnd) || q < 0) { nzL[i] = nzR[i] = 0; continue; }
         const int a = (int)q, b = a + 1 < wv.n ? a + 1 : 0; const float fr = (float)(q - a);
         nzL[i] = lev * (wl[a] + (wl[b] - wl[a]) * fr); nzR[i] = lev * (wr[a] + (wr[b] - wr[a]) * fr);
       }
@@ -681,7 +688,7 @@ class Harmor : public Instrument {
       const double tm = (v.t - dt) * clampd(p[HM_MAP_SPEED], 0, 16);
       double fp = clampd(p[HM_MAP_START], 0, 1) * (nm.frames - 1) + tm / nm.hop;
       const bool loop = p[HM_MAP_LOOP] > 0.5 && nm.frames > 1;
-      if (loop) fp = std::fmod(fp, (double)nm.frames); else fp = clampd(fp, 0, nm.frames - 1);
+      fp = mapPos(fp, nm.frames, loop);
       const int g0 = (int)fp, g1 = loop ? (g0 + 1) % nm.frames : std::min(g0 + 1, nm.frames - 1); const float gf = p[HM_MAP_INTERP] > 0.5 ? (float)(fp - g0) : 0.f;
       const float lev = (float)(std::max(0.0, p[HM_MAP_NOISE]) * mMix * mLev), *rL0 = nm.aL.data() + (size_t)g0 * nm.bands, *rL1 = nm.aL.data() + (size_t)g1 * nm.bands;
       const float *rR0 = nm.stereo ? nm.aR.data() + (size_t)g0 * nm.bands : rL0, *rR1 = nm.stereo ? nm.aR.data() + (size_t)g1 * nm.bands : rL1;

@@ -42,6 +42,11 @@ const r = await page.evaluate(async ({ MEL, NOTE, BURST, GAP }) => {
   let f = await eng.renderTrack(0, dur); out.id = [b64(f.l.slice(0, n)), b64(f.r.slice(0, n))];
   // speed 2x: the noise bands stand in for the waveform (played over half the time)
   P.setInstParam(0, HM.MAP_SPEED, 2); f = await eng.renderTrack(0, dur); out.sp2 = [b64(f.l.slice(0, n)), b64(f.r.slice(0, n))]; P.setInstParam(0, HM.MAP_SPEED, 1);
+  // Map End in the middle of note 1: Loop off holds that frame (note 1 sounds on, no bursts after it); Map End at the end of segment 1 + Loop on repeats segment 1
+  const mapDur = (a.report.frames - 1) * a.report.hopMs / 1000, segS = NOTE + BURST + GAP; out.mapDur = mapDur;
+  P.setInstParam(0, HM.MAP_END, 0.25 / mapDur); f = await eng.renderTrack(0, dur); out.endHold = [b64(f.l.slice(0, n)), b64(f.r.slice(0, n))];
+  P.setInstParam(0, HM.MAP_END, segS / mapDur); P.setInstParam(0, HM.MAP_LOOP, 1); f = await eng.renderTrack(0, dur); out.endLoop = [b64(f.l.slice(0, n)), b64(f.r.slice(0, n))];
+  P.setInstParam(0, HM.MAP_LOOP, 0); P.setInstParam(0, HM.MAP_END, 1);
   // flatten
   await setup(1, '/Samples/src.wav', [[HM.MAP_FDEV, 0]]); c = P.addClip(1, 0, tk(dur)); c.notes = [{ t: 0, d: tk(dur), p: base, v: 1 }]; P.touchClips(1);
   f = await eng.renderTrack(1, dur); const fl = [f.l.slice(0, n), f.r.slice(0, n)]; out.flat = [b64(fl[0]), b64(fl[1])];
@@ -75,6 +80,13 @@ const half = (q) => { const [a, z] = burstAt(q); return [Math.round(a / 2), Math
 for (let q = 0; q < 2; q++) { const [a, z] = half(q); for (let i = a; i < z; i++) { e2 += sp2[0][i] ** 2 + sp2[1][i] ** 2; n2++; } const [a2, z2] = burstAt(q); for (let i = a2; i < z2; i++) { eS += src[0][i] ** 2 + src[1][i] ** 2; nS++; } }
 const d2 = 10 * Math.log10((e2 / n2) / (eS / nS));
 ok(Math.abs(d2) < 3, `Map Speed 2x: the noise bands stand in for the waveform, the bursts at ${d2 >= 0 ? '+' : ''}${d2.toFixed(2)} dB of the source`);
+const eH = F(r.endHold), eL = F(r.endLoop), seg1 = (c, q) => { const z = Math.round((q * seg + NOTE) * sr); return [c[0].slice(z - Math.round(0.3 * sr), z), c[1].slice(z - Math.round(0.3 * sr), z)]; };
+const pAt = (c, q) => { const p = pitchOf(seg1(c, q)).filter((v) => v != null); p.sort((x, y) => x - y); return p.length ? p[p.length >> 1] : null; };
+const held = [1, 2, 3].map((q) => pAt(eH, q)), looped = [1, 2, 3].map((q) => pAt(eL, q));
+const hL = rmsDb(seg1(eH, 3)) - rmsDb(seg1(src, 0));
+ok(held.every((v) => v != null && Math.abs(v - MEL[0]) < 0.5) && Math.abs(hL) < 3, `Map End (Loop off): past the end it holds the end frame, notes 2-4 stay at ${held.map((v) => v && v.toFixed(1)).join(' / ')} (note 1 = ${MEL[0]}), level ${hL >= 0 ? '+' : ''}${hL.toFixed(1)} dB of note 1`);
+const bL = (() => { let e = 0, n = 0; for (let q = 1; q < MEL.length; q++) { const [a0, z0] = burstAt(q); for (let i = a0 + Math.round(0.01 * sr); i < z0 - Math.round(0.01 * sr); i++) { e += eL[0][i] ** 2 + eL[1][i] ** 2; n++; } } return 10 * Math.log10(e / n + 1e-20) - burstDb(src); })();
+ok(looped.every((v) => v != null && Math.abs(v - MEL[0]) < 0.5) && bL > -6, `Map End (Loop on): segment 1 repeats, pitch ${looped.map((v) => v && v.toFixed(1)).join(' / ')}, its burst comes back each time (${bL >= 0 ? '+' : ''}${bL.toFixed(1)} dB)`);
 ok(!errs.length, `no page errors ${errs.slice(0, 2).join(' | ')}`);
 await b.close(); server.close();
 console.log(bad ? `\n${bad} FAILED` : '\nharmor-resynth-test: all passed');

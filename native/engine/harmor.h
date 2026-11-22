@@ -47,7 +47,7 @@ constexpr int HM_FX_NP[HM_FX_N] = { 6, 13, 15, 20, 8, 12, 42 };      // their pa
 // log-frequency bands) of amplitude (left / right), frequency deviation (cents) and phase. A map lives in a sample-bank slot and
 // describes itself: the first 16 values of the slot's left channel are a header (HM_MAP_MAGIC, frames, bins, hop s, layout,
 // base MIDI note, lowest Hz, highest Hz), the data follows (frame-major). Slot A: left / right amplitude; slot B: deviation / phase.
-constexpr int HM_MAP_MIX = 1060, HM_MAP_A = 1061, HM_MAP_B = 1062, HM_MAP_N = 1063, HM_MAP_NOISE = 1064, HM_MAP_W = 1065, HM_MAP_SPEED = 1069, HM_MAP_START = 1070, HM_MAP_LOOP = 1071, HM_MAP_INTERP = 1072;
+constexpr int HM_MAP_MIX = 1060, HM_MAP_A = 1061, HM_MAP_B = 1062, HM_MAP_N = 1063, HM_MAP_NOISE = 1064, HM_MAP_W = 1065, HM_MAP_END = 1066, HM_MAP_SPEED = 1069, HM_MAP_START = 1070, HM_MAP_LOOP = 1071, HM_MAP_INTERP = 1072;
 constexpr int HM_MAP_FORMANT = 1073, HM_MAP_FDEV = 1074, HM_MAP_LEVEL = 1075, HM_MAP_SHIFT = 1076, HM_MAP_PHASE = 1077;
 constexpr int HM_MAP_HDR = 16; constexpr double HM_MAP_MAGIC = 4096.5;
 enum { HM_MAP_HARM = 0, HM_MAP_LOGF = 1, HM_MAP_NOISEB = 2, HM_MAP_WAVE = 3 };
