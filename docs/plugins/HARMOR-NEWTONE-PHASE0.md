@@ -237,6 +237,15 @@ Acuan: screenshot dan manual dari pemilik (tata letak, kepadatan, alur kerja). G
 - **Moisture**: tinggi body sama di semua halaman (skala jendela tetap); MATRIX dua kolom (32 rute); GLOBAL mengisi halaman.
 - Tes: `harmor-ui-test` (FX: kosong secara default, tambah Delay + Reverb, urutan, hapus), `moisture-ui-test` (baru).
 
+### Phase 6d (Harmor + Moisture) — tata letak mengikuti referensi pemilik: selesai (tes lulus)
+
+- **Harmor**: zona modul di atas (pemilih halaman vertikal Timbre / Pitch / Filter / Unison / Mod di kiri), editor di bawah (tab ENV
+  HARM IMG FX ADV di header, judul editor miring di kiri), spektrum keluaran langsung di kolom kanan (partial voice terbaru, bergulir).
+  Judul bagian miring title-case, knob bertutup logam dengan busur berwarna per keluarga (--kc), zona modul warna anggur gelap,
+  editor abu-biru gelap. Portrait: tiga baris (modul / editor / spektrum).
+- **Moisture**: panel dua warna (header gelap + tampilan gelap di atas, area kontrol abu terang dengan knob gelap dan label gelap).
+- Tes `harmor-ui-test`: cek muat per zona (modul / editor), spektrum keluaran ikut tergambar saat chord dimainkan.
+
 ## 5. Referensi dari pemilik (untuk fase berikutnya)
 
 ### Tampilan Harmor (screenshot Harmor di Live 12) — acuan Phase 6, disederhanakan untuk HP, tidak ditiru

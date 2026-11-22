@@ -2334,7 +2334,6 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .hm .hm-kn { width: 34px; height: 34px; }
 .hm .hm-k.sm { width: 48px; } .hm .hm-k.sm .hm-kn { width: 28px; height: 28px; } .hm .hm-k.sm .hm-kl, .hm .hm-k.sm .hm-kv { font-size: 9.5px; }
 .hm .hm-k.lg { width: 64px; } .hm .hm-k.lg .hm-kn { width: 44px; height: 44px; }
-.hm .hm-kn circle { fill: #343031; stroke: #0b0a0a; }
 .hm .hm-top .hm-k { width: auto; } .hm .hm-top .hm-k > .hm-kl { order: 0; } .hm .hm-top .hm-kn { width: 28px; height: 28px; }
 .hm .hm-p .hm-row:has(> .hm-k) { justify-content: flex-start; gap: 2px 6px; flex-wrap: wrap; align-items: flex-start; }
 .hm .hm-chip, .hm .hm-tog { min-height: 28px; padding: 0 9px; background: #2f2c2d; border-color: #141213; }
@@ -2394,3 +2393,97 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .m2x-glob .m2x-btn { height: 34px; }
 @media (max-height: 620px) { .m2x-body { height: 450px; } }
 .m2x-glob > .m2x-p { display: flex; flex-direction: column; } .m2x-glob > .m2x-p > :not(.m2x-ph) { flex: 1; justify-content: center; }
+/* ===== Harmor v5 (owner's reference layout): modules on top (page strip at the left), the editor below (tabs on its header), the live
+   output spectrum down the right. Module zone in a dark wine tone, editor in dark slate; italic title-case section names; metal-cap knobs
+   with a coloured arc per family (--kc). MobileDAW's own drawing and colours. ===== */
+.hm { --hm-wine: #3a2a30; --hm-wine2: #46333a; --hm-slate: #2b3038; --hm-slate2: #343a44; }
+.hm-top { background: #1d1a1c; border-color: #0c0b0c; padding: 1px 6px; min-height: 0; }
+.hm-top .hm-logo b { font-style: italic; font-weight: 600; letter-spacing: .02em; }
+.hm-body { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 108px; grid-template-rows: minmax(0, 47fr) minmax(0, 53fr); gap: 3px; }
+.hm-up { grid-column: 1; grid-row: 1; display: flex; min-height: 0; min-width: 0; background: var(--hm-wine); border: 1px solid #120d0f; border-radius: 4px;
+  background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 2px, transparent 2px 7px); }
+.hm-edz { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--hm-slate); border: 1px solid #0e1013; border-radius: 4px; }
+.hm-spec { grid-column: 2; grid-row: 1 / 3; position: relative; min-height: 0; background: #100c0e; border: 1px solid #0a0809; border-radius: 4px; overflow: hidden; }
+.hm-spec > canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* page strip (top zone) and editor tabs */
+.hm-pts.vert { flex-direction: column; flex: none; width: 66px; gap: 2px; padding: 4px 3px; overflow: visible; border-right: 1px solid rgba(0,0,0,.35); }
+.hm .hm-pt { min-height: 0; height: auto; flex: 1 1 0; padding: 0 4px; font: italic 600 10.5px/1 var(--font, system-ui); letter-spacing: .02em; text-transform: none;
+  background: rgba(0,0,0,.22); border: 1px solid rgba(0,0,0,.35); color: #d9cdd0; border-radius: 3px; }
+.hm .hm-pts:not(.vert) .hm-pt { height: 26px; flex: none; padding: 0 12px; }
+.hm .hm-pt.on { background: linear-gradient(#ffb75a, #f39a2c); color: #2a1606; border-color: #b7681c; }
+.hm-edh { display: flex; align-items: center; gap: 8px; padding: 3px 4px 3px 8px; border-bottom: 1px solid #14171b; background: var(--hm-slate2); flex: none; }
+.hm-edt { flex: 1; font: italic 600 11.5px/1 var(--font, system-ui); color: #c9d2dc; }
+.hm-main.up, .hm-main.ed { background: transparent; border: 0; border-radius: 0; flex: 1 1 0; min-width: 0; }
+.hm-main.up { padding: 2px 4px; }
+/* sections: italic title-case names, no boxes */
+.hm .hm-ph b { font: italic 600 13px/1.1 var(--font, system-ui) !important; letter-spacing: .01em; color: #efe4e6; padding-left: 0; text-transform: none; }
+.hm .hm-ph b::before { display: none; }
+.hm-up .hm-grid > .hm-p + .hm-p { border-left: 1px dashed rgba(255,255,255,.12); }
+.hm-up .hm-main > .hm-grid, .hm-up .hm-main > .hm-p { border-bottom: 1px dashed rgba(255,255,255,.10); }
+.hm-edz .hm-grid > .hm-p + .hm-p { border-left: 1px solid rgba(255,255,255,.07); }
+.hm-edz .hm-main > .hm-grid, .hm-edz .hm-main > .hm-p { border-bottom: 1px solid rgba(255,255,255,.07); }
+.hm .hm-k > .hm-kl { font-style: italic; color: #d8ccce; font-size: 10.5px; }
+.hm .hm-k > .hm-kv { color: #f4e3c8; }
+.hm-edz .hm-k > .hm-kl { color: #c7d0da; }
+.hm .hm-chip, .hm .hm-tog, .hm .hm-dd, .hm .hm-btn { background: rgba(0,0,0,.28); border-color: rgba(0,0,0,.45); color: #eee; }
+.hm-disp { background: #1a1d22; border-color: #0c0e11; }
+.hm-up .hm-disp { background: #251b1f; border-color: #120d0f; }
+/* sizes for the two zones */
+.hm-up .hm-wave { height: 38px; }
+.hm-up .hm-filt, .hm-up .hm-uni { min-height: 36px; }
+.hm-edz .hm-env, .hm-edz .hm-harm, .hm-edz .hm-adsr { min-height: 40px; }
+.hm-edz .hm-img { grid-template-columns: minmax(0, 1fr) 250px; }
+.hm-edz .hm-imgside { gap: 4px; padding: 4px 6px; }
+.hm-edz .hm-tgrid { grid-template-columns: repeat(4, 1fr); } .hm-edz .hm-tgrid > .hm-tog { padding: 0 4px; min-height: 24px; font-size: 10px; }
+.hm-edz .hm-kgrid .hm-k.sm .hm-kn { width: 28px; height: 28px; }
+.hm-main.ed.pg-fx { overflow-y: auto; }
+.hm-main.ed .hm-fxbar { padding: 4px 6px; }
+@media (orientation: portrait) { .hm-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 42fr) minmax(0, 46fr) minmax(0, 12fr); } .hm-spec { grid-column: 1; grid-row: 3; } }
+
+.hm-top .hm-logo { flex-direction: row; align-items: baseline; gap: 8px; } .hm-top .hm-logo small { font-style: italic; }
+.hm-body { grid-template-columns: minmax(0, 1fr) 92px; grid-template-rows: minmax(0, 44fr) minmax(0, 56fr); }
+.hm-spec::before { content: "Output"; position: absolute; left: 6px; top: 4px; z-index: 1; font: italic 600 10.5px/1 var(--font, system-ui); color: #c9a9b6; }
+.hm-spec::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 1px, transparent 1px 22px); }
+/* v5 sizing: the editor gets more height; in the module zone a growing section may shrink to its header + a thin display */
+.hm-body { grid-template-rows: minmax(0, 41fr) minmax(0, 59fr); }
+.hm-up .hm-main > .grow { min-height: 0; }
+.hm-up .hm-p.grow { min-height: 0; overflow: hidden; }
+.hm-up .hm-p.grow > .hm-disp, .hm-up .hm-p.grow > .hm-side { flex: 1 1 0; height: auto; min-height: 20px; }
+.hm-up .hm-side { display: flex; gap: 6px; } .hm-up .hm-side > .hm-disp { flex: 1 1 0; height: auto; min-height: 20px; }
+.hm-up .hm-k { width: 50px; } .hm-up .hm-k.sm { width: 46px; }
+.hm-up .hm-kn { width: 34px; height: 34px; }
+.hm-up .hm-ph { min-height: 14px; } .hm-up .hm-p { padding: 3px 6px; gap: 2px; }
+.hm-up .hm-ph b { font-size: 12px !important; }
+.hm-edz .hm-hint { display: none; }
+.hm-edz .hm-chips.scroll { flex-wrap: nowrap; overflow-x: auto; padding: 3px 4px 0; scrollbar-width: none; }
+.hm-edz .hm-chips.scroll > .hm-chip { min-height: 22px; padding: 0 7px; font-size: 10.5px; }
+.hm-edz .hm-edbody { padding: 2px 4px 4px; }
+.hm-edz .hm-k { width: 50px; } .hm-edz .hm-kn { width: 30px; height: 30px; }
+.hm-up .hm-grid.g-mod { grid-template-columns: .7fr 1fr 1fr 1.7fr; }
+.hm-up .hm-p .hm-row:has(> .hm-k) { flex-wrap: nowrap; gap: 0 2px; }
+.hm-up .hm-k { width: 48px; } .hm-up .hm-k > .hm-kl { font-size: 10px; } .hm-up .hm-k > .hm-kv { font-size: 9.5px; }
+/* ===== Moisture v5 (owner's reference): two-tone panels — dark header strip with its on-switch and the dark displays on top, a light
+   slate control area with dark knobs and dark-ink labels below; dark value fields. MobileDAW's own drawing and colours. ===== */
+.m2x { --m2-p: #7f8a98; --m2-ph: #222931; }
+.m2x-p { background: linear-gradient(180deg, #8995a3, #74808e); border-color: #1a2027; }
+.m2x-ph { background: var(--m2-ph); color: #e9eef4; margin: 0 -5px 3px; }
+.m2x-ph b { color: #e9eef4; }
+.m2x-p .m2x-kl { color: #17202a; font-weight: 700; }
+.m2x-p .m2x-led { background: #2a323c; color: #c9d3de !important; }
+.m2x-p .m2x-nb { background: #1c232b; border-color: #10151a; }
+.m2x-p .m2x-dd { background: #1c232b; }
+.m2x-p .m2x-disp { border-color: #10151a; box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
+.m2x-tabs { background: #222931; } .m2x-tab { background: #2b333d; }
+.m2x-fx .m2x-fxh { margin: 0; }
+.m2x-mx { background: #7b8694; } .m2x-mxh { color: #1b222a; font-weight: 700; } .m2x-mxn { color: #1b222a; }
+.m2x-note { color: #c9d3de; } .m2x-p .m2x-note { color: #1b222a; }
+.m2x-fx .m2x-kl { color: #17202a; font-weight: 700; }
+.m2x-fx .m2x-led { background: #2a323c; color: #c9d3de !important; }
+.m2x-glob .m2x-p > .m2x-row { width: 100%; justify-content: space-evenly; }
+.m2x-glob .m2x-p > .m2x-col { align-items: center; }
+.hm-up .hm-main.pg-pitch > .hm-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.hm-edz .hm-imgside .hm-btn, .hm-edz .hm-imgside .hm-chip { min-height: 24px; font-size: 10.5px; padding: 0 6px; }
+.hm-edz .hm-imgside .hm-k.sm { width: 44px; } .hm-edz .hm-imgside .hm-k.sm .hm-kn { width: 24px; height: 24px; }
+.hm-edz .hm-imgside .hm-k > .hm-kl, .hm-edz .hm-imgside .hm-k > .hm-kv { font-size: 9px; }
+.hm-edz .hm-imgside .hm-report { padding: 2px 4px; }
+@media (orientation: portrait) { .hm-body { grid-template-rows: minmax(0, 30fr) minmax(0, 56fr) minmax(0, 14fr); } }

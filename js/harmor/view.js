@@ -13,6 +13,7 @@ import { HM, HM_WAVES, HM_QUALITY, HM_FILTERS, HM_SLOPES, HM_LFO_SHAPES, HM_LFO_
 
 const OR = '#ff9d2e', OR2 = 'rgba(255,157,46,.22)', INK = '#d6d6d6', DIM = '#8a8a8a', GRID = 'rgba(255,255,255,.07)', GRID2 = 'rgba(255,255,255,.14)', BL = '#5fd4f5';
 const C01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+let KID = 0;
 const STATE = new Map();                               // per instrument: the open page / editor / selections (survive a redraw)
 const E = (e, s) => HM.ENV + HM.ENV_STRIDE * e + s;
 const F = (f, s) => HM.F + HM.F_STRIDE * f + s;
@@ -32,8 +33,11 @@ export function harmorView(k) {
     const R = 15, A0 = Math.PI * 0.75, A1 = Math.PI * 2.25, arc = (a0, a1) => { const q = (a) => [20 + R * Math.cos(a), 20 + R * Math.sin(a)], [x0, y0] = q(a0), [x1, y1] = q(a1); return `M${x0} ${y0} A${R} ${R} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1} ${y1}`; };
     mk('path', { d: arc(A0, A1), fill: 'none', stroke: '#141414', 'stroke-width': 3.2, 'stroke-linecap': 'round' });
     const val = mk('path', { d: '', fill: 'none', stroke: OR, 'stroke-width': 3.2, 'stroke-linecap': 'round' });
-    mk('circle', { cx: 20, cy: 20, r: 10, fill: '#3a3a3a', stroke: '#1c1c1c', 'stroke-width': 1 });
-    const ptr = mk('line', { x1: 20, y1: 20, x2: 20, y2: 11, stroke: '#e6e6e6', 'stroke-width': 2, 'stroke-linecap': 'round' });
+    const gid = 'hmk' + (++KID), df = document.createElementNS(NS, 'defs'), rg = document.createElementNS(NS, 'radialGradient'); rg.setAttribute('id', gid); rg.setAttribute('cx', '40%'); rg.setAttribute('cy', '32%'); rg.setAttribute('r', '75%');
+    for (const [o2, c] of [['0', '#d9d4cf'], ['0.45', '#8d8782'], ['1', '#3d3836']]) { const st2 = document.createElementNS(NS, 'stop'); st2.setAttribute('offset', o2); st2.setAttribute('stop-color', c); rg.append(st2); } df.append(rg); svg.append(df);
+    mk('circle', { cx: 20, cy: 20, r: 11.5, fill: '#151314' });
+    mk('circle', { cx: 20, cy: 20, r: 9.5, fill: `url(#${gid})`, stroke: '#0c0b0b', 'stroke-width': 0.8, class: 'face' });   // a brushed metal cap
+    const ptr = mk('line', { x1: 20, y1: 20, x2: 20, y2: 11, stroke: '#1a1617', 'stroke-width': 2, 'stroke-linecap': 'round' }); val.style.stroke = 'var(--kc, ' + OR + ')';
     const vt = h('span', { class: 'hm-kv' }), bip = o.bip ?? (p.min < 0 && p.max > 0);
     const draw = () => { const v = normOf(p, k.get(j)), a = A0 + (A1 - A0) * v, z = bip ? A0 + (A1 - A0) * normOf(p, 0) : A0;
       val.setAttribute('d', Math.abs(a - z) < 0.02 ? '' : arc(Math.min(a, z), Math.max(a, z))); ptr.setAttribute('x2', 20 + 9 * Math.cos(a)); ptr.setAttribute('y2', 20 + 9 * Math.sin(a)); vt.textContent = fmtParam(p, k.get(j)); };
@@ -108,7 +112,12 @@ export function harmorView(k) {
     el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
   }
   const txt = (g, s, x, y, col = DIM, sz = 10, al = 'left') => { g.fillStyle = col; g.font = `500 ${sz}px system-ui,sans-serif`; g.textAlign = al; g.textBaseline = 'alphabetic'; g.fillText(s, x, y); g.textAlign = 'left'; };
-  const panel = (title, body, o = {}) => h('div', { class: 'hm-p' + (o.cls ? ' ' + o.cls : '') }, h('div', { class: 'hm-ph' }, o.on != null ? tog(o.on, '', { cls: 'led' }) : null, h('b', {}, title), ...(o.head || [])), body);
+  // a section: an italic title-case name and its knob colour (--kc) by family, as the owner's reference groups them
+  const KC = [[/^TIMBRE|^HARM|^KUALITAS/, '#45d0e6'], [/^MIX|^VOLUME|^VELOCITY/, '#ffb347'], [/^PITCH|^VIBRATO|^VOICE|^ARTIK/, '#f2c94c'], [/^FILTER|^RESPONS/, '#3ddc97'],
+    [/^UNISON|^SALINAN|^STEREO/, '#9fa8ff'], [/^PRISM|^PLUCK/, '#ff8a5c'], [/^BLUR|^PHASER/, '#c6f05a']];
+  const tcase = (t) => t.split(' ').map((w) => (w.length > 2 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w)).join(' ');
+  const panel = (title, body, o = {}) => { const c = (KC.find(([re]) => re.test(title)) || [0, ''])[1];
+    return h('div', { class: 'hm-p' + (o.cls ? ' ' + o.cls : ''), style: c ? '--kc:' + c : '' }, h('div', { class: 'hm-ph' }, o.on != null ? tog(o.on, '', { cls: 'led' }) : null, h('b', {}, tcase(title)), ...(o.head || [])), body); };
   const row = (...a) => h('div', { class: 'hm-row' }, ...a.filter(Boolean));
   const colm = (...a) => h('div', { class: 'hm-col' }, ...a.filter(Boolean));
 
@@ -151,7 +160,7 @@ export function harmorView(k) {
     txt(g, noteName(Math.round(69 + 12 * Math.log2(live.f0 / 440))) + '  ' + live.on + ' voice', 6, hh - 6, INK, 10);
   }, { cls: 'hm-parts' });
   k.every(50, () => { const o = eng.devOut(i(), 998); if (!o || o.length < 5) { if (live.f0) { live = { ...live, f0: 0, parts: new Float32Array(0), on: 0 }; partials.paint(); } live.pk = [0, 0]; meter.paint(); return; }
-    live.pk = [o[0], o[1]]; live.hold = live.hold.map((x, c) => Math.max(o[c], x * 0.92)); live.on = o[2]; live.f0 = o[3]; const K = Math.min(o[4] | 0, o.length - 5); live.parts = Float32Array.from(o.slice(5, 5 + K)); meter.paint(); if (st.sec === 0 || st.sec === 4) partials.paint(); });
+    live.pk = [o[0], o[1]]; live.hold = live.hold.map((x, c) => Math.max(o[c], x * 0.92)); live.on = o[2]; live.f0 = o[3]; const K = Math.min(o[4] | 0, o.length - 5); live.parts = Float32Array.from(o.slice(5, 5 + K)); meter.paint(); specRow(); });
 
   // ---------------------------------------------------------------- sound pages
   const waveThumb = (tt) => disp((g, w, hh) => {
@@ -165,7 +174,7 @@ export function harmorView(k) {
     const tb = (tt) => panel('TIMBRE ' + (tt ? 'B' : 'A'), colm(waveThumb(tt), row(colm(dd(HM.T * (tt + 1), HM_WAVES, { after: redrawAll }), h('button', { class: 'hm-btn sm', onclick: () => { st.sec = 6; st.harmT = tt; show(); } }, 'Edit harmonik')),
       knob(HM.T * (tt + 1) + 1, 'Level'), knob(HM.T * (tt + 1) + 2, 'Phase Rnd'))), { cls: 'tb' });
     const mixP = panel('MIX', colm(chips(HM.BLEND, ['Mix', 'Morph']), row(knob(HM.MIX, 'A ↔ B'), knob(HM.STRETCH, 'Stretch'), knob(HM.SUB, 'Sub'))), { cls: 'mix' });
-    return [h('div', { class: 'hm-grid g-timbre' }, tb(0), mixP, tb(1)), panel('PARTIAL', partials, { cls: 'wide grow' })];
+    return [h('div', { class: 'hm-grid g-timbre' }, tb(0), mixP, tb(1))];
   };
   // pitch over time for one note (2 s): the glide from a note 2 semitones below, then the vibrato after its delay (cents, ±depth)
   const pitchDisp = () => disp((g, w, hh) => {
@@ -179,7 +188,7 @@ export function harmorView(k) {
     const co = Math.round(k.get(HM.PITCH)), fi = k.get(HM.FINE);
     txt(g, `Glide ${Math.round(gl * 1000)} ms  •  Vibrato ${rt.toFixed(2)} Hz ±${Math.round(dp)} ct  •  ${co >= 0 ? '+' : ''}${co} st ${fi >= 0 ? '+' : ''}${fi.toFixed(0)} ct`, w - 8, 14, INK, 10, 'right');
   }, { cls: 'hm-pitch' });
-  const pitchPage = () => [panel('PITCH  •  WAKTU', pitchDisp(), { cls: 'wide grow' }), h('div', { class: 'hm-grid' },
+  const pitchPage = () => [h('div', { class: 'hm-grid' },
     panel('PITCH', row(knob(HM.PITCH, 'Coarse'), knob(HM.FINE, 'Fine'), knob(HM.GLIDE, 'Glide'))),
     panel('VOICE', colm(row(tog(HM.MONO, 'Mono'), tog(HM.LEGATO, 'Legato')), row(num(HM.POLY, 'Voices')))),
     panel('VIBRATO', row(knob(HM.VIB_RATE, 'Rate'), knob(HM.VIB_DEPTH, 'Depth'), knob(HM.VIB_DELAY, 'Delay'))),
@@ -201,7 +210,7 @@ export function harmorView(k) {
     const fp = (f) => panel('FILTER ' + (f + 1), row(knob(F(f, 2), 'Cutoff'), knob(F(f, 3), 'Res'), knob(F(f, 4), 'Width'), knob(F(f, 5), 'Offset'), knob(F(f, 7), 'Key'), knob(F(f, 8), 'Mix')),
       { on: F(f, 0), cls: 'flt', head: [dd(F(f, 1), HM_FILTERS, { after: () => filt.paint(), cls: 'sm' }), chips(F(f, 6), HM_SLOPES, { after: () => filt.paint(), cls: 'sm' }),
         h('button', { class: 'hm-btn sm', onclick: () => { st.sec = 5; st.env = 2 + f; show(); } }, 'Env')] });
-    return [panel('RESPONS', h('div', { class: 'hm-side' }, filt, colm(knob(HM.SELFOSC, 'Self-Osc'), knob(HM.VEL_FLT, 'Vel > Cut'))), { cls: 'wide grow' }), h('div', { class: 'hm-grid g-2' }, fp(0), fp(1))]; };
+    return [h('div', { class: 'hm-grid g-2' }, fp(0), fp(1)), panel('RESPONS', h('div', { class: 'hm-side' }, filt, row(knob(HM.SELFOSC, 'Self-Osc', { size: 'sm' }), knob(HM.VEL_FLT, 'Vel > Cut', { size: 'sm' }))), { cls: 'wide grow' })]; };
   const uniDisp = () => disp((g, w, hh) => {
     const n = Math.round(k.get(HM.U_VOICES)), det = k.get(HM.U_DETUNE), ps = k.get(HM.U_PITCH), sp = k.get(HM.U_SPREAD), vd = k.get(HM.U_VOLDIST), mid = hh / 2;
     g.fillStyle = GRID2; g.fillRect(w / 2, 0, 1, hh); txt(g, 'L', 4, 12, DIM, 10); txt(g, 'R', w - 12, 12, DIM, 10);
@@ -215,7 +224,7 @@ export function harmorView(k) {
     panel('PRISM', row(knob(HM.PRISM_AMT, 'Amount'), chips(HM.PRISM_MODE, ['Scatter', 'Shift']))),
     panel('PLUCK', row(knob(HM.PLUCK_AMT, 'Amount'), knob(HM.PLUCK_TIME, 'Time'), knob(HM.PLUCK_DAMP, 'Damp'))),
     panel('BLUR', row(knob(HM.BLUR_ATT, 'Attack'), knob(HM.BLUR_REL, 'Release'), knob(HM.BLUR_HARM, 'Harm'))),
-    panel('PHASER', row(knob(HM.SPH_DEPTH, 'Depth'), knob(HM.SPH_DENS, 'Notches'), knob(HM.SPH_SPEED, 'Speed'), knob(HM.SPH_SHARP, 'Sharp'), knob(HM.SPH_OFS, 'Offset')))), panel('PARTIAL  •  HASIL MODUL', partials, { cls: 'wide grow' })];
+    panel('PHASER', row(knob(HM.SPH_DEPTH, 'Depth'), knob(HM.SPH_DENS, 'Notches'), knob(HM.SPH_SPEED, 'Speed'), knob(HM.SPH_SHARP, 'Sharp'), knob(HM.SPH_OFS, 'Offset'))))];
 
   // ---------------------------------------------------------------- editor: articulators (multi-point) + LFOs
   const envPts = (e) => {                               // the articulator's points [t (s, absolute), level, curve], sustain, loop (AHDSR made into points)
@@ -399,18 +408,42 @@ export function harmorView(k) {
     panel('VOLUME (saat artikulator Volume off)', row(knob(HM.ATT, 'A'), knob(HM.DEC, 'D'), knob(HM.SUS, 'S'), knob(HM.REL, 'R'))),
     panel('VELOCITY', row(knob(HM.VELS, 'Vel > Vol'), knob(HM.VEL_FLT, 'Vel > Cut')))), panel('VOLUME  •  ADSR', adsrDisp(), { cls: 'wide grow' })];
 
-  // ---------------------------------------------------------------- frame: ONE row of tabs (sound pages, then editors), one section at a time
-  // filling the window (a phone in landscape has ~490 px under the window bar: nothing is stacked, nothing is cut off at the bottom)
-  const SECS = [['TIMBRE', timbrePage], ['PITCH', pitchPage], ['FILTER', filterPage], ['UNISON', unisonPage], ['MOD', modulesPage],
-    ['ENV', envTab], ['HARM', harmTab], ['IMG', imgTab], ['FX', fxTab], ['ADV', advTab]];
-  const main = h('div', { class: 'hm-main' });
-  const tabs = SECS.map(([n], q) => h('button', { class: 'hm-pt' + (q === 5 ? ' gap' : ''), onclick: () => { st.sec = q; show(); } }, n));
-  function show() { st.sec = Math.max(0, Math.min(SECS.length - 1, st.sec | 0)); tabs.forEach((b, q) => b.classList.toggle('on', q === st.sec)); main.replaceChildren(...[].concat(SECS[st.sec][1]())); main.scrollTop = 0; }
+  // ---------------------------------------------------------------- frame (owner's reference layout): the sound modules on top (pages picked
+  // on a vertical strip at the left), the editor under them (ENV HARM IMG FX ADV on its header), the live output spectrum down the right
+  const edt = h('span', { class: 'hm-edt' }, '');
+  const UP = [['TIMBRE', timbrePage], ['PITCH', pitchPage], ['FILTER', filterPage], ['UNISON', unisonPage], ['MOD', modulesPage]];
+  const ED = [['ENV', envTab], ['HARM', harmTab], ['IMG', imgTab], ['FX', fxTab], ['ADV', advTab]];
+  if ((st.sec | 0) >= UP.length) { st.ed = (st.sec | 0) - UP.length; st.sec = 0; }   // a page remembered from the one-row layout
+  if (st.ed == null) st.ed = 0;
+  const mainU = h('div', { class: 'hm-main up' }), mainE = h('div', { class: 'hm-main ed' });
+  const tabU = UP.map(([n], q) => h('button', { class: 'hm-pt', onclick: () => { st.sec = q; show(); } }, n));
+  const tabE = ED.map(([n], q) => h('button', { class: 'hm-pt', onclick: () => { st.ed = q; show(); } }, n));
+  function show() {
+    st.sec = Math.max(0, Math.min(UP.length - 1, st.sec | 0)); st.ed = Math.max(0, Math.min(ED.length - 1, st.ed | 0));
+    tabU.forEach((b, q) => b.classList.toggle('on', q === st.sec)); tabE.forEach((b, q) => b.classList.toggle('on', q === st.ed));
+    mainU.className = 'hm-main up pg-' + UP[st.sec][0].toLowerCase(); mainE.className = 'hm-main ed pg-' + ED[st.ed][0].toLowerCase();
+    mainU.replaceChildren(...[].concat(UP[st.sec][1]())); mainE.replaceChildren(...[].concat(ED[st.ed][1]())); mainU.scrollTop = 0; mainE.scrollTop = 0; edt.textContent = ['Artikulator', 'Harmonik', 'Peta gambar / resintesis', 'Efek', 'Lanjutan'][st.ed];
+  }
   function redrawAll() { k.redraw && k.redraw(); }
+  // the output spectrum: the newest voice's partials, one row per update, scrolling up (frequency across, log 40 Hz .. 16 kHz)
+  const specC = h('canvas'), spec = h('div', { class: 'hm-spec' }, specC);
+  let sw = 0, sh = 0, sdp = 1;
+  const specSize = () => { const W = spec.clientWidth, Hh = spec.clientHeight; if (W < 8 || Hh < 8) return; const d = Math.min(2, window.devicePixelRatio || 1); if (W === sw && Hh === sh && d === sdp) return;
+    sw = W; sh = Hh; sdp = d; specC.width = Math.round(W * d); specC.height = Math.round(Hh * d); const g = specC.getContext('2d'); g.fillStyle = '#100c0e'; g.fillRect(0, 0, specC.width, specC.height); };
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(specSize).observe(spec);
+  function specRow() {
+    if (!sw) return; const g = specC.getContext('2d'), W = specC.width, Hh = specC.height, rh = Math.max(2, Math.round(2 * sdp));
+    g.drawImage(specC, 0, -rh); g.fillStyle = 'rgba(16,12,14,1)'; g.fillRect(0, Hh - rh, W, rh);
+    const n = live.parts.length; if (!n || !live.f0) return;
+    for (let q = 0; q < n; q++) { const a = live.parts[q]; if (!(a > 1e-5)) continue; const f = live.f0 * (q + 1); if (f > 16000) break; const x = Math.log(f / 40) / Math.log(400) * W; if (x < 0) continue;
+      const v = C01((20 * Math.log10(a * 4) + 60) / 60); g.fillStyle = `rgba(${Math.round(150 + 105 * v)},${Math.round(40 + 60 * v * v)},${Math.round(120 + 100 * v)},${0.25 + 0.75 * v})`; g.fillRect(Math.round(x) - sdp, Hh - rh, 2 * sdp + Math.round(2 * v * sdp), rh); }
+  }
   const tr = t(), src = tr && tr.inst && tr.inst.hm ? tr.inst.hm.path.split('/').pop() : 'additive';
-  const top = h('div', { class: 'hm-top' }, h('div', { class: 'hm-logo' }, h('b', {}, 'Harmor'), h('small', {}, src)), h('div', { class: 'hm-pts' }, ...tabs),
-    h('div', { class: 'hm-stat' }, status), meter, knob(HM.VOL, 'Vol'));
-  const root = h('div', { class: 'hm' }, top, main);
+  const top = h('div', { class: 'hm-top' }, h('div', { class: 'hm-logo' }, h('b', {}, 'Harmor'), h('small', {}, src)), h('div', { class: 'hm-stat' }, status), meter, knob(HM.VOL, 'Vol'));
+  const upper = h('div', { class: 'hm-up' }, h('div', { class: 'hm-pts vert' }, ...tabU), mainU);
+  const editor = h('div', { class: 'hm-edz' }, h('div', { class: 'hm-edh' }, edt, h('div', { class: 'hm-pts' }, ...tabE)), mainE);
+  const body = h('div', { class: 'hm-body' }, upper, editor, spec);
+  const root = h('div', { class: 'hm' }, top, body);
   show();
   return root;
 }

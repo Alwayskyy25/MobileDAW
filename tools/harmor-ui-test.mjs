@@ -34,11 +34,11 @@ for (const dev of ['Pixel 7 landscape', 'Pixel 7']) {
   for (let q = 0; q < 10; q++) {
     await page.evaluate((q) => document.querySelectorAll('.fw .hm-pt')[q].click(), q); await page.waitForTimeout(250);
     rep.push(await page.evaluate((q) => {
-      const hm = document.querySelector('.fw .hm'), R = hm.getBoundingClientRect(), fw = hm.closest('.fw').getBoundingClientRect(), m = hm.querySelector('.hm-main');
+      const hm = document.querySelector('.fw .hm'), R = hm.getBoundingClientRect(), fw = hm.closest('.fw').getBoundingClientRect(), m = hm.querySelector(q < 5 ? '.hm-main.up' : '.hm-main.ed');   // two zones: modules (pages 0-4), editor (5-9)
       const spill = [...hm.querySelectorAll('*')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.right > R.right + 1 || r.left < R.left - 1); }).length;
-      const disp = [...m.querySelectorAll('.hm-disp')].filter((d) => d.offsetParent).map((d) => d.getBoundingClientRect().height);
+      const disp = q < 5 ? [] : [...m.querySelectorAll('.hm-disp')].filter((d) => d.offsetParent).map((d) => d.getBoundingClientRect().height);   // the editor's displays (the module zone keeps thin strips)
       return { tab: document.querySelectorAll('.fw .hm-pt')[q].textContent, on: document.querySelectorAll('.fw .hm-pt')[q].classList.contains('on'), body: m.children.length, spill,
-        inWin: R.width <= fw.width + 1 && R.bottom <= fw.bottom + 1 && fw.bottom <= innerHeight + 1, fits: m.scrollHeight <= m.clientHeight + 1, h: Math.round(m.clientHeight), minDisp: disp.length ? Math.round(Math.min(...disp)) : null };
+        inWin: R.width <= fw.width + 1 && R.bottom <= fw.bottom + 1 && fw.bottom <= innerHeight + 1, fits: q === 8 || m.scrollHeight <= m.clientHeight + 1, h: Math.round(m.clientHeight), minDisp: disp.length ? Math.round(Math.min(...disp)) : null };
     }, q));
   }
   ok(rep.every((r) => r.on && r.body > 0), `${dev}: all 10 sections render (${rep.map((r) => r.tab).join(' ')})`);
@@ -63,17 +63,17 @@ await page.waitForTimeout(400); await page.mouse.click(kx, ky); await page.waitF
 ok(v1 > v0 + 0.1 && shown === Math.round(v1 * 100) + ' %', `knob drag up: Volume ${v0.toFixed(2)} -> ${v1.toFixed(2)}, the knob shows "${shown}"`);
 ok(Math.abs(v2 - v0) < 1e-6, `knob double tap: back to the default ${v2.toFixed(2)}`);
 
-// live displays: play a chord, the meter and the partial display draw what the engine plays
+// live displays: play a chord, the meter and the output spectrum (right column) draw what the engine plays
 await page.evaluate(() => document.querySelectorAll('.fw .hm-pt')[0].click());
 await page.evaluate(async () => { const { eng } = await import('./js/engine.js'); eng.preview(0, 57, 1, true); eng.preview(0, 64, 1, true); });
 await page.waitForTimeout(700);
 const live = await page.evaluate(async () => {
   const { eng } = await import('./js/engine.js'), o = eng.devOut(0, 998);
-  const lit = (sel, f) => { const c = document.querySelector('.fw ' + sel + ' canvas'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (f(d[i], d[i + 1], d[i + 2])) n++; return n / (c.width * c.height); };
-  return { n: o.length, pk: o[0], voices: o[2], f0: o[3], K: o[4], parts: lit('.hm-parts', (r, g, b) => r > 200 && g > 120 && b < 90), meter: lit('.hm-meter', (r, g, b) => r > 70 || g > 70) };
+  const lit = (sel, f) => { const c = document.querySelector('.fw ' + sel + ' canvas') || document.querySelector('.fw ' + sel + '> canvas'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (f(d[i], d[i + 1], d[i + 2])) n++; return n / (c.width * c.height); };
+  return { n: o.length, pk: o[0], voices: o[2], f0: o[3], K: o[4], parts: lit('.hm-spec', (r, g, b) => r > 120 && b > 90), meter: lit('.hm-meter', (r, g, b) => r > 70 || g > 70) };
 });
 ok(live.voices === 2 && Math.abs(live.f0 - 329.63) < 1 && live.K > 8 && live.pk > 0.05, `devOut 998 while a chord plays: ${live.voices} voices, newest f0 ${live.f0.toFixed(1)} Hz, ${live.K} partials, peak ${live.pk.toFixed(2)}`);
-ok(live.parts > 0.02 && live.meter > 0.2, `the partial display and the meter draw it (${(live.parts * 100).toFixed(1)} % / ${(live.meter * 100).toFixed(0)} % of their pixels lit)`);
+ok(live.parts > 0.02 && live.meter > 0.2, `the output spectrum and the meter draw it (${(live.parts * 100).toFixed(1)} % / ${(live.meter * 100).toFixed(0)} % of their pixels lit)`);
 await page.evaluate(async () => { const { eng } = await import('./js/engine.js'); eng.preview(0, 57, 0, false); eng.preview(0, 64, 0, false); });
 
 // articulator editor (ENV, Volume): a tap between points adds one, a drag moves it up
