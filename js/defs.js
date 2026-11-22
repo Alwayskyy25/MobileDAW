@@ -1296,4 +1296,4 @@ export function migrateClassicInst(inst) {
 // Moisture (37): the Serum-style wavetable synth (js/moistdefs.js, native/engine/moist2.cpp). The old Moisture (7) stays as 'Moisture Klasik'.
 INSTRUMENTS[37] = moistureDef();
 // Harmor (38): additive synthesizer (js/harmor/schema.js, native/engine/harmor.cpp)
-INSTRUMENTS[38] = harmorDef();
+INSTRUMENTS[38] = harmorDef(DEVICES);

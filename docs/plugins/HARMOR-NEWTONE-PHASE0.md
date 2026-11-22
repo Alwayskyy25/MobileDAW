@@ -121,8 +121,20 @@ Keputusan pemilik: loop suara real-time Harmor di C++ (pola Moisture); semua bag
   attack 200 ms (0,51 di 100 ms), loop multi-titik 100 ms, tilt −12 dB/okt tepat, fase harmonik, timbre mix, stretch, LFO 4 Hz,
   pan, unison (kiri flat / kanan sharp, level terjaga), chord 8 × 8 unison tanpa clipping, glide legato tanpa klik, CPU ≈ 22 % satu core
   desktop untuk 8 voice × 4 unison + 2 filter + LFO + articulator. Golden `inst-harmor` diperluas: desktop vs WASM −203 dBFS.
-- Berikutnya (Phase 2b): efek internal Harmor (Distortion, Chorus, Phaser, Delay, Reverb, Compressor, EQ, urutan bisa diubah)
-  dan modul khusus Prism / Pluck / Blur / Phaser.
+
+### Phase 2b — modul khusus + rak efek: selesai (tes lulus)
+- Di ranah partial: **Prism** (Scatter: partial digeser acak-deterministik sampai ½ harmonik; Shift: semua partial naik sampai 2 × f0 Hz,
+  inharmonik), **Pluck** (tiap partial meluruh, yang tinggi lebih cepat: Time, Damp), **Blur** (amplitudo partial dihaluskan terhadap waktu,
+  naik = Attack, turun = Release, Harm = partial tinggi lebih lambat), **Phaser spektral** (notch berjarak oktaf menyapu spektrum: Depth,
+  Notches/oktaf, Speed, Sharp, Offset).
+- **Rak efek** di dalam Harmor: Distortion (Saturator), Chorus-Ensemble, Phaser-Flanger, Delay, Reverb, Compressor, EQ Eight — **efek
+  MobileDAW yang sama** (C++ yang sama dengan efek track), urutan 7 slot bisa diubah, On + Mix per efek, tempo / posisi lagu diteruskan,
+  latensi dilaporkan (PDC), instrumen tetap aktif selama ekor efek berbunyi. Parameter detail tiap efek: ID HM.FX + 48 k + 2 + j
+  (sama urutannya dengan efek di track), panelnya di Phase 6.
+- Tes: Prism shift (partial 1 tepat 220 Hz, partial 3 tepat 440 Hz), scatter; Pluck (fundamental −6,51 dB dalam 0,75 s = teori −6,51;
+  partial 8 tertinggal 79 dB); Blur (26 % vs 3 % di 40 ms, 99 % di 1 s); phaser spektral 2,0 Hz / 33 dB; **ketujuh efek di dalam Harmor
+  identik bit-per-bit (−240 dB) dengan efek yang sama di track**; urutan efek berpengaruh; mix 50 % tepat di tengah; ekor delay terdengar
+  setelah voice selesai. Golden `inst-harmor` mencakup 2b (desktop vs WASM −204 dBFS).
 
 ## 5. Referensi dari pemilik (untuk fase berikutnya)
 

@@ -15,8 +15,14 @@
 // Volume, Pitch, Filter 1 / 2 cutoff, Frequency (harmonic stretch), Harmonic level (tilt), Harmonic phase, Timbre mix, (Image freq /
 // gain: phase 3). Two LFOs per voice (sine, triangle, saw, square, sample & hold) on a chosen destination. Vibrato with delay.
 // Mono / legato with glide. The partial count adapts to the quality (Draft / Normal / High) and to the oscillator banks sounding.
+// Special processing, also per partial: Prism (partials moved off their harmonic places: scattered or shifted by Hz), Pluck (each
+// partial decays, the higher ones faster), Blur (partial amplitudes smeared in time, rising and falling apart, higher partials slower),
+// spectral Phaser (notches spaced in octaves sweeping across the spectrum).
+// Effects: a rack of 7 MobileDAW effects (the same C++ devices a track uses) after the voices, in a chosen order, each with on / mix;
+// the instrument stays active while their tail sounds.
 #include "harmor.h"
 #include "dsp.h"
+#include "os.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -48,6 +54,12 @@ inline double pexp2(double x) {
   return std::ldexp(p, (int)fl);
 }
 
+inline double pcos(double a) {   // cos of a in [0, 2 pi)
+  if (a > PI) a = TAU - a;
+  return a <= PI * 0.5 ? psin(PI * 0.5 - a) : -psin(a - PI * 0.5);
+}
+inline float hash01(int k) { uint32_t h = (uint32_t)(k + 1) * 2654435761u; h ^= h >> 15; h *= 2246822519u; h ^= h >> 13; return (h >> 8) * (1.0f / 16777216.0f); }
+
 struct Timbre {
   float a[HM_MAXP] = {}, ph[HM_MAXP] = {};          // amplitude (>= 0), phase (radians)
   float tl[HM_MAXP] = {}, tp[HM_MAXP] = {};         // the drawn table: level, phase (0..1 of a cycle)
@@ -63,7 +75,7 @@ struct Voice {
   Adsr env; double f0 = 0, fcur = 0, bend = 1, t = 0;   // f0: the note's frequency, fcur: after glide; t: seconds since the start
   int nu = 1;                                         // unison copies of this voice
   float gl[HM_UNI] = {}, gr[HM_UNI] = {}, um[HM_UNI] = {};   // per copy: pan gains, frequency ratio
-  double rotF[HM_UNI] = {}, rotS = -9;                // the frequency / stretch the rotation coefficients were made for
+  double rotF[HM_UNI] = {}, rotS = -9;                // the frequency / stretch (+ prism) the rotation coefficients were made for
   int n = 0;                                          // partials computed (the sounding ones and those fading out)
   bool dirty = true;                                  // phase vectors to rebuild (note start, timbre phase change)
   int pPitch = -1; double pVel = 0; int fade = 0;     // stealing: fade out over `fade` samples, then start the pending note
@@ -89,16 +101,24 @@ class Harmor : public Instrument {
     for (int e = 0; e < HM_ENVS; e++) { int b0 = HM_ENV + HM_ENV_STRIDE * e; p[b0 + 1] = e == HM_E_VOL ? 1 : 0.5; p[b0 + 3] = -1; p[b0 + 4] = -1; p[b0 + 5] = 0.01; p[b0 + 7] = 0.4; p[b0 + 8] = e == HM_E_VOL ? 0.8 : 0; p[b0 + 9] = 0.3; }
     for (int k = 0; k < HM_MAXP; k++) l2k[k] = (float)std::log2((double)(k + 1));
     l2k[HM_MAXP] = -1; l2k[HM_MAXP + 1] = -2;
+    p[HM_PLUCK_TIME] = 1; p[HM_PLUCK_DAMP] = 0.5; p[HM_SPH_DENS] = 1; p[HM_SPH_SPEED] = 0.2; p[HM_SPH_SHARP] = 0.5;
+    for (int k = 0; k < HM_FX_N; k++) { p[HM_FX_ORDER + k] = k; p[HM_FX + HM_FX_STRIDE * k + 1] = 1; fx[k] = makeDevice(HM_FX_TYPES[k], sr, nullptr); }
+    upOrder();
     voices = new Voice[HM_POLY];
     buildTimbre(0); buildTimbre(1); upEnv(); for (int f = 0; f < 2; f++) buildFilter(f); for (int e = 0; e < HM_ENVS; e++) buildEnv(e);
   }
-  ~Harmor() override { delete[] voices; }
+  ~Harmor() override { delete[] voices; for (Device* d : fx) delete d; }
 
-  void setTempo(double b) override { bpm = b > 0 ? b : 120; }
+  void setTempo(double b) override { bpm = b > 0 ? b : 120; for (Device* d : fx) if (d) d->setTempo(bpm); }
+  void setSongPos(bool playing, double beat) override { for (Device* d : fx) if (d && d->hasTr) d->tr(playing, beat); }
+  int lat() override { int n = 0; for (int k = 0; k < HM_FX_N; k++) if (fx[k] && p[HM_FX + HM_FX_STRIDE * k] > 0.5) n += fx[k]->lat(); return n; }
   void setParam(int i, double v) override {
     if (i < 0 || i >= HM_PARAMS || i == 90) return;
     p[i] = v;
     if (i >= HM_ENV && i < HM_ENV + HM_ENV_STRIDE * HM_ENVS) { buildEnv((i - HM_ENV) / HM_ENV_STRIDE); return; }
+    if (i >= HM_FX_ORDER && i < HM_FX_ORDER + HM_FX_N) { upOrder(); return; }
+    if (i >= HM_FX && i < HM_FX + HM_FX_STRIDE * HM_FX_N) { int k = (i - HM_FX) / HM_FX_STRIDE, j = (i - HM_FX) % HM_FX_STRIDE; if (j >= 2 && j - 2 < HM_FX_NP[k] && fx[k]) fx[k]->setParam(j - 2, v); return; }
+    if (i == HM_PRISM_AMT || i == HM_PRISM_MODE) { for (int k = 0; k < HM_POLY; k++) voices[k].rotS = -9; return; }
     switch (i) {
       case HM_T_WAVE: case HM_T_WAVE + 10: buildTimbre(i == HM_T_WAVE ? 0 : 1); break;
       case HM_T_TABLE: case HM_T_TABLE + 10: loadTable(i == HM_T_TABLE ? 0 : 1, (int)v); break;
@@ -131,7 +151,7 @@ class Harmor : public Instrument {
     for (int k = 0; k < HM_POLY; k++) { Voice& v = voices[k]; if (v.pPitch == pitch) v.pPitch = -1; if (v.on && v.held && v.pitch == pitch) release(v); }
   }
   void allOff() override { nHeld = 0; for (int k = 0; k < HM_POLY; k++) { Voice& v = voices[k]; v.pPitch = -1; if (v.on) release(v); } }
-  bool active() override { for (int k = 0; k < HM_POLY; k++) if (voices[k].on) return true; return false; }
+  bool active() override { for (int k = 0; k < HM_POLY; k++) if (voices[k].on) return true; return fxOn() && tail > 0; }   // the effects' tail keeps it running
   int voicesOn() override { int n = 0; for (int k = 0; k < HM_POLY; k++) if (voices[k].on) n++; return n; }
   bool canBend() override { return true; }
   void bendSounding(double r) override { for (int k = 0; k < HM_POLY; k++) if (voices[k].on) voices[k].bend *= r; }
@@ -139,15 +159,27 @@ class Harmor : public Instrument {
 
   void render(float* L, float* R, int a, int b) override {
     int banks = 0; for (int k = 0; k < HM_POLY; k++) if (voices[k].on) banks += voices[k].nu;
-    if (!banks) return;
+    const bool anyFx = fxOn();
+    if (!banks && !(anyFx && tail > 0)) return;
     int q = std::max(0, std::min(2, (int)std::lround(p[HM_QUALITY])));
     int want = std::max(1, std::min({ HM_MAXP, CAP[q], (int)std::lround(p[HM_PARTIALS]) }));
-    want = std::min(want, std::max(8, BUDGET[q] / banks));                   // adaptive: the partial-bank budget of the quality
-    // voices into the instrument's own buffer, then a soft limit (transparent below 0.7, never past 1) added to the track
+    if (banks) want = std::min(want, std::max(8, BUDGET[q] / banks));        // adaptive: the partial-bank budget of the quality
+    // voices into the instrument's own buffer (steps of SUB), the effects rack (blocks of up to 128), then a soft limit (transparent
+    // below 0.7, never past 1) added to the track
     for (int at = a; at < b; ) {
-      int m = std::min(SUB, b - at); std::memset(oL, 0, sizeof(float) * m); std::memset(oR, 0, sizeof(float) * m);
-      for (int k = 0; k < HM_POLY; k++) { Voice& v = voices[k]; if (v.on) renderVoice(v, oL, oR, m, want); }
-      for (int i = 0; i < m; i++) { L[at + i] += soft(oL[i]); R[at + i] += soft(oR[i]); }
+      const int m = std::min(128, b - at);
+      std::memset(fL, 0, sizeof(float) * m); std::memset(fR, 0, sizeof(float) * m);
+      for (int s0 = 0; s0 < m; s0 += SUB) {
+        const int mm = std::min(SUB, m - s0);
+        sphPh += clampd(p[HM_SPH_SPEED], -8, 8) * mm / sr; sphPh -= std::floor(sphPh);
+        for (int k = 0; k < HM_POLY; k++) { Voice& v = voices[k]; if (v.on) renderVoice(v, fL + s0, fR + s0, mm, want); }
+      }
+      if (anyFx) {
+        runFx(fL, fR, m);
+        float pk = 0; for (int i = 0; i < m; i++) pk = std::max(pk, std::max(std::fabs(fL[i]), std::fabs(fR[i])));
+        if (pk > 1e-5f || voicesOn()) tail = (int)(sr * 0.5); else tail -= m;
+      }
+      for (int i = 0; i < m; i++) { L[at + i] += soft(fL[i]); R[at + i] += soft(fR[i]); }
       at += m;
     }
   }
@@ -155,7 +187,25 @@ class Harmor : public Instrument {
  private:
   double sr, bpm = 120; Bank* bank; double p[HM_PARAMS]; Voice* voices = nullptr; Timbre tb[2]; AdsrP ap; uint32_t counter = 0, seed = 0x9e3779b9u;
   float l2k[NX];
-  float buf[HM_UNI][SUB], oL[SUB], oR[SUB];
+  float buf[HM_UNI][SUB], fL[128], fR[128], dL[128], dR[128];
+  Device* fx[HM_FX_N] = {}; int order[HM_FX_N] = { 0, 1, 2, 3, 4, 5, 6 }; int tail = 0; double sphPh = 0;
+  bool fxOn() const { for (int k = 0; k < HM_FX_N; k++) if (fx[k] && p[HM_FX + HM_FX_STRIDE * k] > 0.5) return true; return false; }
+  // the slots' effects in order; a repeated or missing effect: the first use counts, the rest follow in their own order
+  void upOrder() {
+    bool used[HM_FX_N] = {}; int n = 0;
+    for (int s = 0; s < HM_FX_N; s++) { int k = (int)std::lround(p[HM_FX_ORDER + s]); if (k >= 0 && k < HM_FX_N && !used[k]) { used[k] = true; order[n++] = k; } }
+    for (int k = 0; k < HM_FX_N; k++) if (!used[k]) order[n++] = k;
+  }
+  void runFx(float* L, float* R, int m) {
+    for (int s = 0; s < HM_FX_N; s++) {
+      const int k = order[s], b0 = HM_FX + HM_FX_STRIDE * k; Device* d = fx[k];
+      if (!d || p[b0] <= 0.5) continue;
+      const float mix = (float)clampd(p[b0 + 1], 0, 1);
+      if (mix < 1) { std::memcpy(dL, L, sizeof(float) * m); std::memcpy(dR, R, sizeof(float) * m); }
+      d->process(L, R, m);
+      if (mix < 1) for (int i = 0; i < m; i++) { L[i] = dL[i] + (L[i] - dL[i]) * mix; R[i] = dR[i] + (R[i] - dR[i]) * mix; }
+    }
+  }
   float ft[2][FT_N]; float fcustom[2][256]; bool fcHas[2] = { false, false };
   float fmt[FM_N]; double fmtVowel = -1, fmtRes = -1;
   EnvDef ed[HM_ENVS];
@@ -368,8 +418,12 @@ class Harmor : public Instrument {
     // per-partial frequency multipliers (only when the stretch moved), then the rotation per sample of every copy (only when the pitch moved)
     bool rebuild = false;
     if (stretch != v.rotS) {
-      const double e = 1 + 0.1 * stretch;
-      for (int k = 0; k < HM_MAXP; k++) { v.lvm[k] = (float)(e * l2k[k]); v.vm[k] = (float)pexp2(v.lvm[k]); }
+      const double e = 1 + 0.1 * stretch, pa = clampd(p[HM_PRISM_AMT], 0, 1); const bool shift = p[HM_PRISM_MODE] > 0.5;
+      for (int k = 0; k < HM_MAXP; k++) {
+        double m0 = pexp2(e * l2k[k]);
+        if (pa > 0) m0 = shift ? m0 + 2 * pa : (k ? m0 + pa * 0.5 * (2 * hash01(k) - 1) : m0);   // Prism: shift every partial by up to 2 x f0 Hz, or scatter it by up to half a harmonic
+        m0 = std::max(0.01, m0); v.vm[k] = (float)m0; v.lvm[k] = (float)std::log2(m0);
+      }
       v.vm[HM_MAXP] = 0.5f; v.vm[HM_MAXP + 1] = 0.25f; v.lvm[HM_MAXP] = -1; v.lvm[HM_MAXP + 1] = -2;
       v.rotS = stretch; rebuild = true;
     }
@@ -398,6 +452,9 @@ class Harmor : public Instrument {
     }
     const double tilt = ed[HM_E_HLEVEL].on ? ev[HM_E_HLEVEL] * ed[HM_E_HLEVEL].depth * 12 : 0;   // dB per octave of harmonic number
     const double hph = (ed[HM_E_HPHASE].on ? ev[HM_E_HPHASE] * ed[HM_E_HPHASE].depth : 0) + lm[HM_LD_HPHASE];
+    const double plA = clampd(p[HM_PLUCK_AMT], 0, 1), plT = std::max(0.01, p[HM_PLUCK_TIME]), plD = clampd(p[HM_PLUCK_DAMP], 0, 1);
+    const double blA = std::max(0.0, p[HM_BLUR_ATT]), blR = std::max(0.0, p[HM_BLUR_REL]), blH = clampd(p[HM_BLUR_HARM], 0, 1); const bool blur = blA > 0 || blR > 0;
+    const double spD = clampd(p[HM_SPH_DEPTH], 0, 1), spN = clampd(p[HM_SPH_DENS], 0.1, 8), spO = p[HM_SPH_OFS]; const int spP = 1 + (int)std::lround(clampd(p[HM_SPH_SHARP], 0, 1) * 15);
     for (int u = 0; u < v.nu; u++) std::memset(buf[u], 0, sizeof(float) * m);
     const float inv = 1.0f / m; int last = 0;
     for (int k = 0; k < NX; k++) {
@@ -408,6 +465,8 @@ class Harmor : public Instrument {
       if (g > 0 && ((k < HM_MAXP && k < want) || (k >= HM_MAXP && sub > 0))) {
         for (int fi = 0; fi < 2; fi++) if (fOn[fi]) { const double h = ftype[fi] == HM_FORMANT ? fmtAt(lf) : flt(fi, lf - fx0[fi]); g *= 1 - fmix[fi] + fmix[fi] * h; }
         if (tilt != 0 && k < HM_MAXP) g *= pexp2(tilt / 6.0206 * l2k[k]);
+        if (plA > 0 && k < HM_MAXP) g *= 1 - plA + plA * pexp2(-v.t / (plT / (1 + 8 * plD * l2k[k])) * 1.4426950408889634);   // Pluck
+        if (spD > 0) { double u0 = lf * spN + spO + sphPh; u0 -= std::floor(u0); double c = 0.5 + 0.5 * pcos(TAU * u0), cn = c; for (int j = 1; j < spP; j++) cn *= c; g *= 1 - spD * cn; }   // spectral phaser
         if (k < HM_MAXP) {
           const double a1 = w1 * tb[0].a[k], a2 = w2 * tb[1].a[k];
           double x, y;
@@ -422,7 +481,11 @@ class Harmor : public Instrument {
         } else tx = (float)(sub * (k == HM_MAXP ? 0.5 : 0.25) * g);
       }
       if (f >= nyq) tx = ty = 0;
-      if (v.fresh) { v.X[k] = tx; v.Y[k] = ty; }
+      if (blur) {                                      // Blur: the coefficients follow their target slowly (rising: attack, falling: release)
+        if (v.fresh) { v.X[k] = v.Y[k] = 0; }
+        const double cur = (double)v.X[k] * v.X[k] + (double)v.Y[k] * v.Y[k], tg = (double)tx * tx + (double)ty * ty, tau = (tg > cur ? blA : blR) * (1 + 3 * blH * std::max(0.0f, l2k[k]));
+        if (tau > 0) { const float al = (float)(1 - pexp2(-dt / tau * 1.4426950408889634)); tx = v.X[k] + (tx - v.X[k]) * al; ty = v.Y[k] + (ty - v.Y[k]) * al; }
+      } else if (v.fresh) { v.X[k] = tx; v.Y[k] = ty; }
       const float x0 = v.X[k], y0 = v.Y[k];
       if (x0 == 0 && y0 == 0 && tx == 0 && ty == 0) continue;
       if (k < HM_MAXP) last = k + 1;

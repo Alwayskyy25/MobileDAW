@@ -264,6 +264,9 @@ export const SCENARIOS = [
       P(110, 1); P(115, 0.02); P(117, 0.3); P(118, 0.6); P(119, 0.4); P(170, 1); P(171, 0.1); P(410, 1); P(411, 0.4); play(e, 1.5);
       P(230, 1); P(231, 0.5); P(232, 4); P(233, 2); P(234, 0); P(240, 0); P(241, 0); P(243, 0.05); P(244, 1); P(246, 0.05); P(247, 0.2); P(249, 0.1); P(250, 0); play(e, 1.2);
       P(7, 1); P(8, 1); P(6, 0.1); play(e, 1.2);
+      // phase 2b: Prism, Pluck, Blur, spectral phaser, the effects rack (reordered, mix)
+      P(7, 0); P(81, 0.4); P(83, 0.7); P(84, 0.6); P(86, 0.05); P(87, 0.2); P(88, 0.5); P(103, 0.8); P(105, 1.5); play(e, 1.2);
+      P(82, 1); P(720, 1); P(722, 9); P(768, 1); P(816, 1); P(864, 1); P(873, 0.4); P(912, 1); P(913, 0.5); P(960, 1); P(1008, 1); P(1013, 1); P(1016, 4); P(712, 4); P(713, 0); play(e, 1.5);
     } },
   { name: 'inst-moisture', native: true, info: 'C++ only (native/engine/moist2.cpp): Moisture (37), the Serum-style wavetable synth: wavetables A / B, WT position, unison + detune + blend, warp modes (sync, bend, PWM, FM from B), sub, noise, the filter types, Env 1-3, LFO -> matrix routes, mono glide, pitch bend, every effect of the rack, tempo change',
     run(e) {

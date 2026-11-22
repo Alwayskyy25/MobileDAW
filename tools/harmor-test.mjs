@@ -244,4 +244,59 @@ const hAmp = (x, k, a = A2, n = AN) => bin(x, SR, F2 * k, a, n).amp;
   console.log(`info 8 voices x 4 unison, 2 filters, LFO + stretch articulator: ${(ms / 40).toFixed(1)} % of one desktop core (the partial budget shares 2048 partials among the 32 banks)`);
   ok(ms / 4000 < 0.35 && L.every(Number.isFinite), 'heavy patch stays inside real time on a desktop core, output finite');
 }
+
+// ================================================================ phase 2b: Prism, Pluck, Blur, spectral Phaser, effects rack
+{
+  const ref = (await synth(SR, SAW110, [on(0, 45)], 1.2)).L;
+  // Prism shift 50 %: every partial moves up by one fundamental (partial k sits at (k + 1) f0)
+  const ps = (await synth(SR, { ...SAW110, 81: 0.5, 82: 1 }, [on(0, 45)], 1)).L;
+  ok(Math.abs(freqAt(ps, SR, 2 * F2, A2, AN) - 2 * F2) < 0.05 && Math.abs(freqAt(ps, SR, 4 * F2, A2, AN) - 4 * F2) < 0.05 && Math.abs(db(bin(ps, SR, 4 * F2, A2, AN).amp / hAmp(ref, 3))) < 0.2,
+    'Prism shift 50 %: partial 1 at 220 Hz, partial 3 at 440 Hz (+1 x f0), with partial 3\'s level');
+  const sc = (await synth(SR, { ...SAW110, 81: 1, 82: 0 }, [on(0, 45)], 1)).L;
+  ok([5, 7, 9].every((k) => hAmp(sc, k) < 0.5 * hAmp(ref, k)) && Math.abs(db(hAmp(sc, 1) / hAmp(ref, 1))) < 0.2, 'Prism scatter: partials leave their harmonic places, the fundamental stays');
+  // Pluck: each partial decays, the higher ones faster
+  const pl = (await synth(SR, { ...SAW110, 83: 1, 84: 1, 85: 0.5 }, [on(0, 45)], 1.2)).L;
+  const early = db(bin(pl, SR, 880, Math.round(SR * 0.05), 4096).amp / bin(pl, SR, 110, Math.round(SR * 0.05), 4096).amp), late = db(bin(pl, SR, 880, Math.round(SR * 0.8), 4096).amp / bin(pl, SR, 110, Math.round(SR * 0.8), 4096).amp);
+  const f1 = db(bin(pl, SR, 110, Math.round(SR * 0.8), 4096).amp / bin(pl, SR, 110, Math.round(SR * 0.05), 4096).amp);
+  ok(early - late > 12 && Math.abs(f1 - 20 * Math.log10(Math.exp(-0.75))) < 0.8, `Pluck: partial 8 falls ${(early - late).toFixed(1)} dB behind the fundamental in 0.75 s; the fundamental decays ${f1.toFixed(2)} dB (time 1 s: ${(20 * Math.log10(Math.exp(-0.75))).toFixed(2)})`);
+  // Blur: partials rise slowly, the higher ones slower
+  const bl = (await synth(SR, { ...SAW110, 86: 0.2, 88: 1 }, [on(0, 45)], 1.2)).L;
+  const r1 = bin(bl, SR, 110, Math.round(SR * 0.04), 2048).amp / hAmp(ref, 1), r8 = bin(bl, SR, 880, Math.round(SR * 0.04), 2048).amp / hAmp(ref, 8), r1b = bin(bl, SR, 110, Math.round(SR * 1.0), 4096).amp / bin(ref, SR, 110, Math.round(SR * 1.0), 4096).amp;
+  ok(r1 < 0.6 && r8 < r1 * 0.7 && r1b > 0.95, `Blur attack 200 ms: after 40 ms partial 1 at ${(r1 * 100).toFixed(0)} %, partial 8 at ${(r8 * 100).toFixed(0)} % (higher = slower); partial 1 full by 1 s (${(r1b * 100).toFixed(0)} %)`);
+  // spectral phaser: notches sweep the spectrum (a partial's level swings at the speed)
+  const sp = (await synth(SR, { ...SAW110, 103: 1, 104: 1, 105: 2, 106: 0.6 }, [on(0, 45)], 2)).L;
+  const tr = []; for (let t = 0.2; t < 1.7; t += 0.01) tr.push(db(bin(sp, SR, 880, Math.round(t * SR), 2048).amp)); const mid = (Math.max(...tr) + Math.min(...tr)) / 2; let cr = 0; for (let i = 1; i < tr.length; i++) if ((tr[i - 1] - mid) * (tr[i] - mid) < 0) cr++;
+  ok(Math.max(...tr) - Math.min(...tr) > 20 && Math.abs(cr / 2 / 1.5 - 2) < 0.5, `spectral phaser 2 Hz: partial 8 swings ${(Math.max(...tr) - Math.min(...tr)).toFixed(0)} dB, ${(cr / 2 / 1.5).toFixed(1)} times a second`);
+}
+// effects rack: each effect inside Harmor = the same MobileDAW effect on the track after a dry Harmor (sample for sample)
+{
+  const FXN = ['Distortion', 'Chorus', 'Phaser', 'Delay', 'Reverb', 'Compressor', 'EQ'], TYPES = [3, 20, 21, 17, 7, 4, 31];
+  const SET = [[[0, 12], [3, 0.3]], [[2, 0.8], [1, 1.5]], [[7, 0.7], [8, 0.4]], [[9, 0.5]], [[2, 0.4], [0, 0.8]], [[0, -24], [1, 6]], [[5, 1], [8, 6]]];
+  const base = { ...flat, 10: 1, 0: 0.25, 1: 64 }, notes = [on(0, 45), on(0.15, 52), off(0.6, 45), off(0.6, 52)];
+  const render = async (cmd) => { const w = await loadWasmEngine(SR); const er = w.cmd(cmd); if (er) throw new Error(er); const n = Math.round(SR * 1.2), L = new Float32Array(n), R = new Float32Array(n); let at = 0;
+    for (const e of notes) { const to = Math.round(e.t * SR); if (to > at) { const l = new Float32Array(to - at), r = new Float32Array(to - at); w.render(l, r, to - at); L.set(l, at); R.set(r, at); at = to; } w.cmd(e.cmd); }
+    const l = new Float32Array(n - at), r = new Float32Array(n - at); w.render(l, r, n - at); L.set(l, at); R.set(r, at); return { L, R }; };
+  const head = 'masterLimit 0\ntrackVol 0 1\ntrackInst 0 38\n' + Object.entries(base).map(([k, v]) => `instParam 0 ${k} ${v}\n`).join('');
+  const res = [];
+  for (let k = 0; k < 7; k++) {
+    const inside = await render(head + `instParam 0 ${720 + 48 * k} 1\n` + SET[k].map(([j, v]) => `instParam 0 ${720 + 48 * k + 2 + j} ${v}\n`).join(''));
+    const outside = await render(head + `insertDevice 0 0 ${TYPES[k]}\n` + SET[k].map(([j, v]) => `devParam 0 0 ${j} ${v}\n`).join(''));
+    const dry = await render(head);
+    let e = 0, r = 0, ch = 0; for (let i = 0; i < inside.L.length; i++) { e += (inside.L[i] - outside.L[i]) ** 2 + (inside.R[i] - outside.R[i]) ** 2; r += outside.L[i] ** 2; ch += (inside.L[i] - dry.L[i]) ** 2; }
+    res.push([FXN[k], db(Math.sqrt(e / inside.L.length)), db(Math.sqrt(ch / r))]);
+  }
+  ok(res.every(([, d, c]) => d < -90 && c > -40), 'every effect in the rack = the MobileDAW effect on a track, and it changes the sound: ' + res.map(([n, d]) => `${n} ${d === -Infinity ? 'identical' : d.toFixed(0) + ' dB'}`).join(', '));
+  // order: Distortion -> Reverb is not Reverb -> Distortion
+  const both = head + 'instParam 0 720 1\ninstParam 0 722 24\ninstParam 0 912 1\ninstParam 0 914 0.6\n';
+  const a = await render(both + 'instParam 0 712 0\ninstParam 0 713 4\n'), b = await render(both + 'instParam 0 712 4\ninstParam 0 713 0\n');
+  let d2 = 0, r2 = 0; for (let i = 0; i < a.L.length; i++) { d2 += (a.L[i] - b.L[i]) ** 2; r2 += a.L[i] ** 2; }
+  ok(db(Math.sqrt(d2 / r2)) > -30, `the order of the effects counts (Distortion -> Reverb vs Reverb -> Distortion: ${db(Math.sqrt(d2 / r2)).toFixed(1)} dB apart)`);
+  // mix 50 %: halfway between dry and wet
+  const wet = await render(head + 'instParam 0 912 1\ninstParam 0 914 1\n'), half = await render(head + 'instParam 0 912 1\ninstParam 0 913 0.5\ninstParam 0 914 1\n'), dry = await render(head);
+  let dm = 0, rm = 0; for (let i = 0; i < half.L.length; i++) { const want = dry.L[i] + 0.5 * (wet.L[i] - dry.L[i]); dm += (half.L[i] - want) ** 2; rm += want * want; }
+  ok(db(Math.sqrt(dm / rm)) < -90, 'effect mix 50 % = halfway between dry and wet');
+  // tail: a delay keeps sounding after the notes have ended
+  const dl = await render(head + 'instParam 0 864 1\ninstParam 0 875 0.6\n');
+  ok(peak(dl.L, Math.round(SR * 0.9), Math.round(SR * 1.2)) > 1e-3 && peak(dry.L, Math.round(SR * 0.9), Math.round(SR * 1.2)) < 1e-5, 'the delay tail sounds after the voices have ended (the instrument stays active)');
+}
 console.log(bad ? `\n${bad} FAILED` : '\nharmor-test: all passed'); process.exit(bad ? 1 : 0);

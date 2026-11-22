@@ -9,7 +9,7 @@
 
 namespace mdaw {
 
-constexpr int HM_PARAMS = 1024;
+constexpr int HM_PARAMS = 1100;
 constexpr int HM_MAXP = 516;          // partials per voice
 constexpr int HM_POLY = 16;           // voices
 constexpr int HM_UNI = 8;             // unison copies per voice
@@ -34,6 +34,15 @@ enum { HM_LD_OFF = 0, HM_LD_PITCH, HM_LD_CUT1, HM_LD_CUT2, HM_LD_VOL, HM_LD_MIX,
 // 4 loop start point, 5..9 attack / hold / decay / sustain / release, 10 + 3 j: point j = time from the previous point (s), level, curve
 constexpr int HM_ENV = 110, HM_ENV_STRIDE = 60, HM_ENVS = 10, HM_ENV_PTS = 16;
 enum { HM_E_VOL = 0, HM_E_PITCH, HM_E_CUT1, HM_E_CUT2, HM_E_FREQ, HM_E_HLEVEL, HM_E_HPHASE, HM_E_MIX, HM_E_IMGFREQ, HM_E_IMGGAIN };
+// special processing (in the partial domain): Prism (partials moved off their harmonic places), Pluck (higher partials die faster),
+// Blur (partial amplitudes smeared in time), spectral Phaser (notches sweeping across the spectrum)
+constexpr int HM_PRISM_AMT = 81, HM_PRISM_MODE = 82, HM_PLUCK_AMT = 83, HM_PLUCK_TIME = 84, HM_PLUCK_DAMP = 85, HM_BLUR_ATT = 86, HM_BLUR_REL = 87, HM_BLUR_HARM = 88;
+constexpr int HM_SPH_DEPTH = 103, HM_SPH_DENS = 104, HM_SPH_SPEED = 105, HM_SPH_SHARP = 106, HM_SPH_OFS = 107;
+// effects rack: 7 MobileDAW effects run inside Harmor in a chosen order. HM_FX_ORDER + s = the effect in slot s; effect k: HM_FX + 48 k:
+// 0 on, 1 mix, 2 + j = parameter j of the effect (its own MobileDAW device type HM_FX_TYPES[k], same parameters as on a track)
+constexpr int HM_FX_ORDER = 712, HM_FX = 720, HM_FX_STRIDE = 48, HM_FX_N = 7;
+constexpr int HM_FX_TYPES[HM_FX_N] = { 3, 20, 21, 17, 7, 4, 31 };   // Distortion (Saturator), Chorus-Ensemble, Phaser-Flanger, Delay, Reverb, Compressor, EQ Eight
+constexpr int HM_FX_NP[HM_FX_N] = { 6, 13, 15, 20, 8, 12, 42 };      // their parameter counts (js/defs.js DEVICES): only these are passed on
 // waveforms of a timbre
 enum { HM_SINE = 0, HM_SAW = 1, HM_SQUARE = 2, HM_TRI = 3, HM_CUSTOM = 4 };
 
