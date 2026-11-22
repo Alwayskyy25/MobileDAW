@@ -310,12 +310,14 @@ export function harmorView(k) {
   // ---------------------------------------------------------------- editor: image synthesis / resynthesis
   const imgTab = () => {
     const hm = (t() && t().inst.hm) || null, H = () => import('./harmor.js');
+    if (st.resQ == null && hm && hm.src === 'audio' && hm.opts && hm.opts.quality != null) st.resQ = hm.opts.quality;   // the quality the map was made at
     const map = disp((g, w, hh) => {
       const m = mapView(); if (!m) { txt(g, 'Belum ada peta. Muat gambar atau audio di bawah.', w / 2, hh / 2, DIM, 11, 'center'); return; }
       const { frames, bins, data } = m, img = g.createImageData(Math.max(1, Math.round(w)), Math.max(1, Math.round(hh))), W = img.width, Hh = img.height;
       for (let x = 0; x < W; x++) { const f = Math.min(frames - 1, Math.floor(x / W * frames)); for (let y = 0; y < Hh; y++) { const b = Math.min(bins - 1, Math.floor((1 - y / Hh) * bins)), a = data[16 + f * bins + b] || 0, db = a > 0 ? 20 * Math.log10(a) : -120, v = C01((db + 66) / 60), o = (y * W + x) * 4;
         img.data[o] = 30 + 225 * v; img.data[o + 1] = 22 + 135 * v * v; img.data[o + 2] = 18 + 30 * v; img.data[o + 3] = 255; } }
-      g.putImageData(img, 0, 0); txt(g, (hm ? (hm.src === 'image' ? 'Gambar: ' : 'Audio: ') + hm.path.split('/').pop() : '') + '  •  ' + frames + ' frame × ' + bins + (m.layout ? ' pita log' : ' partial') + (hm && hm.src === 'image' ? '  •  geser = pan, cubit = zoom' : ''), 6, 12, INK, 10);
+      { const c2 = document.createElement('canvas'); c2.width = W; c2.height = Hh; c2.getContext('2d').putImageData(img, 0, 0); g.imageSmoothingEnabled = false; g.drawImage(c2, 0, 0, w, hh); }   // through a canvas: putImageData ignores the display scale
+      txt(g, (hm ? (hm.src === 'image' ? 'Gambar: ' : 'Audio: ') + hm.path.split('/').pop() : '') + '  •  ' + frames + ' frame × ' + bins + (m.layout ? ' pita log' : ' partial') + (hm && hm.src === 'image' ? '  •  geser = pan, cubit = zoom' : ''), 6, 12, INK, 10);
     }, { cls: 'hm-map grow', touch: hm && hm.src === 'image' ? { down: (x, y) => ({ x, y, o: { ...(t().inst.hm.opts || {}) } }), move: (x, y, s) => { s.dx = x - s.x; s.dy = y - s.y; },
       up: (s) => { if (!s || (!s.dx && !s.dy)) return; const [w, hh] = map.size(), o = s.o, cw = (o.x1 ?? 1) - (o.x0 ?? 0), chh = (o.y1 ?? 1) - (o.y0 ?? 0), mx = -s.dx / w * cw, my = s.dy / hh * chh;
         const nx0 = Math.max(0, Math.min(1 - cw, (o.x0 ?? 0) + mx)), ny0 = Math.max(0, Math.min(1 - chh, (o.y0 ?? 0) + my)); applyImg({ ...o, x0: nx0, x1: nx0 + cw, y0: ny0, y1: ny0 + chh }); },
