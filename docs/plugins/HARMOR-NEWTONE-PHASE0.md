@@ -181,6 +181,16 @@ Keputusan pemilik: loop suara real-time Harmor di C++ (pola Moisture); semua bag
   Revisi pemilik: tombol jendela menjadi **lampu bulat berwarna ala MacBook** (gambar sendiri, CSS): merah = tutup, kuning = kecilkan,
   hijau = perbesar, abu-abu = gulung; simbol samar di layar sentuh dan jelas saat ditekan; jendela yang tidak aktif lampunya pudar.
   Sudut jendela membulat 10 px, field Preset / Mix 5 px.
+  Revisi berikutnya (lampu terlalu tebal / makan tempat): lampu 12 px dengan jarak rapat 20 px, simbol hanya saat ditekan, lampu gulung
+  dihapus (ketuk 2× title bar tetap menggulung), nama track tidak lagi di bar.
+- **Level resintesis**: tahap output Harmor = 0,25 × Volume (ruang aman untuk akor), sehingga audio yang diresintesis terdengar ~15 dB
+  lebih pelan dari filenya. Saat audio dimuat, Map Level kini diset 4× (bila belum pernah diubah): Volume 100 % = level file (partial 1
+  0,300 dari 0,300; tes di `harmor-app-test`), Volume 70 % = −3 dB.
+- **Uji pemilik (WAV 22 s, melodi 11 nada)**: track "Harmor Datar" = resintesis High, Freq Dev 0 %, satu not D4 → 100 % frame bernada
+  dalam ±50 cent dari D4 (median 0,1 cent); track "Harmor Nada" = resintesis WAV datar + 41 not dari melodi asli (mono + legato, Formant)
+  → 99,2 % frame bernada sama dengan aslinya (median selisih 2,8 cent); level −31,4 (asli) / −31,9 (datar) / −33,1 dB (nada).
+  Batas yang diketahui: resintesis harmonik tidak punya komponen noise, sehingga bagian tak bernada (konsonan / desis) ikut menjadi
+  bernada.
 - Perbaikan umum: parameter berkurva log yang bisa 0 (Map Speed, 0 = peta berhenti) memakai kurva kubik (sebelumnya knob NaN).
 - Tes `tools/harmor-ui-test.mjs` (24 cek, masuk `run-tests`): Pixel 7 landscape + portrait — 10 bagian tampil, tidak meluber ke samping,
   muat tanpa scroll, display ≥ 40 px, tanpa error; knob geser 0,70 → 1,00 dan ketuk 2× kembali 0,70; devOut 998 saat akor: 2 voice,

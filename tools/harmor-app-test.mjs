@@ -30,6 +30,8 @@ const r = await page.evaluate(async () => {
   const ra = await H.harmorLoadAudio(0, '/Samples/saw.wav', { quality: 1 });
   rr = await eng.renderTrack(0, 1); const lv = [1, 2, 3, 6].map((k) => bin(rr.l, 220 * k, Math.round(sr * 0.3), 8192));
   out.audio = { ok: ra.ok, report: ra.report, lv, slotA: P.state.tracks[0].inst.params[1061], hm: P.state.tracks[0].inst.hm && P.state.tracks[0].inst.hm.src };
+  // the resynthesis plays at the file's level: Map Level 4x is set on load, at Volume 100 % (Sustain 100 %) partial 1 = the file's 0.300
+  { const v0 = P.state.tracks[0].inst.params[0], s0 = P.state.tracks[0].inst.params[42]; P.setInstParam(0, 0, 1); P.setInstParam(0, 42, 1); const rv = await eng.renderTrack(0, 1); out.unity = { mapLevel: P.state.tracks[0].inst.params[1075], p1: bin(rv.l, 220, Math.round(sr * 0.3), 8192) }; P.setInstParam(0, 0, v0 ?? 0.7); P.setInstParam(0, 42, s0 ?? 0.8); }
   // save and open again: the map is restored (cache) and renders the same
   const txt = P.serialize(); const t0 = performance.now(); await P.deserialize(txt); const tOpen = performance.now() - t0;
   rr = await eng.renderTrack(0, 1); const lv2 = [1, 2, 3, 6].map((k) => bin(rr.l, 220 * k, Math.round(sr * 0.3), 8192));
@@ -38,6 +40,7 @@ const r = await page.evaluate(async () => {
 });
 ok(r.image.ok && r.image.p6 > 20 * r.image.p1, `image synthesis in the app: the picture's line plays partial 6 (${(20 * Math.log10(r.image.p6 / r.image.p1)).toFixed(0)} dB over partial 1)`);
 const rel = r.audio.lv.map((a) => 20 * Math.log10(a / r.audio.lv[0]));
+ok(r.unity.mapLevel === 4 && Math.abs(20 * Math.log10(r.unity.p1 / 0.3)) < 1, `resynthesis at the file's level: Map Level ${r.unity.mapLevel}x on load, Volume 100 % -> partial 1 = ${r.unity.p1.toFixed(3)} (file 0.300, ${(20 * Math.log10(r.unity.p1 / 0.3)).toFixed(2)} dB)`);
 ok(r.audio.ok && r.audio.report && r.audio.report.pitched && Math.abs(r.audio.report.note - 57) < 0.1 && [0, -6.02, -9.54, -15.56].every((w, i) => Math.abs(rel[i] - w) < 0.6), `resynthesis in the app: note ${r.audio.report && r.audio.report.note.toFixed(2)}, harmonics ${rel.map((v) => v.toFixed(2)).join(' / ')} dB (0 / -6.02 / -9.54 / -15.56)`);
 ok(r.reopen.slotA >= 0 && r.reopen.lv2.every((a, i) => Math.abs(20 * Math.log10(a / r.audio.lv[i])) < 0.05), `saved and opened again: the map is back and sounds the same (opened in ${r.reopen.tOpen} ms)`);
 ok(!errs.length, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
