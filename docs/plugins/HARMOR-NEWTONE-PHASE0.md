@@ -159,6 +159,27 @@ Keputusan pemilik: loop suara real-time Harmor di C++ (pola Moisture); semua bag
   Formant pindah ke 1540 Hz); noise → peta log dengan kemiringan terjaga; di aplikasi: gambar, resintesis (nada 57,00), simpan + buka
   ulang identik (93 ms). Golden `inst-harmor` + peta: desktop vs WASM −205 dBFS.
 
+### Phase 6 (Harmor) — tampilan plugin: selesai (tes lulus)
+- **Jendela** (`js/harmor/view.js`, `VI[38]` di `js/fxkit.js`): jendela mengambang besar, gaya Live 12 (charcoal, aksen oranye, knob
+  cincin, garis tipis), gambar buatan MobileDAW sendiri.
+- **Satu baris tab, satu bagian sekali tampil**: TIMBRE · PITCH · FILTER · UNISON · MOD | ENV · HARM · IMG · FX · ADV. Bagian mengisi
+  tinggi jendela, display (partial, respons filter, unison, envelope, harmonik, peta) mengambil sisa tinggi. Di HP landscape (tinggi
+  layout 534 px) semua 10 bagian **muat tanpa scroll, tidak terpotong di bawah** (revisi atas laporan pemilik: versi pertama menumpuk
+  halaman + editor setinggi ~980 px sehingga terpotong). Tab bergeser ke samping bila jendela sempit.
+- **Kontrol sentuh**: knob geser naik/turun, ketuk 2× = default, tekan lama = automation; editor envelope multi-titik (ketuk = titik baru,
+  geser titik/garis, ketuk 2× = hapus, cubit = zoom, Sustain/Loop/AHDSR); editor harmonik (gambar level/fase per partial, preset 1/k,
+  Ganjil, Organ, Bel, Reset) → tabel timbre di slot bank sample (`harmorSetTable`, ikut tersimpan di proyek); peta gambar geser = pan,
+  cubit = zoom; rak FX dengan LED, Mix, ▲▼ urutan, ketuk nama = knob device.
+- **Data langsung dari engine**: `devOut(track, 998)` → `Instrument::readOut` (C++ dan JS): puncak L/R, jumlah voice, f0 dan level partial
+  voice terbaru → meter + display PARTIAL.
+- Jendela: saat layar berubah (rotasi, layar penuh) seluruh jendela ditarik kembali ke dalam layar, bukan hanya title bar.
+- Perbaikan umum: parameter berkurva log yang bisa 0 (Map Speed, 0 = peta berhenti) memakai kurva kubik (sebelumnya knob NaN).
+- Tes `tools/harmor-ui-test.mjs` (24 cek, masuk `run-tests`): Pixel 7 landscape + portrait — 10 bagian tampil, tidak meluber ke samping,
+  muat tanpa scroll, display ≥ 40 px, tanpa error; knob geser 0,70 → 1,00 dan ketuk 2× kembali 0,70; devOut 998 saat akor: 2 voice,
+  f0 329,6 Hz, 62 partial, meter + partial tergambar; MSEG ketuk menambah titik (AHDSR → 6 titik), geser menaikkan level, ketuk 2×
+  menghapus; goresan harmonik → partial 1 −27,7 dB, preset Ganjil → partial 2 −6,0 → −112,5 dB, partial 3 −9,5 dB (1/3 tepat); simpan +
+  buka ulang identik (≤ 0,03 dB); urutan FX Distortion, Chorus → Chorus, Distortion. Golden 134 skenario identik.
+
 ## 5. Referensi dari pemilik (untuk fase berikutnya)
 
 ### Tampilan Harmor (screenshot Harmor di Live 12) — acuan Phase 6, disederhanakan untuk HP, tidak ditiru

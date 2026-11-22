@@ -258,7 +258,8 @@ export function titleOf(id) { const w = wins.get(id); return w ? w.titleEl.textC
 export function initFloat() {
   ensureLayer();
   window.addEventListener('applayout', () => { for (const w of wins.values()) { keepInside(w); layout(w); } });
-  window.addEventListener('resize', () => { for (const w of wins.values()) { keepInside(w); layout(w); } });
+  // the screen changed (rotation, fullscreen, keyboard): the whole window back on screen, not only its title bar (nothing cut off at the bottom)
+  window.addEventListener('resize', () => { const A = area(); for (const w of wins.values()) { keepInside(w); if (!w.s.max && w.s.y + w.s.h > A.h) w.s.y = Math.max(0, A.h - w.s.h); layout(w); } });
   document.addEventListener('keydown', (e) => {                                  // Esc closes the front window (desktop keyboard)
     if (e.key !== 'Escape' || !wins.size || e.target.closest && e.target.closest('input,textarea')) return;
     let top = null; for (const w of wins.values()) if (!w.s.min && (!top || +w.el.style.zIndex > +top.el.style.zIndex)) top = w;

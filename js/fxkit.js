@@ -22,6 +22,7 @@ import { WT_CATS, WT_LIST, WT_COUNT, WT_N_FRAMES, wtTable, wtCatOf } from './eng
 import { offerAutomation } from './automate.js';
 import { Biquad } from './engine/dsp.js';
 import { addFlmPanels, addMoisturePanel } from './flmpanels.js';
+import { harmorView } from './harmor/view.js';
 import { moistureView } from './moistview.js';
 import { eng, MASTER, RET0 } from './engine.js';
 import * as P from './project.js';
@@ -1514,7 +1515,7 @@ export function instKitView(i, t, every) {
   const d = { id: 'in' + t.id, type: t.inst.type, params: new Proxy({}, { get: (_, kk) => t.inst.params[kk] ?? (def.params[kk] ? def.params[kk].def : undefined) }) };
   const ctx = { i, di: -1, d, def, every, setParam: (kk, v) => P.setInstParam(i, +kk, v),
     autoFn: (kk) => (rect) => offerAutomation(rect, { kind: 5, strip: P.stripOf(i), param: +kk, def: def.params[kk] }, `${t.name} • ${def.params[kk].n}`) };
-  const k = kit(ctx), el = VI[t.inst.type](k); if (!el.classList.contains('m2x')) el.classList.add('lk', 'lk-inst'); if (DENSE_INST.has(t.inst.type) && !el.classList.contains('m2x')) el.classList.add('lk-dense'); return { el, draw: k.redraw };
+  const k = kit(ctx), el = VI[t.inst.type](k), own = el.classList.contains('m2x') || el.classList.contains('hm'); if (!own) el.classList.add('lk', 'lk-inst'); if (DENSE_INST.has(t.inst.type) && !own) el.classList.add('lk-dense'); return { el, draw: k.redraw };   // own plug-in windows (Moisture, Harmor) keep their look
 }
 
 // ---- shared pieces for the Live 12 layouts: Sync / Time switch (orange "Sync" when synced, cyan "Time" when free), icon choices, checkbox
@@ -2030,3 +2031,4 @@ export function padChainView(i, k, every) {
 // DirectWave / GMS / MiniSynth / SuperSaw panels: js/flmpanels.js (tabs as in FLM, Live 12 sections, displays that fill the card)
 addFlmPanels(VI);
 addMoisturePanel(VI); VI[37] = moistureView;   // Moisture (37): its own plug-in window (js/moistview.js)
+VI[38] = harmorView;   // Harmor (38): its own plug-in window (js/harmor/view.js)

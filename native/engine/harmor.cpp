@@ -93,7 +93,7 @@ struct Voice {
   float X[NX], Y[NX], u[NX], e1x[NX], e1y[NX], e2x[NX], e2y[NX];
   float soC = 1, soS = 0, soX = 0;                    // self-oscillation: a sine at the filter 1 resonance
   float XR[NX], YR[NX], ldm[NX], emx[NX], emy[NX];   // map: right-channel coefficients (stereo map), log2 frequency deviation, phase vectors
-  bool devPrev = false, stPrev = false;
+  bool devPrev = false, stPrev = false; float lastEnv = 0;           // the envelope at the end of the last step (display)
 };
 
 class Harmor : public Instrument {
@@ -165,6 +165,16 @@ class Harmor : public Instrument {
   void allOff() override { nHeld = 0; for (int k = 0; k < HM_POLY; k++) { Voice& v = voices[k]; v.pPitch = -1; if (v.on) release(v); } }
   bool active() override { for (int k = 0; k < HM_POLY; k++) if (voices[k].on) return true; return fxOn() && tail > 0; }   // the effects' tail keeps it running
   int voicesOn() override { int n = 0; for (int k = 0; k < HM_POLY; k++) if (voices[k].on) n++; return n; }
+  // display data (devOut 998): peak left / right since the last read, voices sounding, the newest voice's fundamental (Hz), its partial
+  // count K, then K partial levels (coefficient magnitude x its envelope)
+  int readOut(float* out) override {
+    out[0] = pkL; out[1] = pkR; pkL = pkR = 0;
+    const Voice* nv = nullptr; int on = 0; for (int k = 0; k < HM_POLY; k++) if (voices[k].on) { on++; if (!nv || voices[k].age > nv->age) nv = &voices[k]; }
+    out[2] = (float)on; out[3] = nv ? (float)(nv->fcur * nv->bend) : 0;
+    const int K = nv ? std::min(256, nv->n) : 0; out[4] = (float)K;
+    for (int k = 0; k < K; k++) out[5 + k] = (float)(std::sqrt((double)nv->X[k] * nv->X[k] + (double)nv->Y[k] * nv->Y[k]) * nv->lastEnv);
+    return 5 + K;
+  }
   bool canBend() override { return true; }
   void bendSounding(double r) override { for (int k = 0; k < HM_POLY; k++) if (voices[k].on) voices[k].bend *= r; }
   void bendNewest(double r) override { for (int k = 0; k < HM_POLY; k++) if (voices[k].on && voices[k].age == counter) voices[k].bend *= r; }
@@ -191,7 +201,7 @@ class Harmor : public Instrument {
         float pk = 0; for (int i = 0; i < m; i++) pk = std::max(pk, std::max(std::fabs(fL[i]), std::fabs(fR[i])));
         if (pk > 1e-5f || voicesOn()) tail = (int)(sr * 0.5); else tail -= m;
       }
-      for (int i = 0; i < m; i++) { L[at + i] += soft(fL[i]); R[at + i] += soft(fR[i]); }
+      for (int i = 0; i < m; i++) { const float l = soft(fL[i]), r = soft(fR[i]); L[at + i] += l; R[at + i] += r; pkL = std::max(pkL, std::fabs(l)); pkR = std::max(pkR, std::fabs(r)); }
       at += m;
     }
   }
@@ -199,7 +209,7 @@ class Harmor : public Instrument {
  private:
   double sr, bpm = 120; Bank* bank; double p[HM_PARAMS]; Voice* voices = nullptr; Timbre tb[2]; AdsrP ap; uint32_t counter = 0, seed = 0x9e3779b9u;
   float l2k[NX];
-  float buf[HM_UNI][SUB], fL[128], fR[128], dL[128], dR[128];
+  float buf[HM_UNI][SUB], fL[128], fR[128], dL[128], dR[128], pkL = 0, pkR = 0;
   Device* fx[HM_FX_N] = {}; int order[HM_FX_N] = { 0, 1, 2, 3, 4, 5, 6 }; int tail = 0; double sphPh = 0;
   bool fxOn() const { for (int k = 0; k < HM_FX_N; k++) if (fx[k] && p[HM_FX + HM_FX_STRIDE * k] > 0.5) return true; return false; }
   // the slots' effects in order; a repeated or missing effect: the first use counts, the rest follow in their own order
@@ -613,7 +623,7 @@ class Harmor : public Instrument {
       }
       L[i] += (float)(l * e * pl); R[i] += (float)(r * e * pr);
     }
-    v.volPrev = vEnd;
+    v.volPrev = vEnd; v.lastEnv = (float)((menv ? vEnd : v.env.v) * gain / 0.25);
     if (menv) { if (v.es[HM_E_VOL].done && (!v.held || v.es[HM_E_VOL].val <= 0) && vEnd <= 1e-5 && v.fade == 0) v.on = false; }
     else if (v.env.st == 0 && v.fade == 0) v.on = false;
   }

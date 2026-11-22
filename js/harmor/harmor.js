@@ -80,8 +80,31 @@ export function harmorClearMap(i) {
 }
 // a project opening: the map of a Harmor track is made again (or read from the cache)
 export async function restoreHarmorMap(t) {
+  await restoreHarmorTables(t);
   const i = P.state.tracks.indexOf(t); if (i < 0 || !t.inst || !t.inst.hm) return { ok: true };
   const h = t.inst.hm;
   try { return h.src === 'image' ? await harmorLoadImage(i, h.path, h.opts || {}) : await harmorLoadAudio(i, h.path, h.opts || {}); }
   catch (e) { return { error: (e && e.message) || String(e) }; }
+}
+
+// ---- drawn harmonic tables (the HARM editor): level and phase (0..1 of a cycle) of partials 1..516 of timbre tt, into a sample-bank slot
+// of their own (left = level, right = phase) and the timbre's table parameter (13 / 23); kept in the project as plain numbers
+const tslots = new Map();                              // track id -> [slot timbre A, slot timbre B]
+export async function harmorSetTable(i, tt, lv, ph) {
+  const t = harmorTrack(i); if (!t) return { error: 'Pilih track Harmor dulu.' };
+  const j = HM.T * (tt + 1) + 3;
+  if (!lv) { P.setInstParamQuiet(i, j, -1); if (t.inst.hmT) t.inst.hmT[tt] = null; return { ok: true }; }
+  let ids = tslots.get(t.id); if (!ids) { ids = [-1, -1]; tslots.set(t.id, ids); }
+  if (ids[tt] < 0) { ids[tt] = P.allocSampleSlot(); if (ids[tt] < 0) return { error: 'Slot sample penuh (256).' }; }
+  const L = Float32Array.from(lv), R = Float32Array.from(ph || new Float32Array(L.length));
+  const r = await eng.putSampleBuffers(ids[tt], L, R); if (!r || r.error) return { error: (r && r.error) || 'Engine tidak bisa memuat tabel.' };
+  const k = P.state.tracks.indexOf(t); if (k < 0) return { ok: true };
+  P.setInstParamQuiet(k, j, ids[tt]);
+  const q = (a) => Array.from(a, (x) => Math.round(x * 1e4) / 1e4);
+  t.inst.hmT = t.inst.hmT || [null, null]; t.inst.hmT[tt] = { lv: q(L), ph: q(R) };
+  return { ok: true };
+}
+export async function restoreHarmorTables(t) {
+  const i = P.state.tracks.indexOf(t); if (i < 0 || !t.inst || !t.inst.hmT) return;
+  for (let tt = 0; tt < 2; tt++) { const x = t.inst.hmT[tt]; if (x && x.lv) await harmorSetTable(i, tt, x.lv, x.ph); }
 }

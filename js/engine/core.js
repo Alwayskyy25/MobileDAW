@@ -275,6 +275,7 @@ export class Engine {
 
   // ---------------------------------------------------------------- readouts
   devOut(t, d, out) {
+    if (d === 998) { const r = this.ok(t) && this.s[t].inst; return r && r.readOut && !r.irack ? r.readOut(out) : 0; }   // an instrument's own display data
     if (d === 999 || d >= 2000) { const r = this.ok(t) && this.s[t].inst; if (!r || !r.irack) return 0; if (d === 999) return r.readOut(out); const x = r.sub(((d - 2000) >> 4) & 15, (d - 2000) & 15); return x ? x.readOut(out) : 0; }   // Instrument Rack: 999 = chain meters, 2000 + chain * 16 + j = an effect inside
     if (d >= 1000 && this.ok(t)) { const q = d - 1000, r = this.s[t].dev[q >> 8], x = r && r.rack && r.sub((q >> 4) & 15, q & 15); return x ? x.readOut(out) : 0; }   // a device inside a rack: 1000 + rack index * 256 + chain * 16 + index
     return this.ok(t) && this.s[t].dev[d] ? this.s[t].dev[d].readOut(out) : 0;

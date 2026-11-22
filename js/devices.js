@@ -246,11 +246,11 @@ export function openDeviceWindow(devId) {
 export function openInstWindow(trackId) {
   const idx = () => state.tracks.findIndex((x) => x.id === trackId);
   const i0 = idx(); if (i0 < 0 || !state.tracks[i0].inst) return;
-  FW.openFloat({ id: 'i:' + trackId, title: INSTRUMENTS[state.tracks[i0].inst.type].name + ' \u2022 ' + state.tracks[i0].name, sub: state.tracks[i0].name, mergeHead: true, color: '#ffa722', fit: true, ...(state.tracks[i0].inst.type === 37 ? { w: 1040, h: 660, color: '#38c8ff' } : {}),
+  FW.openFloat({ id: 'i:' + trackId, title: INSTRUMENTS[state.tracks[i0].inst.type].name + ' \u2022 ' + state.tracks[i0].name, sub: state.tracks[i0].name, mergeHead: true, color: '#ffa722', fit: true, ...(state.tracks[i0].inst.type === 37 ? { w: 1040, h: 660, color: '#38c8ff' } : state.tracks[i0].inst.type === 38 ? { w: 900, h: 720, fit: false } : {}),   // Harmor: a big window (the window manager keeps it inside the screen)
     build(api) {
       const i = idx(); if (i < 0 || !state.tracks[i].inst) return null;
       const t = state.tracks[i]; api.setTitle(INSTRUMENTS[t.inst.type].name + ' \u2022 ' + t.name, t.name);
-      return instCard(i, t, { floating: true });
+      return instCard(i, t, { floating: true, every: api.every });   // the window's own timers (displays / meters run while it is open)
     } });
 }
 

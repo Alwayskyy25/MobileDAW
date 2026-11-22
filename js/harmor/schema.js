@@ -99,5 +99,5 @@ export function harmorDef(DEVICES) {
   at(HM.MAP_FDEV, q('Freq Dev', 0, 1, 1, { unit: '%' })); at(HM.MAP_LEVEL, q('Map Level', 0, 4, 1, { unit: 'x' })); at(HM.MAP_SHIFT, q('Map Shift', -48, 48, 0, { unit: 'st' }));
   at(HM.MAP_PHASE, onoff('Map Phase', 1));
   for (const e of [8, 9]) { const b = HM.ENV + HM.ENV_STRIDE * e; for (const k of [0, 1, 5, 6, 7, 8, 9]) delete P[b + k].hidden; }   // Image Freq / Image Gain articulators now live
-  return { name: 'Harmor', full: true, native: true, schema: HM_SCHEMA, params: P };
+  return { name: 'Harmor', view: 'kit', full: true, native: true, floatOnly: true, big: true, schema: HM_SCHEMA, params: P };   // its own plug-in window (js/harmor/view.js)
 }

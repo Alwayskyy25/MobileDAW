@@ -756,10 +756,12 @@ export const NO_WET_FX = new Set([48, 49, 50]);   // modulators (LFO / Shaper / 
 export const WET_PARAMS = { mix: { n: 'Mix', min: 0, max: 1, def: 1, unit: '%' }, gain: { n: 'Gain', min: WET_GAIN_MIN, max: WET_GAIN_MAX, def: 0, unit: 'dB' } };
 
 // Parameter <-> 0..1 mapping shared by knobs, automation editing and the engine sync.
-export const normOf = (p, v) => { const x = p.curve === 'log' ? Math.log(v / p.min) / Math.log(p.max / p.min) : (v - p.min) / (p.max - p.min); return x < 0 ? 0 : x > 1 ? 1 : x; };
+// a 'log' parameter that reaches 0 (e.g. Harmor Map Speed: 0 = frozen) cannot be logarithmic: a cubic law instead (fine near 0, wide on top)
+const zlog = (p) => p.curve === 'log' && !(p.min > 0);
+export const normOf = (p, v) => { const x = zlog(p) ? Math.cbrt(Math.max(0, (v - p.min) / (p.max - p.min))) : p.curve === 'log' ? Math.log(v / p.min) / Math.log(p.max / p.min) : (v - p.min) / (p.max - p.min); return x < 0 ? 0 : x > 1 ? 1 : x; };
 export function valOf(p, x) {
   x = x < 0 ? 0 : x > 1 ? 1 : x;
-  let v = p.curve === 'log' ? p.min * Math.pow(p.max / p.min, x) : p.min + x * (p.max - p.min);
+  let v = zlog(p) ? p.min + (p.max - p.min) * x * x * x : p.curve === 'log' ? p.min * Math.pow(p.max / p.min, x) : p.min + x * (p.max - p.min);
   if (p.step) v = Math.round(v / p.step) * p.step;
   return Math.min(p.max, Math.max(p.min, v));
 }
