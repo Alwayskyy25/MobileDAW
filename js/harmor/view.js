@@ -335,7 +335,7 @@ export function harmorView(k) {
       h('div', { class: 'hm-chips' }, h('span', { class: 'hm-lab' }, 'Kualitas'), ...HM_QUALITY.map((n, q) => h('button', { class: 'hm-chip' + ((st.resQ ?? 1) === q ? ' on' : ''), onclick: () => { st.resQ = q; show(); } }, n)))),
       h('div', { class: 'hm-report' }, rp ? (rp.pitched ? `Nada ${noteName(Math.round(rp.note))} (${rp.hz.toFixed(1)} Hz) • ${rp.partials} partial • ${Math.round(rp.voiced * 100)} % bernada • ${rp.frames} frame` : `Tanpa nada: ${rp.why} — peta spektrum frekuensi`) : 'Audio vokal / instrumen bernada tunggal paling akurat.'),
       row(tog(HM.MAP_FORMANT, 'Formant'), knob(HM.MAP_FDEV, 'Freq Dev'), tog(HM.MAP_PHASE, 'Fase'))), { cls: 'res' });
-    const common = panel('PETA', row(knob(HM.MAP_MIX, 'Mix'), knob(HM.MAP_LEVEL, 'Level'), knob(HM.MAP_SHIFT, 'Shift'), knob(HM.MAP_SPEED, 'Speed'), knob(HM.MAP_START, 'Start'), tog(HM.MAP_LOOP, 'Loop'), tog(HM.MAP_INTERP, 'Interp'),
+    const common = panel('PETA', row(knob(HM.MAP_MIX, 'Mix'), knob(HM.MAP_LEVEL, 'Level'), knob(HM.MAP_SHIFT, 'Shift'), knob(HM.MAP_SPEED, 'Speed'), knob(HM.MAP_NOISE, 'Noise'), knob(HM.MAP_START, 'Start'), tog(HM.MAP_LOOP, 'Loop'), tog(HM.MAP_INTERP, 'Interp'),
       h('button', { class: 'hm-btn sm', onclick: async () => { (await H()).harmorClearMap(i()); show(); } }, 'Hapus')), { cls: 'wide' });
     return [map, h('div', { class: 'hm-grid g-2' }, imgP, resP), common];
   };

@@ -94,6 +94,7 @@ struct Voice {
   float soC = 1, soS = 0, soX = 0;                    // self-oscillation: a sine at the filter 1 resonance
   float XR[NX], YR[NX], ldm[NX], emx[NX], emy[NX];   // map: right-channel coefficients (stereo map), log2 frequency deviation, phase vectors
   bool devPrev = false, stPrev = false; float lastEnv = 0;           // the envelope at the end of the last step (display)
+  float nz[HM_NB_MAX][4] = {}, nzS[HM_NB_MAX][4] = {}, ngL[HM_NB_MAX] = {}, ngR[HM_NB_MAX] = {}; uint32_t nr[HM_NB_MAX][2] = {};   // per band: its own noise (mid, side)   // noise layer: band filter states, gains, generator
 };
 
 class Harmor : public Instrument {
@@ -110,7 +111,7 @@ class Harmor : public Instrument {
     for (int e = 0; e < HM_ENVS; e++) { int b0 = HM_ENV + HM_ENV_STRIDE * e; p[b0 + 1] = e == HM_E_VOL ? 1 : 0.5; p[b0 + 3] = -1; p[b0 + 4] = -1; p[b0 + 5] = 0.01; p[b0 + 7] = 0.4; p[b0 + 8] = e == HM_E_VOL ? 0.8 : 0; p[b0 + 9] = 0.3; }
     for (int k = 0; k < HM_MAXP; k++) l2k[k] = (float)std::log2((double)(k + 1));
     l2k[HM_MAXP] = -1; l2k[HM_MAXP + 1] = -2;
-    p[HM_MAP_A] = p[HM_MAP_B] = -1; p[HM_MAP_SPEED] = 1; p[HM_MAP_LOOP] = 1; p[HM_MAP_INTERP] = 1; p[HM_MAP_FDEV] = 1; p[HM_MAP_LEVEL] = 1; p[HM_MAP_PHASE] = 1;
+    p[HM_MAP_A] = p[HM_MAP_B] = p[HM_MAP_N] = p[HM_MAP_W] = -1; p[HM_MAP_NOISE] = 1; p[HM_MAP_SPEED] = 1; p[HM_MAP_LOOP] = 1; p[HM_MAP_INTERP] = 1; p[HM_MAP_FDEV] = 1; p[HM_MAP_LEVEL] = 1; p[HM_MAP_PHASE] = 1;
     p[HM_PLUCK_TIME] = 1; p[HM_PLUCK_DAMP] = 0.5; p[HM_SPH_DENS] = 1; p[HM_SPH_SPEED] = 0.2; p[HM_SPH_SHARP] = 0.5;
     for (int k = 0; k < HM_FX_N; k++) { p[HM_FX_ORDER + k] = k; p[HM_FX + HM_FX_STRIDE * k + 1] = 1; fx[k] = makeDevice(HM_FX_TYPES[k], sr, nullptr); }
     upOrder();
@@ -135,6 +136,8 @@ class Harmor : public Instrument {
       case HM_T_PRND: case HM_T_PRND + 10: for (int k = 0; k < HM_POLY; k++) voices[k].dirty = true; break;
       case HM_ATT: case HM_DEC: case HM_SUS: case HM_REL: upEnv(); break;
       case HM_MAP_A: case HM_MAP_B: loadMap(i == HM_MAP_A ? 0 : 1, (int)v); break;
+      case HM_MAP_N: loadNoise((int)v); break;
+      case HM_MAP_W: loadWave((int)v); break;
       case HM_MAP_PHASE: for (int k = 0; k < HM_POLY; k++) voices[k].dirty = true; break;
       default:
         if (i >= HM_F_ON && i < HM_F_ON + 20) { int f = (i - HM_F_ON) / 10, k = (i - HM_F_ON) % 10; if (k == 9) loadFilterTable(f, (int)v); else if (k == 1 || k == 3 || k == 4 || k == 5 || k == 6) buildFilter(f); }
@@ -233,6 +236,62 @@ class Harmor : public Instrument {
   EnvDef ed[HM_ENVS];
   struct Map { int frames = 0, bins = 0, layout = 0; double hop = 0.01, base = 0, flo = 20, fhi = 20000; std::vector<float> aL, aR, dev, ph; bool stereo = false, hasDev = false, hasPh = false; } mp;
   float bufR[HM_UNI][SUB];
+  // the residual noise map (slot N) and its band-pass bank: band j = two equal biquads centred in the band (geometric centre), each with
+  // the band's width in octaves; nPg = 1 / sqrt(the cascade's power gain for unit white noise), measured once, so a band plays the RMS
+  // the analysis measured
+  struct NMap { int frames = 0, bands = 0; double hop = 0.01, flo = 40, fhi = 20000; std::vector<float> aL, aR; bool stereo = false, ms = false; } nm;
+  float nb0[HM_NB_MAX] = {}, na1[HM_NB_MAX] = {}, na2[HM_NB_MAX] = {}, nPg[HM_NB_MAX] = {}; bool nOn[HM_NB_MAX] = {};
+  struct WMap { int n = 0; double sr = 48000; std::vector<float> l, r; } wv;
+  void loadWave(int id) {
+    const Sample* s = id >= 0 && id < 256 && bank ? bank->s[id] : nullptr;
+    wv.n = 0; wv.l.clear(); wv.r.clear();
+    if (!s || s->frames < HM_MAP_HDR || std::fabs(s->l[0] - HM_MAP_MAGIC) > 1e-3 || std::lround(s->l[4]) != HM_MAP_WAVE) return;
+    const int n = (int)std::lround(s->l[1]); if (n < 1 || (long)n + HM_MAP_HDR > s->frames) return;
+    wv.n = n; wv.sr = std::max(1000.0, (double)s->l[3]); wv.l.assign(s->l + HM_MAP_HDR, s->l + HM_MAP_HDR + n);
+    if (s->r && s->r != s->l) wv.r.assign(s->r + HM_MAP_HDR, s->r + HM_MAP_HDR + n);
+  }
+  void loadNoise(int id) {
+    const Sample* s = id >= 0 && id < 256 && bank ? bank->s[id] : nullptr;
+    nm.frames = 0; nm.aL.clear(); nm.aR.clear();
+    if (!s || s->frames < HM_MAP_HDR || std::fabs(s->l[0] - HM_MAP_MAGIC) > 1e-3 || std::lround(s->l[4]) != HM_MAP_NOISEB) return;
+    const int fr = (int)std::lround(s->l[1]), bn = (int)std::lround(s->l[2]);
+    if (fr < 1 || fr > 8192 || bn < 1 || bn > HM_NB_MAX || (long)fr * bn + HM_MAP_HDR > s->frames) return;
+    nm.frames = fr; nm.bands = bn; nm.hop = std::max(1e-4, (double)s->l[3]); nm.flo = std::max(1.0, (double)s->l[6]); nm.fhi = std::max(nm.flo * 1.01, (double)s->l[7]);
+    const size_t n = (size_t)fr * bn; nm.aL.assign(s->l + HM_MAP_HDR, s->l + HM_MAP_HDR + n);
+    nm.stereo = s->r && s->r != s->l; if (nm.stereo) nm.aR.assign(s->r + HM_MAP_HDR, s->r + HM_MAP_HDR + n); nm.ms = std::lround(s->l[5]) == 1;
+    const double lo = std::log2(nm.flo), w = (std::log2(nm.fhi) - lo) / bn;
+    for (int j = 0; j < bn; j++) {
+      const double fc = std::pow(2.0, lo + (j + 0.5) * w); nOn[j] = fc < 0.45 * sr; if (!nOn[j]) continue;
+      const double w0 = TAU * fc / sr, q = 1.0 / (2 * std::sinh(std::log(2.0) / 2 * w * 1.55)), al = std::sin(w0) / (2 * q), a0 = 1 + al;   // 1.55: two sections narrow the band
+      nb0[j] = (float)(al / a0); na1[j] = (float)(-2 * std::cos(w0) / a0); na2[j] = (float)((1 - al) / a0);
+      double pg = 0; const int G = 2048;                  // power gain of the cascade for white noise: mean |H|^4 over 0..pi
+      for (int g = 0; g < G; g++) { const double om = PI * (g + 0.5) / G, c1 = std::cos(om), s1 = std::sin(om), c2 = std::cos(2 * om), s2 = std::sin(2 * om);
+        const double nr = nb0[j] * (1 - c2), ni = nb0[j] * s2, dr = 1 + na1[j] * c1 + na2[j] * c2, di = -(na1[j] * s1 + na2[j] * s2), h2 = (nr * nr + ni * ni) / (dr * dr + di * di); pg += h2 * h2; }
+      pg /= G; nPg[j] = (float)(1.0 / std::sqrt(std::max(1e-12, pg)));
+    }
+    // the bands overlap: noise through band j also lands in its neighbours. M[i][j] = the power that unit white noise through band j puts
+    // into band i (exact responses of the cascades); each frame's band gains g^2 solve M g^2 = the measured band powers (non-negative,
+    // projected Gauss-Seidel), so the played noise has the analysed spectrum. Done once here: the map then holds the gains.
+    // (every band has its OWN noise source: the bands' powers add; one shared source would make neighbours cancel at the crossovers)
+    std::vector<double> M((size_t)bn * bn, 0.0);
+    { const int G = 4096; const double lw0 = std::log2(nm.flo), lwt = std::log2(nm.fhi);
+      for (int g = 0; g < G; g++) {                       // a log-spaced grid (the low bands are narrow), weight = d(omega) / pi
+        const double hz = std::pow(2.0, lw0 + (g + 0.5) / G * (lwt - lw0)), om = TAU * hz / sr, wt = om * std::log(2.0) * (lwt - lw0) / G / PI; if (om >= PI) continue;
+        const int i = std::min(bn - 1, (int)((std::log2(hz) - lw0) / (lwt - lw0) * bn)); const double c1 = std::cos(om), s1 = std::sin(om), c2 = std::cos(2 * om), s2 = std::sin(2 * om);
+        for (int j = 0; j < bn; j++) { if (!nOn[j]) continue; const double nr = nb0[j] * (1 - c2), ni = nb0[j] * s2, dr = 1 + na1[j] * c1 + na2[j] * c2, di = -(na1[j] * s1 + na2[j] * s2), h2 = (nr * nr + ni * ni) / (dr * dr + di * di);
+          M[(size_t)i * bn + j] += h2 * h2 * wt; } } }
+    auto solve = [&](float* row) {                       // row: band RMS in -> gain on unit noise out
+      double t[HM_NB_MAX], x[HM_NB_MAX];
+      for (int j = 0; j < bn; j++) { t[j] = (double)row[j] * row[j]; const double d = M[(size_t)j * bn + j]; x[j] = nOn[j] && d > 1e-15 ? t[j] / d : 0; }
+      for (int it = 0; it < 12; it++) for (int i = 0; i < bn; i++) { if (!nOn[i]) continue; const double d = M[(size_t)i * bn + i]; if (d <= 1e-15) continue;
+        double r = t[i]; for (int j = 0; j < bn; j++) if (j != i) r -= M[(size_t)i * bn + j] * x[j]; x[i] = std::max(0.0, r / d); }
+      for (int j = 0; j < bn; j++) row[j] = (float)std::sqrt(std::max(0.0, x[j]));
+    };
+    for (int f = 0; f < fr; f++) { solve(nm.aL.data() + (size_t)f * bn); if (nm.stereo) solve(nm.aR.data() + (size_t)f * bn); }
+    for (int j = 0; j < bn; j++) nPg[j] = 1.f;            // the solved gains already include each band's own power gain
+    for (int k = 0; k < HM_POLY; k++) { std::memset(voices[k].nz, 0, sizeof(voices[k].nz)); std::memset(voices[k].nzS, 0, sizeof(voices[k].nzS));
+      for (int j = 0; j < HM_NB_MAX; j++) { voices[k].nr[j][0] = 0x12345u + 0x9e3779b9u * (uint32_t)(j + 64 * k) | 1u; voices[k].nr[j][1] = 0xabcdefu + 0x7f4a7c15u * (uint32_t)(j + 64 * k) | 1u; } }
+  }
   // slot A (amplitude) / B (deviation, phase): copied out of the bank, as the bank's sample can be replaced at any time
   bool mapHeader(const Sample* s, int& fr, int& bn) const {
     if (!s || s->frames < HM_MAP_HDR || std::fabs(s->l[0] - HM_MAP_MAGIC) > 1e-3) return false;
@@ -605,6 +664,59 @@ class Harmor : public Instrument {
         for (int i = 0; i < m; i++) { so[i] = s * x; const float c2 = c * cr - s * sn; s = s * cr + c * sn; c = c2; x += dx; }
         const float g2 = 1.5f - 0.5f * (c * c + s * s); v.soC = c * g2; v.soS = s * g2; v.soX = (float)tgt;
       } }
+    // the resynthesis residual: one noise source through the band bank, each band's gain ramping to the noise map at this step's map time
+    float nzL[SUB], nzR[SUB]; bool nzOn = false;
+    const bool wvOn = mapOn && wv.n > 0 && p[HM_MAP_NOISE] > 0 && std::fabs(p[HM_MAP_SPEED] - 1) < 1e-3;
+    if (wvOn) {                                        // the residual waveform on the map's timeline (same start / loop as the map)
+      const float lev = (float)(std::max(0.0, p[HM_MAP_NOISE]) * mMix * mLev); const bool loop = p[HM_MAP_LOOP] > 0.5;
+      const double t0 = clampd(p[HM_MAP_START], 0, 1) * std::max(0, mp.frames - 1) * mp.hop + (v.t - dt), step = wv.sr / sr; double pos = t0 * wv.sr;
+      const float* wl = wv.l.data(); const float* wr = wv.r.empty() ? wl : wv.r.data();
+      for (int i = 0; i < m; i++, pos += step) {
+        double q = pos; if (loop) { q = std::fmod(q, (double)wv.n); if (q < 0) q += wv.n; } else if (q >= wv.n - 1 || q < 0) { nzL[i] = nzR[i] = 0; continue; }
+        const int a = (int)q, b = a + 1 < wv.n ? a + 1 : 0; const float fr = (float)(q - a);
+        nzL[i] = lev * (wl[a] + (wl[b] - wl[a]) * fr); nzR[i] = lev * (wr[a] + (wr[b] - wr[a]) * fr);
+      }
+      nzOn = true;
+    } else if (mapOn && nm.frames > 0 && p[HM_MAP_NOISE] > 0) {
+      const double tm = (v.t - dt) * clampd(p[HM_MAP_SPEED], 0, 16);
+      double fp = clampd(p[HM_MAP_START], 0, 1) * (nm.frames - 1) + tm / nm.hop;
+      const bool loop = p[HM_MAP_LOOP] > 0.5 && nm.frames > 1;
+      if (loop) fp = std::fmod(fp, (double)nm.frames); else fp = clampd(fp, 0, nm.frames - 1);
+      const int g0 = (int)fp, g1 = loop ? (g0 + 1) % nm.frames : std::min(g0 + 1, nm.frames - 1); const float gf = p[HM_MAP_INTERP] > 0.5 ? (float)(fp - g0) : 0.f;
+      const float lev = (float)(std::max(0.0, p[HM_MAP_NOISE]) * mMix * mLev), *rL0 = nm.aL.data() + (size_t)g0 * nm.bands, *rL1 = nm.aL.data() + (size_t)g1 * nm.bands;
+      const float *rR0 = nm.stereo ? nm.aR.data() + (size_t)g0 * nm.bands : rL0, *rR1 = nm.stereo ? nm.aR.data() + (size_t)g1 * nm.bands : rL1;
+      const bool ms = nm.ms && nm.stereo;               // mid / side map: two independent noises, L = M + S, R = M - S
+      constexpr float NS = 1.7320508f / 2147483648.f;     // xorshift32 -> uniform noise of unit variance
+      std::memset(nzL, 0, sizeof(float) * m); std::memset(nzR, 0, sizeof(float) * m);
+      for (int j = 0; j < nm.bands; j++) {
+        if (!nOn[j]) continue;
+        const float tL = lev * nPg[j] * (rL0[j] + (rL1[j] - rL0[j]) * gf), tR = lev * nPg[j] * (rR0[j] + (rR1[j] - rR0[j]) * gf);
+        float gL = v.fresh ? tL : v.ngL[j], gR = v.fresh ? tR : v.ngR[j]; v.ngL[j] = tL; v.ngR[j] = tR;
+        if (gL == 0 && tL == 0 && gR == 0 && tR == 0) continue;
+        const float dL = (tL - gL) * inv, dR = (tR - gR) * inv, b0 = nb0[j], a1 = na1[j], a2 = na2[j];
+        float z0 = v.nz[j][0], z1 = v.nz[j][1], z2 = v.nz[j][2], z3 = v.nz[j][3];
+        uint32_t r = v.nr[j][0], r2 = v.nr[j][1];
+        if (!ms) for (int i = 0; i < m; i++) {           // two band-pass sections (transposed direct form II, b1 = 0, b2 = -b0)
+          r ^= r << 13; r ^= r >> 17; r ^= r << 5;
+          const float x = (float)(int32_t)r * NS, y1 = b0 * x + z0; z0 = -a1 * y1 + z1; z1 = -b0 * x - a2 * y1;
+          const float y2 = b0 * y1 + z2; z2 = -a1 * y2 + z3; z3 = -b0 * y1 - a2 * y2;
+          nzL[i] += y2 * gL; nzR[i] += y2 * gR; gL += dL; gR += dR;
+        } else {                                         // gL = mid gain, gR = side gain
+          float s0 = v.nzS[j][0], s1 = v.nzS[j][1], s2 = v.nzS[j][2], s3 = v.nzS[j][3];
+          for (int i = 0; i < m; i++) {
+            r ^= r << 13; r ^= r >> 17; r ^= r << 5; r2 ^= r2 << 13; r2 ^= r2 >> 17; r2 ^= r2 << 5;
+            const float x = (float)(int32_t)r * NS, y1 = b0 * x + z0; z0 = -a1 * y1 + z1; z1 = -b0 * x - a2 * y1;
+            const float y2 = b0 * y1 + z2; z2 = -a1 * y2 + z3; z3 = -b0 * y1 - a2 * y2;
+            const float u = (float)(int32_t)r2 * NS, w1 = b0 * u + s0; s0 = -a1 * w1 + s1; s1 = -b0 * u - a2 * w1;
+            const float w2 = b0 * w1 + s2; s2 = -a1 * w2 + s3; s3 = -b0 * w1 - a2 * w2;
+            const float mm = y2 * gL, ss = w2 * gR; nzL[i] += mm + ss; nzR[i] += mm - ss; gL += dL; gR += dR;
+          }
+          v.nzS[j][0] = s0; v.nzS[j][1] = s1; v.nzS[j][2] = s2; v.nzS[j][3] = s3;
+        }
+        v.nz[j][0] = z0; v.nz[j][1] = z1; v.nz[j][2] = z2; v.nz[j][3] = z3; v.nr[j][0] = r; v.nr[j][1] = r2;
+      }
+      nzOn = true;
+    }
     v.n = last; v.fresh = false;
     // amplitude: volume articulator (or the ADSR), velocity, volume, tremolo; pan; a stolen voice fades out, then its pending note starts
     const double vs = clampd(p[HM_VELS], 0, 1), gain = 0.25 * std::max(0.0, p[HM_VOL]) * ((1 - vs) + vs * v.vel) * clampd(1 + lm[HM_LD_VOL], 0, 2);
@@ -617,6 +729,7 @@ class Harmor : public Instrument {
       if (!st) { for (int u = 0; u < v.nu; u++) { l += buf[u][i] * v.gl[u]; r += buf[u][i] * v.gr[u]; } if (v.nu == 1) { l = r = buf[0][i]; } }
       else { for (int u = 0; u < v.nu; u++) { l += buf[u][i] * v.gl[u]; r += bufR[u][i] * v.gr[u]; } if (v.nu == 1) { l = buf[0][i]; r = bufR[0][i]; } }
       if (soOn) { l += so[i]; r += so[i]; }
+      if (nzOn) { l += nzL[i]; r += nzR[i]; }
       if (v.fade > 0) {
         e *= (double)v.fade / (sr * 0.003 + 1); v.fade--;
         if (v.fade == 0) { L[i] += (float)(l * e * pl); R[i] += (float)(r * e * pr); if (v.pPitch >= 0) { int pp = v.pPitch; double pv = v.pVel; v.on = false; start(v, pp, pv, -1); } else v.on = false; return; }

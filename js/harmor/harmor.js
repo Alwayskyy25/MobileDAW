@@ -21,20 +21,22 @@ const harmorTrack = (i) => { const t = P.state.tracks[i]; return t && t.inst && 
 // the map into the engine: the track's two slots (made once), then the parameters (not an undo step: the map is data, like a sample)
 async function install(i, t, out) {
   let ids = slots.get(t.id);
-  if (!ids) { const a = P.allocSampleSlot(), b = P.allocSampleSlot(); if (a < 0 || b < 0) throw new Error('Slot sample penuh (256). Simpan proyek lalu buka ulang.'); ids = [a, b]; slots.set(t.id, ids); }
+  if (!ids) { const a = P.allocSampleSlot(), b = P.allocSampleSlot(); if (a < 0 || b < 0) throw new Error('Slot sample penuh (256). Simpan proyek lalu buka ulang.'); ids = [a, b, -1, -1]; slots.set(t.id, ids); }
+  for (const [q, has] of [[2, out.N], [3, out.W]]) if (has && !(ids[q] >= 0)) { ids[q] = P.allocSampleSlot(); if (ids[q] < 0) throw new Error('Slot sample penuh (256). Simpan proyek lalu buka ulang.'); }
   const r1 = await eng.putSampleBuffers(ids[0], out.A.l, out.A.r || out.A.l); if (!r1 || r1.error) throw new Error((r1 && r1.error) || 'Engine tidak bisa memuat peta.');
   if (out.B) { const r2 = await eng.putSampleBuffers(ids[1], out.B.l, out.B.r || out.B.l); if (!r2 || r2.error) throw new Error((r2 && r2.error) || 'Engine tidak bisa memuat peta.'); }
   const j = P.state.tracks.indexOf(t); if (j < 0) return;
-  P.setInstParamQuiet(j, HM.MAP_A, ids[0]); P.setInstParamQuiet(j, HM.MAP_B, out.B ? ids[1] : -1);
+  for (const [q, x] of [[2, out.N], [3, out.W]]) if (x) { const r3 = await eng.putSampleBuffers(ids[q], x.l, x.r || x.l); if (!r3 || r3.error) throw new Error((r3 && r3.error) || 'Engine tidak bisa memuat peta.'); }
+  P.setInstParamQuiet(j, HM.MAP_A, ids[0]); P.setInstParamQuiet(j, HM.MAP_B, out.B ? ids[1] : -1); P.setInstParamQuiet(j, HM.MAP_N, out.N ? ids[2] : -1); P.setInstParamQuiet(j, HM.MAP_W, out.W ? ids[3] : -1);
   if (!(t.inst.params[HM.MAP_MIX] > 0)) P.setInstParamQuiet(j, HM.MAP_MIX, 1);
 }
-const cacheKey = (kind, path, extra) => 'hm' + kind + '|' + path + '|' + (eng.fileSize ? eng.fileSize(path) : 0) + '|' + JSON.stringify(extra) + '|v1';
+const cacheKey = (kind, path, extra) => 'hm' + kind + '|' + path + '|' + (eng.fileSize ? eng.fileSize(path) : 0) + '|' + JSON.stringify(extra) + '|v3';   // v3: harmonic + noise resynthesis, residual waveform
 async function fromCache(key) {
   const a = await P.cacheGet(key + '|A'); if (!a) return null;
-  const b = await P.cacheGet(key + '|B');
-  return { A: { l: a.l, r: a.r !== a.l ? a.r : null }, B: b ? { l: b.l, r: b.r !== b.l ? b.r : null } : null };
+  const b = await P.cacheGet(key + '|B'), nz = await P.cacheGet(key + '|N'), wv = await P.cacheGet(key + '|W');
+  return { A: { l: a.l, r: a.r !== a.l ? a.r : null }, B: b ? { l: b.l, r: b.r !== b.l ? b.r : null } : null, N: nz ? { l: nz.l, r: nz.r !== nz.l ? nz.r : null } : null, W: wv ? { l: wv.l, r: wv.r !== wv.l ? wv.r : null } : null };
 }
-function toCache(key, out) { P.cachePut(key + '|A', out.A.l, out.A.r || out.A.l); if (out.B) P.cachePut(key + '|B', out.B.l, out.B.r || out.B.l); }
+function toCache(key, out) { P.cachePut(key + '|A', out.A.l, out.A.r || out.A.l); if (out.B) P.cachePut(key + '|B', out.B.l, out.B.r || out.B.l); if (out.N) P.cachePut(key + '|N', out.N.l, out.N.r || out.N.l); if (out.W) P.cachePut(key + '|W', out.W.l, out.W.r || out.W.l); }
 
 // Resynthesis: an audio file of the library (WAV / MP3 / FLAC / OGG ...) -> the map. opts: { quality: 0 Draft, 1 Normal, 2 High }
 export async function harmorLoadAudio(i, path, opts = {}, onProgress) {
@@ -79,7 +81,7 @@ export async function harmorLoadImage(i, path, opts = {}) {
 }
 export function harmorClearMap(i) {
   const t = harmorTrack(i); if (!t) return;
-  P.setInstParamQuiet(i, HM.MAP_A, -1); P.setInstParamQuiet(i, HM.MAP_B, -1); delete t.inst.hm; P.emit('devices');
+  P.setInstParamQuiet(i, HM.MAP_A, -1); P.setInstParamQuiet(i, HM.MAP_B, -1); P.setInstParamQuiet(i, HM.MAP_N, -1); P.setInstParamQuiet(i, HM.MAP_W, -1); delete t.inst.hm; P.emit('devices');
 }
 // a project opening: the map of a Harmor track is made again (or read from the cache)
 export async function restoreHarmorMap(t) {

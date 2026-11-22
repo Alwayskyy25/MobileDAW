@@ -186,11 +186,23 @@ Keputusan pemilik: loop suara real-time Harmor di C++ (pola Moisture); semua bag
 - **Level resintesis**: tahap output Harmor = 0,25 × Volume (ruang aman untuk akor), sehingga audio yang diresintesis terdengar ~15 dB
   lebih pelan dari filenya. Saat audio dimuat, Map Level kini diset 4× (bila belum pernah diubah): Volume 100 % = level file (partial 1
   0,300 dari 0,300; tes di `harmor-app-test`), Volume 70 % = −3 dB.
-- **Uji pemilik (WAV 22 s, melodi 11 nada)**: track "Harmor Datar" = resintesis High, Freq Dev 0 %, satu not D4 → 100 % frame bernada
-  dalam ±50 cent dari D4 (median 0,1 cent); track "Harmor Nada" = resintesis WAV datar + 41 not dari melodi asli (mono + legato, Formant)
-  → 99,2 % frame bernada sama dengan aslinya (median selisih 2,8 cent); level −31,4 (asli) / −31,9 (datar) / −33,1 dB (nada).
-  Batas yang diketahui: resintesis harmonik tidak punya komponen noise, sehingga bagian tak bernada (konsonan / desis) ikut menjadi
-  bernada.
+- **Resintesis harmonik + residu (revisi atas uji pemilik "belum sama")** — selalu dibandingkan dengan file asli:
+  - Analisis (`js/harmor/resynth.js`): jendela Hann 5 periode nada frame itu sendiri (bukan 186 ms), hop 4 ms; harmonik hanya bila
+    lobusnya 6 dB di atas lantai noise (median celah × 1,44); frekuensi dikunci ke k × f0 (±25 cent); pelacak YIN ambang 0,25 + celah
+    ≤ 20 ms diisi (dulu harmonik menyala-mati tiap beberapa ms); koreksi amplop waktu per frame (energi sesaat 8 ms).
+  - Residu (semua yang bukan harmonik: konsonan, napas, transien) disimpan dua cara: **gelombang** (slot W: spektrum kompleks dengan lobus
+    harmonik diredam, WOLA) yang diputar engine pada garis waktu peta, dan **32 pita noise mid/side** (slot N) sebagai pengganti saat
+    Map Speed ≠ 1. Engine (C++): noise per pita dengan sumber sendiri (sumber bersama saling meniadakan), gain diselesaikan dengan matriks
+    kebocoran antar-pita (NNLS) saat dimuat. Parameter baru: Noise (level residu), slot N/W.
+  - Untuk mengembalikan nada dari file datar: Formant **off** (kebalikan persis dari pendataran), mono + legato, not tersusun dari
+    kontur asli per 5 ms (lari nada ≥ 15 ms ikut, salah oktaf di ekor pelan dibuang).
+- **Uji pemilik (WAV 22 s, melodi 11 nada)** — hasil akhir dibanding file asli: track "Harmor Datar" (resintesis High, Freq Dev 0 %,
+  satu not D4) → 99,9 % frame bernada di D4 (median 0,2 cent); track "Harmor Nada" (resintesis WAV datar + 71 not) → LSD 2,34 dB
+  (awal 17,6), 1,16 dB di bagian keras (smoothed), korelasi amplop 1,000, nada sama 98,7 % (median 2,9 cent), level per pita
+  0,0 / −0,1 / −0,0 / +0,1 dB, level total −31,6 dB (asli −31,4). Satu lintasan saja (identitas): LSD 1,52 dB. Batas: residu gelombang
+  tidak bisa di-stretch (Map Speed ≠ 1 memakai pita noise); fase antar-harmonik hanya diambil di awal peta.
+- Tes `tools/harmor-resynth-test.mjs` (alur pemilik pada sumber sintetis bernada + desis "s", dibanding sumber): identitas 0,28 dB,
+  datar 100 % di nadanya, nada kembali 100 % sama / 0,27 dB / noise +0,00 dB, Map Speed 2× +0,04 dB.
 - Perbaikan umum: parameter berkurva log yang bisa 0 (Map Speed, 0 = peta berhenti) memakai kurva kubik (sebelumnya knob NaN).
 - Tes `tools/harmor-ui-test.mjs` (24 cek, masuk `run-tests`): Pixel 7 landscape + portrait — 10 bagian tampil, tidak meluber ke samping,
   muat tanpa scroll, display ≥ 40 px, tanpa error; knob geser 0,70 → 1,00 dan ketuk 2× kembali 0,70; devOut 998 saat akor: 2 voice,

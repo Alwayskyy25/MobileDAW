@@ -45,12 +45,21 @@ export function buildImageMap(rgba, w, h, o = {}) {
   return { layout, frames, bins, hop: secs / frames, base: 0, flo: o.flo || 40, fhi: o.fhi || 16000, aL, aR, dev: null, ph: null };
 }
 
-// a map -> the two slots: A = { l: header + left amplitude, r: header + right amplitude (null = mono) }, B = deviation / phase (or null)
+// a map -> the slots: A = { l: header + left amplitude, r: header + right amplitude (null = mono) }, B = deviation / phase (or null),
+// N = the residual noise bands (or null)
 export function packMap(m) {
   const n = m.frames * m.bins, head = (arr) => { arr[0] = MAP_MAGIC; arr[1] = m.frames; arr[2] = m.bins; arr[3] = m.hop; arr[4] = m.layout; arr[5] = m.base || 0; arr[6] = m.flo || 20; arr[7] = m.fhi || 20000; return arr; };
   const mk = (src) => { const a = head(new Float32Array(MAP_HDR + n)); a.set(src, MAP_HDR); return a; };
   const A = { l: mk(m.aL), r: m.aR ? mk(m.aR) : null };
   const B = m.dev ? { l: mk(m.dev), r: m.ph ? mk(m.ph) : null } : null;
-  return { A, B };
+  // N (resynthesis residual): frames x noise bands of band RMS (mid / side when header[5] = 1, else left / right), layout 2, its band edges
+  let N = null;
+  if (m.noise) { const nz = m.noise, nb = m.frames * nz.bands, mkN = (src) => { const a = new Float32Array(MAP_HDR + nb); a[0] = MAP_MAGIC; a[1] = m.frames; a[2] = nz.bands; a[3] = m.hop; a[4] = 2; a[5] = nz.ms ? 1 : 0; a[6] = nz.flo; a[7] = nz.fhi; a.set(src, MAP_HDR); return a; };
+    N = { l: mkN(nz.nL), r: nz.nR ? mkN(nz.nR) : null }; }
+  // W (resynthesis residual as a waveform): header (magic, samples, channels, sample rate, layout 3), then the samples (left / right)
+  let W = null;
+  if (m.wave) { const wv = m.wave, n = wv.l.length, mkW = (src) => { const a = new Float32Array(MAP_HDR + n); a[0] = MAP_MAGIC; a[1] = n; a[2] = wv.r ? 2 : 1; a[3] = wv.sr; a[4] = 3; a.set(src, MAP_HDR); return a; };
+    W = { l: mkW(wv.l), r: wv.r ? mkW(wv.r) : null }; }
+  return { A, B, N, W };
 }
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
