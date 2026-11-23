@@ -155,7 +155,7 @@ function fxGroups(def) {
 const tidy = (n, pf) => { let s = String(n); if (pf && s.startsWith(pf + ' ')) s = s.slice(pf.length + 1); s = s.trim(); return /^[A-Z0-9 .\-/]+$/.test(s) && s.length > 3 ? s[0] + s.slice(1).toLowerCase() : s; };
 
 // a card body with tabs (more than one section) and a grid of controls
-function body(key, groups, mk, every, bigTabs, hero) {
+function body(key, groups, mk, every, bigTabs) {
   const box = h('div', { class: 'u2c-b' }), tabs = h('div', { class: 'u2c-tabs', role: 'tablist' }), grid = h('div', { class: 'u2c-g' });
   let live = [];
   const show = (gi) => {
@@ -167,13 +167,13 @@ function body(key, groups, mk, every, bigTabs, hero) {
     // order: lists and switches first (full-width rows), then the dials
     const rows = ctl.filter(({ c }) => !c.classList.contains('u2d')).map(({ c }) => c), dials = ctl.filter(({ c }) => c.classList.contains('u2d')).map(({ c }) => c);
     // one grid that fills the rack's height row by row and then grows sideways (a field takes two dial cells): nothing is cut off
-    if (hero || env || rows.length || dials.length) parts.push(h('div', { class: 'u2c-dials' + (hero ? ' hero' : '') }, ...(hero ? [hero] : []), ...(env ? [env] : []), ...rows, ...dials));   // the effect's graphic first, over every row
+    if (env || rows.length || dials.length) parts.push(h('div', { class: 'u2c-dials' }, ...(env ? [env] : []), ...rows, ...dials));
     grid.replaceChildren(...parts); fit();
   };
   // rows: as many as the rack is tall (the card is only as tall as its controls, so measure against the rack, not the card)
   const fit = () => requestAnimationFrame(() => {
     const sc = grid.closest('.dev-scroll'), dl = grid.querySelector('.u2c-dials'); if (!sc) return;
-    const hh = sc.clientHeight - (grid.getBoundingClientRect().top - sc.getBoundingClientRect().top) - 22;
+    const hh = sc.clientHeight - (grid.getBoundingClientRect().top - sc.getBoundingClientRect().top) - 18;
     if (hh > 0) grid.style.setProperty('--rows', String(Math.max(1, Math.min(Math.floor((hh + 6) / 66), dl ? dl.children.length : 1))));
   });
   if (typeof ResizeObserver !== 'undefined') { let last = 0; new ResizeObserver(() => { const sc = grid.closest('.dev-scroll'), hgt = sc ? sc.clientHeight : 0; if (hgt !== last) { last = hgt; fit(); } }).observe(grid); requestAnimationFrame(() => { const sc = grid.closest('.dev-scroll'); if (sc) new ResizeObserver(fit).observe(sc); }); }
@@ -208,12 +208,18 @@ const CAT = {
 const INST_IC = SV('<path d="M4 5h16v14H4zM8 5v14M12 5v14M16 5v14"/><path d="M6.6 5v7M10.6 5v7M14.6 5v7M18.2 5v7" stroke-width="2.6"/>');
 const famOf = (type) => { const g = FX_GROUPS.find((x) => x[2].includes(type)); return g && CAT[g[0]] ? g[0] : 'misc'; };
 const catOf = (type) => CAT[famOf(type)];
-// the section tabs sit in the title row, right of the title (no row of their own, no empty band)
-function inHead(head, b) { const tb = b.querySelector(':scope > .u2c-tabs'); if (tb) head.append(tb); return b; }
 // header: [icon badge] [name / family] ... [extra] [switch] [⋯]
 function header(icon, nameEl, sub, ...right) {
   const b = h('i', { class: 'u2c-badge', 'aria-hidden': 'true' }); b.innerHTML = icon;
   return h('div', { class: 'u2c-h' }, b, h('div', { class: 'u2c-tt' }, nameEl, h('small', {}, sub)), ...right.filter(Boolean));
+}
+
+// v3 card: a module like a piece of hardware - a screen on the left (the graphic, with the module's name, switch and menu on it, and the
+// instrument's actions under it), the tabs and the controls on the right
+function cardV3(cls, cc, head, hero, foot, panelKids) {
+  const screen = h('div', { class: 'u2s' }, hero || h('div', { class: 'u2fx blank' }), head, foot && foot.length ? h('div', { class: 'u2s-foot' }, ...foot) : null);
+  const card = h('div', { class: 'card u2c v3 ' + cls }, screen, h('div', { class: 'u2c-p' }, ...panelKids.filter(Boolean)));
+  card.style.setProperty('--cc', cc); return card;
 }
 
 // ---- effect card
@@ -243,12 +249,12 @@ export function fxCard(i, d, di, n, api) {
     return control(p, wet ? p.n : tidy(names[k] || p.n, pf), () => get(k), set, auto);
   };
   mk.get = get; mk.def = pdef;
-  const parts = [head];
-  if (d.type === 16) parts.push(h('div', { class: 'u2c-cta' }, h('p', {}, 'Meter, spektrum, osiloskop dan stereo di satu jendela.'), h('button', { class: 'u2btn fill', onclick: () => api.openWindow() }, 'Buka MiniMeters')));
+  const kids = [];
+  if (d.type === 16) kids.push(h('div', { class: 'u2c-cta' }, h('p', {}, 'Meter, spektrum, osiloskop dan stereo di satu jendela.'), h('button', { class: 'u2btn fill', onclick: () => api.openWindow() }, 'Buka MiniMeters')));
   const hero = d.type === 16 ? null : fxDisplay({ def, d, family: famOf(d.type), strip: i, every: api.every, get: (k) => d.params[k] ?? def.params[k].def });
-  if (groups.length) parts.push(inHead(head, body('d' + d.id, groups, mk, api.every, false, hero)));
-  else parts.push(h('div', { class: 'u2c-empty' }, 'Modul ini tidak punya parameter.'));
-  const card = h('div', { class: 'card u2c fx' + (off ? ' off' : '') }, ...parts); card.style.setProperty('--cc', cat[1]); return card;
+  if (groups.length) kids.push(body('d' + d.id, groups, mk, api.every));
+  else kids.push(h('div', { class: 'u2c-empty' }, 'Modul ini tidak punya parameter.'));
+  return cardV3('fx' + (off ? ' off' : ''), cat[1], head, hero, null, kids);
 }
 
 // ---- instrument card
@@ -258,22 +264,22 @@ export function instCard(i, t, api) {
   const name = midi ? h('button', { class: 'u2c-name', onclick: (e) => { e.stopPropagation(); api.pickInst(e.currentTarget.getBoundingClientRect()); } }, h('span', {}, def.name), h('i', { class: 'car', 'aria-hidden': 'true' }))
     : h('div', { class: 'u2c-name' }, h('span', {}, def.name));
   const items = () => [{ label: 'Editor lengkap…', fn: () => api.openWindow() }, ...(api.extra.length ? [{ sep: true }, ...api.extra] : [])];
-  const head = header(INST_IC, name, (t.kind === 'drum' ? 'Drum' : 'Instrumen') + ' \u2022 ' + t.name,
-    midi ? h('button', { class: 'u2chip', onclick: (e) => { e.stopPropagation(); api.presetMenu(e.currentTarget.getBoundingClientRect()); } }, 'Preset') : null, moreBtn(items));
-  const parts = [head];
-  if (t.inst.missing) { const x = t.inst.missing; parts.push(h('div', { class: 'u2c-warn' }, (x.name || 'Instrumen') + ': ' + (x.sample ? 'sample ' + x.sample.split('/').pop() : 'program') + ' tidak tersedia')); }
-  const acts = [];
-  if (def.zones || def.floatOnly || t.inst.type === 6 || t.inst.type === 35 || t.inst.type === 38 || !midi) acts.push(h('button', { class: 'u2btn tonal', onclick: () => api.openWindow() }, t.inst.type === 6 ? 'File SoundFont & program' : def.zones ? 'Sample & zona' : t.inst.type === 35 ? 'Sample & irisan' : !midi ? 'Pad & sample' : 'Editor lengkap'));
-  for (const x of api.extra.slice(0, 2)) acts.push(h('button', { class: 'u2btn', onclick: (e) => x.fn(e.currentTarget.getBoundingClientRect()) }, x.label.replace(/…$/, '')));
-  if (acts.length) head.append(h('div', { class: 'u2c-acts' }, ...acts));   // the instrument's own actions (sample, SoundFont file...) sit in the title row
+  const head = header(INST_IC, name, (t.kind === 'drum' ? 'Drum' : 'Instrumen') + ' \u2022 ' + t.name, moreBtn(items));
+  const foot = [];
+  if (midi) foot.push(h('button', { class: 'u2chip', onclick: (e) => { e.stopPropagation(); api.presetMenu(e.currentTarget.getBoundingClientRect()); } }, 'Preset'));
+  if (def.zones || def.floatOnly || t.inst.type === 6 || t.inst.type === 35 || t.inst.type === 38 || !midi) foot.push(h('button', { class: 'u2chip fill', onclick: () => api.openWindow() }, t.inst.type === 6 ? 'SoundFont' : def.zones ? 'Sample' : t.inst.type === 35 ? 'Irisan' : !midi ? 'Pad & sample' : 'Editor'));
+  for (const x of api.extra.slice(0, 1)) foot.push(h('button', { class: 'u2chip', onclick: (e) => x.fn(e.currentTarget.getBoundingClientRect()) }, x.label.replace(/\u2026$/, '').replace(/^Zona sample$/, 'Zona')));
+  const kids = [];
+  if (t.inst.missing) { const x = t.inst.missing; kids.push(h('div', { class: 'u2c-warn' }, (x.name || 'Instrumen') + ': ' + (x.sample ? 'sample ' + x.sample.split('/').pop() : 'program') + ' tidak tersedia')); }
   const groups = instGroups(def, t.inst.type);
   const get = (k) => t.inst.params[k] ?? def.params[k].def;
   const mk = (k, pf) => { const p = def.params[k];
-    return control(p, tidy(p.n, pf), () => get(k), (v) => P.setInstParam(i, k, v), (rect) => offerAutomation(rect, { kind: 5, strip: P.stripOf(i), param: k, def: p }, `${t.name} • ${p.n}`)); };
+    return control(p, tidy(p.n, pf), () => get(k), (v) => P.setInstParam(i, k, v), (rect) => offerAutomation(rect, { kind: 5, strip: P.stripOf(i), param: k, def: p }, `${t.name} \u2022 ${p.n}`)); };
   mk.get = get; mk.def = (k) => def.params[k];
-  if (groups.length) parts.push(inHead(head, body('i' + t.id, groups, mk, api.every)));
-  else if (!acts.length) parts.push(h('div', { class: 'u2c-empty' }, 'Instrumen ini diatur lewat editornya.'));
-  const card = h('div', { class: 'card u2c inst' }, ...parts); card.style.setProperty('--cc', t.color || 'var(--accent)'); return card;
+  if (groups.length) kids.push(body('i' + t.id, groups, mk, api.every));
+  else kids.push(h('div', { class: 'u2c-empty' }, 'Diatur lewat editornya.'));
+  const hero = fxDisplay({ def, d: null, family: 'inst', strip: i, every: api.every, get });
+  return cardV3('inst', t.color || 'var(--accent)', head, hero, foot, kids);
 }
 
 // ---- audio track: the source card

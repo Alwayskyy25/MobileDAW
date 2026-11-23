@@ -158,6 +158,20 @@ export function fxDisplay(o) {
       const a = wid * Math.PI / 2; const gr = g.createRadialGradient(cx, cy, 2, cx, cy, R); gr.addColorStop(0, color + 'aa'); gr.addColorStop(1, color + '10');
       g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R * (0.35 + 0.65 * lv), -Math.PI / 2 - a, -Math.PI / 2 + a); g.closePath(); g.fillStyle = gr; g.fill(); g.strokeStyle = color; g.lineWidth = 2; g.stroke();
       label = (wk >= 0 ? 'Width ' + txt(wk) : '') + (pk >= 0 ? (wk >= 0 ? ' • ' : '') + txt(pk) : '');
+    } else if (family === 'inst') {   // instruments: the amp envelope (A / D / S / R) over the live level
+      const fa = pick(/^(amp |master )?(attack|atk|att)$/i), fd = pick(/^(amp |master )?(decay|dec)$/i), fs = pick(/^(amp |master )?(sustain|sus)$/i), fr = pick(/^(amp |master )?(release|rel)$/i);
+      if (fa >= 0 || fd >= 0) {
+        const a = 0.06 + norm(fa, 0.1) * 0.8, dd = 0.06 + norm(fd, 0.3) * 0.8, sl = fs >= 0 ? norm(fs) : 0.7, rr = 0.06 + norm(fr, 0.3) * 0.8, hold = 0.45, k = (W - 12) / (a + dd + hold + rr);
+        const x1 = 6 + a * k, x2 = x1 + dd * k, x3 = x2 + hold * k, x4 = x3 + rr * k, top = 10, bot = H - 8, ys = top + (1 - sl) * (bot - top);
+        fillUnder([[6, bot], [x1, top], [x2, ys], [x3, ys], [x4, bot]], bot);
+        g.fillStyle = '#fff'; for (const [x, y] of [[x1, top], [x2, ys], [x3, ys]]) { g.beginPath(); g.arc(x, y, 3, 0, 6.283); g.fill(); }
+        label = 'A ' + txt(fa) + (fr >= 0 ? '  R ' + txt(fr) : '');
+      } else {
+        const pts = []; for (let n = 0; n < hist.length; n++) pts.push([n * bw, H / 2 - hist[(hp + n) % hist.length] * (H / 2 - 4)]);
+        g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.strokeStyle = color; g.lineWidth = 2; g.stroke();
+        g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, H - y) : g.moveTo(x, H - y))); g.stroke();
+        const lv = level(); label = lv > 1e-5 ? (20 * Math.log10(lv)).toFixed(1) + ' dB' : '';
+      }
     } else if (family === 'flmnote') {
       const bars = 16, step = Math.floor(performance.now() / (60000 / (state.bpm || 120) / 4)) % bars;
       for (let n = 0; n < bars; n++) { const y = (Math.sin(n * 1.7) * 0.5 + 0.5) * (H - 18) + 4; g.fillStyle = color; g.globalAlpha = n === step && state.playing ? 1 : 0.55; g.beginPath(); g.roundRect(4 + n * (W - 8) / bars, y, (W - 8) / bars - 3, 8, 3); g.fill(); }

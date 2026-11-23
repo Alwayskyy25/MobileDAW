@@ -842,3 +842,39 @@ html.ui2 #bar2 .b2-c .tab { width: auto !important; flex: 0 0 auto !important; }
 .u2fx-l { position: absolute; right: 8px; top: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(0, 0, 0, .45); color: var(--text); font: 600 10.5px/1.4 var(--font); font-variant-numeric: tabular-nums; pointer-events: none; }
 .u2c-dials.hero > .u2fx { grid-row: 1 / span var(--rows, 1); }
 .u2fx-l:empty { display: none; }
+
+/* ===== module cards v3: a screen on the left (graphic + name, switch, menu on it), tabs and controls on the right ===== */
+html.ui2 #app .dev-scroll > .card.u2c.v3, html.ui2 .dev-scroll > .card.u2c.v3 {
+  flex-direction: row !important; height: 100% !important; align-self: stretch !important; max-height: none; padding: 6px !important; gap: 8px;
+  background: var(--raise) !important; }
+html.ui2 .dev-scroll { align-items: stretch !important; }
+html.ui2 .dev-scroll > .card.addcard { height: auto; align-self: stretch; }
+.u2c.v3 .u2s { position: relative; flex: none; width: 236px; border-radius: 18px; overflow: hidden; background: color-mix(in srgb, var(--cc) 8%, #0e0f12); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cc) 18%, transparent); }
+.u2c.v3 .u2s > .u2fx { position: absolute; inset: 0; width: auto; height: auto; min-width: 0; border-radius: 0 !important; background: transparent !important; box-shadow: none; }
+.u2c.v3 .u2s > .u2fx .u2fx-l { top: auto; bottom: 8px; right: 8px; }
+/* the title bar on the screen */
+.u2c.v3 .u2s > .u2c-h { position: absolute; left: 0; right: 0; top: 0; height: 44px; padding: 0 4px 0 8px; gap: 7px; z-index: 2;
+  background: linear-gradient(180deg, rgba(8, 9, 12, .82), rgba(8, 9, 12, .0)); }
+.u2c.v3 .u2s .u2c-badge { width: 26px; height: 26px; border-radius: 8px; background: color-mix(in srgb, var(--cc) 30%, transparent); }
+.u2c.v3 .u2s .u2c-badge svg { width: 16px; height: 16px; }
+.u2c.v3 .u2s .u2c-tt { flex: 1 1 auto; max-width: none; min-width: 0; }
+.u2c.v3 .u2s .u2c-tt .u2c-name { font: 650 13px/1.15 var(--font) !important; color: #fff; }
+.u2c.v3 .u2s .u2c-tt small { font-size: 10px; color: rgba(255, 255, 255, .6); }
+.u2c.v3 .u2s .u2c-more i { background: rgba(255, 255, 255, .75); }
+.u2c.v3 .u2s .u2sw-b { height: 30px; }
+/* the instrument's buttons at the foot of the screen */
+.u2c.v3 .u2s-foot { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; gap: 6px; z-index: 2; flex-wrap: wrap; }
+.u2c.v3 .u2s-foot .u2chip { height: 26px; padding: 0 10px; font-size: 11.5px; background: rgba(8, 9, 12, .6); color: #fff; border-color: color-mix(in srgb, var(--cc) 50%, transparent); }
+.u2c.v3 .u2s-foot .u2chip.fill { background: var(--cc); color: #15161a; border-color: transparent; font-weight: 700; }
+.u2c.v3.inst .u2s > .u2fx .u2fx-l { bottom: auto; top: 48px; }
+.u2fx.blank { position: absolute; inset: 0; }
+/* the right side: tabs on top, controls under them */
+.u2c.v3 .u2c-p { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.u2c.v3 .u2c-b { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.u2c.v3 .u2c-tabs { width: 0; min-width: 100%; padding: 0; max-width: none; flex: none; }
+.u2c.v3 .u2c-tabs button { height: 28px; padding: 0 11px; font-size: 12px; border-radius: 9px; }
+.u2c.v3 .u2c-g { flex: 1; min-height: 0; padding: 0; overflow: hidden; }
+.u2c.v3 .u2c-g > .u2c-dials { grid-auto-columns: 62px; }
+.u2c.v3 .u2c-dials > * { background: color-mix(in srgb, var(--text) 4.5%, transparent); }
+.u2c.v3.off .u2s { filter: grayscale(.85) brightness(.75); }
+.u2c.v3.off .u2c-p { opacity: .5; }
