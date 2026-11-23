@@ -108,7 +108,23 @@ function choice(p, label, get, set) {
   };
   el.sync = paint; paint(); return el;
 }
+// a horizontal slider (levels, mixes, amounts): drag sideways, double tap = default, long press = automation
+const SLIDER_RE = /^(mix|dry\/?wet|wet( level)?|dry( level)?|gain|level|volume|output( level)?|post gain|amount|depth|send)\b/i;
+function hslider(p, label, get, set, onLong) {
+  const fill = h('i', { class: 'f' }), knob = h('em'), v = h('span', { class: 'v' });
+  const el = h('div', { class: 'u2sl', role: 'slider', 'aria-label': label, tabindex: 0 }, h('div', { class: 'hd' }, h('span', { class: 'n' }, label), v), h('div', { class: 'tr' }, fill, knob));
+  const paint = () => { const x = get(), n = toNorm(p, x); el.style.setProperty('--n', n.toFixed(4)); const t = fmtParam(p, x); if (v.textContent !== t) v.textContent = t; };
+  let d = null, last = 0;
+  el.addEventListener('pointerdown', (e) => { e.stopPropagation(); el.setPointerCapture(e.pointerId); d = { x: e.clientX, n: toNorm(p, get()), moved: false, fired: false, t: 0 };
+    if (onLong) d.t = setTimeout(() => { if (d && !d.moved) { d.fired = true; onLong(el.getBoundingClientRect()); } }, gestureTiming().longMs); });
+  el.addEventListener('pointermove', (e) => { if (!d || d.fired) return; const dx = e.clientX - d.x; if (!d.moved && Math.abs(dx) < 3) return;
+    if (!d.moved) { d.moved = true; clearTimeout(d.t); el.classList.add('act'); } const w = Math.max(40, el.querySelector('.tr').clientWidth); set(fromNorm(p, clamp(d.n + dx / w, 0, 1))); paint(); });
+  const end = () => { if (!d) return; clearTimeout(d.t); el.classList.remove('act'); if (!d.moved && !d.fired) { const now = performance.now(); if (now - last < gestureTiming().dtapMs) { set(p.def); paint(); last = 0; } else last = now; } d = null; };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  el.sync = () => { if (!d) paint(); }; paint(); return el;
+}
 function control(p, label, get, set, onLong) {
+  if (!isList(p) && !isSwitch(p) && SLIDER_RE.test(String(p.n).trim())) return hslider(p, label, get, set, onLong);
   if (isList(p)) return choice(p, label, get, set);
   if (isSwitch(p)) return toggle(p, label, get, set);
   return dial(p, label, get, set, onLong);
@@ -193,9 +209,9 @@ function body(key, groups, mk, every, bigTabs, onTab) {
     const ctl = g[1].map((k) => { const c = mk(k, g[2], g[3] || {}); live.push(c); return { k, c }; });
     const env = null;   // v3 cards draw the envelope on their screen (fxdisp.js), not again among the controls
     // order: lists and switches first (full-width rows), then the dials
-    const rows = ctl.filter(({ c }) => !c.classList.contains('u2d')).map(({ c }) => c), dials = ctl.filter(({ c }) => c.classList.contains('u2d')).map(({ c }) => c);
+    const rows = ctl.filter(({ c }) => !c.classList.contains('u2d') && !c.classList.contains('u2sl')).map(({ c }) => c), dials = ctl.filter(({ c }) => c.classList.contains('u2d')).map(({ c }) => c), sliders = ctl.filter(({ c }) => c.classList.contains('u2sl')).map(({ c }) => c);
     // one grid that fills the rack's height row by row and then grows sideways (a field takes two dial cells): nothing is cut off
-    if (env || rows.length || dials.length) parts.push(h('div', { class: 'u2c-dials' }, ...(env ? [env] : []), ...rows, ...dials));
+    if (env || rows.length || dials.length || sliders.length) parts.push(h('div', { class: 'u2c-dials' }, ...(env ? [env] : []), ...rows, ...dials, ...sliders));
     grid.replaceChildren(...parts); fit();
     const dl = grid.firstElementChild; if (dl && shownOnce) { dl.classList.remove('swap'); void dl.offsetWidth; dl.classList.add('swap'); } shownOnce = true;
   };
@@ -204,11 +220,15 @@ function body(key, groups, mk, every, bigTabs, onTab) {
   // Checked again while the rack is on screen (the panel can still be opening, the tabs can wrap), set only when it changes.
   const fitNow = () => {
     const card = grid.closest('.card'), sc = grid.closest('.dev-scroll'), dl = grid.querySelector('.u2c-dials'); if (!card || !sc || !card.offsetParent) return;
-    const bottom = Math.min(card.getBoundingClientRect().bottom, sc.getBoundingClientRect().bottom) - 8, hh = bottom - grid.getBoundingClientRect().top;
+    const bottom = Math.min(card.getBoundingClientRect().bottom, sc.getBoundingClientRect().bottom) - 8, dl0 = grid.querySelector('.u2c-dials'), hh = bottom - (dl0 || grid).getBoundingClientRect().top;
     if (!(hh > 0)) return;
-    const kids = dl ? [...dl.children] : [], span = (e) => (e.classList.contains('u2seg-f') ? 3 : e.classList.contains('u2dd') ? 2 : 1);
-    const cells = kids.reduce((a, e) => a + span(e), 0) || 1, rows = Math.max(1, Math.min(Math.floor((hh + 4) / 62), kids.length || 1));
-    const cols = Math.max(Math.ceil(cells / rows), ...kids.map(span), 1);   // read left to right, top to bottom (Attack, Decay, Sustain, Release in order)
+    const kids = dl ? [...dl.children] : [], span = (e) => (e.classList.contains('u2seg-f') ? 3 : e.classList.contains('u2dd') || e.classList.contains('u2sl') ? 2 : 1);
+    const cells = kids.reduce((a, e) => a + span(e), 0) || 1, rows = Math.max(1, Math.min(Math.floor((hh + 4) / 54), kids.length || 1));
+    // the fewest columns whose row-by-row packing (wide controls take 2 or 3 cells, 'dense' fills gaps) fits in the rows
+    const fits = (cols) => { const g = []; let used = 0; for (const e of kids) { const w = span(e); let placed = false;
+      for (let r = 0; r < 64 && !placed; r++) { g[r] = g[r] || new Array(cols).fill(0); for (let c = 0; c + w <= cols; c++) { if (g[r].slice(c, c + w).every((x) => !x)) { for (let q = c; q < c + w; q++) g[r][q] = 1; used = Math.max(used, r + 1); placed = true; break; } } }
+    } return used <= rows; };
+    let cols = Math.max(Math.ceil(cells / rows), ...kids.map(span), 1); while (cols < cells && !fits(cols)) cols++;   // read left to right, top to bottom
     const v = String(rows); if (grid.style.getPropertyValue('--rows') !== v) grid.style.setProperty('--rows', v);
     if (grid.style.getPropertyValue('--cols') !== String(cols)) grid.style.setProperty('--cols', String(cols));
   };

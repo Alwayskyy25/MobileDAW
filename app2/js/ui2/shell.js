@@ -269,7 +269,12 @@ function syncCol() {
     }
     syncSnap();
   }
-  for (const r of rowsEl.querySelectorAll('.tc-row')) { const b = TL.v2Row(r._i); r.style.transform = `translateY(${Math.round(b.y - g.ruler)}px)`; r.style.height = Math.max(0, b.h - 1) + 'px'; }
+  for (const r of rowsEl.querySelectorAll('.tc-row')) {
+    const b = TL.v2Row(r._i), hh = Math.max(0, b.h - 1); r.style.transform = `translateY(${Math.round(b.y - g.ruler)}px)`; r.style.height = hh + 'px';
+    // the wide column fits its row: two lines (buttons, fader) from 62 px, one line (fader + buttons) from 34 px, the name only below
+    const size = hh >= 62 ? 'tall' : hh >= 34 ? 'short' : 'tiny';
+    if (r._size !== size) { r._size = size; r.classList.toggle('short', size === 'short'); r.classList.toggle('tiny', size === 'tiny'); }
+  }
   col.style.height = g.H ? g.H + 'px' : '';
 }
 

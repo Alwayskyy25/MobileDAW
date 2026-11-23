@@ -181,10 +181,15 @@ export function fxDisplay(o) {
         g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, H - y) : g.moveTo(x, H - y))); g.stroke();
         const lv = level(); label = lv > 1e-5 ? (20 * Math.log10(lv)).toFixed(1) + ' dB' : '';
       }
-    } else if (family === 'flmnote') {
-      const bars = 16, step = Math.floor(performance.now() / (60000 / (state.bpm || 120) / 4)) % bars;
-      for (let n = 0; n < bars; n++) { const y = (Math.sin(n * 1.7) * 0.5 + 0.5) * (H - 18) + 4; g.fillStyle = color; g.globalAlpha = n === step && state.playing ? 1 : 0.55; g.beginPath(); g.roundRect(4 + n * (W - 8) / bars, y, (W - 8) / bars - 3, 8, 3); g.fill(); }
-      g.globalAlpha = 1; label = 'Note FX';
+    } else if (family === 'flmnote') {   // note effects have no graph of their own: their settings, read from the module (no decoration)
+      const T0 = 50, ks = ps.map((_, k) => k).filter((k) => !ps[k].hidden && ps[k].n && !/^on$/i.test(ps[k].n)).slice(0, Math.max(2, Math.floor((H - T0 - 6) / 26)));   // below the title bar
+      const rh = Math.min(30, (H - T0 - 6) / Math.max(1, ks.length));
+      g.textBaseline = 'middle';
+      ks.forEach((k, n) => { const y = T0 + rh * (n + 0.5);
+        g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '500 11px system-ui, sans-serif'; g.textAlign = 'left'; g.fillText(ps[k].n, 10, y, W * 0.5);
+        g.fillStyle = '#ececef'; g.font = '700 14px system-ui, sans-serif'; g.textAlign = 'right'; g.fillText(fmtParam(ps[k], get(k)), W - 14, y, W * 0.45);
+        if (n < ks.length - 1) { g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(10, Math.round(y + rh / 2), W - 24, 1); } });
+      g.textAlign = 'left'; label = '';
     } else {
       const pts = []; for (let n = 0; n < hist.length; n++) pts.push([n * bw, H / 2 - hist[(hp + n) % hist.length] * (H / 2 - 4)]);
       g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.strokeStyle = color; g.lineWidth = 2; g.stroke();

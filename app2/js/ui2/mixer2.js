@@ -39,40 +39,34 @@ function drag(el, axis, get, set, reset, span) {
 
 function strip(i) {
   const isT = i < MASTER, t = P.tr(i), kind = isT ? t.kind : 'bus';
-  const name = h('div', { class: 'm2-name' }), fad = h('div', { class: 'm2-fad', 'aria-label': 'Volume' }, h('i', { class: 'trk' }), h('i', { class: 'fill' }), h('em'));
+  const name = h('button', { class: 'm2-name' }), ic = h('i', { class: 'm2-ic' }); ic.innerHTML = svg(ICON[kind] || ICON.midi);
+  // fader with its dB scale and the stereo meter beside it
+  const scale = h('div', { class: 'm2-scale', 'aria-hidden': 'true' }, ...[6, 0, -6, -12, -24, -48].map((db) => h('span', { style: `--u:${Math.sqrt(clamp(Math.pow(10, db / 20) / VMAX, 0, 1)).toFixed(4)}` }, db > 0 ? '+' + db : String(db))));
+  const fad = h('div', { class: 'm2-fad', 'aria-label': 'Volume' }, h('i', { class: 'trk' }), h('i', { class: 'fill' }), h('em'));
   const met = h('div', { class: 'm2-met' }, h('i'), h('i')), db = h('div', { class: 'm2-db' });
-  const pan = h('div', { class: 'm2-pan', 'aria-label': 'Pan' }, h('i'));
+  // pan: a small horizontal slider, centre = C
+  const pan = h('div', { class: 'm2-pan2', 'aria-label': 'Pan' }, h('i', { class: 'mid' }), h('i', { class: 'val' }), h('em')), pv = h('span', { class: 'm2-pv' });
   const on = h('button', { class: 'm2-b m2-m', 'aria-label': 'Mute' }, 'M'), solo = h('button', { class: 'm2-b m2-s', 'aria-label': 'Solo' }, 'S'), rec = h('button', { class: 'm2-b m2-r', 'aria-label': 'Rekam' }, h('i'));
-  const kindB = h('button', { class: 'm2-kind', 'aria-label': 'Pilih track' }); kindB.innerHTML = svg(ICON[kind] || ICON.midi);
-  const el = h('div', { class: 'm2-strip' + (isT ? '' : ' bus') }, name, h('div', { class: 'm2-mid' }, fad, met), db, pan, h('div', { class: 'm2-row' }, ...(isT ? [on, solo, rec] : [])), kindB);
+  const el = h('div', { class: 'm2-strip' + (isT ? '' : ' bus') },
+    h('div', { class: 'm2-head' }, ic, name),
+    h('div', { class: 'm2-mid' }, scale, fad, met), db,
+    h('div', { class: 'm2-panrow' }, pan, pv),
+    h('div', { class: 'm2-row' }, ...(isT ? [on, solo, rec] : [h('span', { class: 'm2-out' }, i === MASTER ? 'Output' : 'Return')])));
   el.style.setProperty('--tc', colorOf(i));
   drag(fad, 'y', () => Math.sqrt(clamp(P.tr(i).vol / VMAX, 0, 1)), (u) => { P.setVol(i, u * u * VMAX); paint(s); }, () => { P.setVol(i, 1); paint(s); }, () => Math.max(60, fad.clientHeight - 20));
-  drag(pan, 'x', () => (clamp(P.tr(i).pan || 0, -1, 1) + 1) / 2, (u) => { P.setPan(i, Math.round((u * 2 - 1) * 100) / 100); paint(s); }, () => { P.setPan(i, 0); paint(s); }, () => 90);
+  drag(pan, 'x', () => (clamp(P.tr(i).pan || 0, -1, 1) + 1) / 2, (u) => { P.setPan(i, Math.round((u * 2 - 1) * 100) / 100); paint(s); }, () => { P.setPan(i, 0); paint(s); }, () => Math.max(50, pan.clientWidth));
   on.onclick = () => { P.toggleMute(i); paint(s); };
   solo.onclick = () => { P.toggleSolo(i); paint(s); };
   rec.onclick = () => { P.toggleArm(i); paint(s); };
-  kindB.onclick = () => { P.selectTrack(i); };
   name.onclick = () => { P.selectTrack(i); if (isT) routeMenu(i, name.getBoundingClientRect()); };
-  const s = { i, el, name, fad, met, db, pan, on, solo, rec, kindB, lv: [0, 0] };
+  const s = { i, el, name, fad, met, db, pan, pv, on, solo, rec, kindB: ic, lv: [0, 0] };
   paint(s); return s;
-}
-// a track's routing (the name's menu): where it goes (Master or an FX track) and its two sends
-const SEND = { n: 'Send', min: 0, max: 1, def: 0, unit: '%' };
-const pct = (p, v) => Math.round(v * 100) + ' %';
-function routeMenu(i, r) {
-  const t = state.tracks[i]; if (!t) return;
-  menu([{ label: 'KELUAR KE', dim: true }, { label: 'Master', check: !(t.out >= 0), fn: () => P.setOut(i, -1) },
-    ...state.returns.map((rt, k) => ({ label: rt.name, check: t.out === k, fn: () => P.setOut(i, k) })),
-    { sep: true }, { label: 'Send A / Send B\u2026', dim: !state.returns.length, fn: () => {
-      const ks = state.returns.slice(0, 2).map((rt, k) => knob({ ...SEND, n: 'Send ' + 'AB'[k] }, () => (t.send || [0, 0])[k] || 0, (v) => P.setSend(i, k, v), pct));
-      modal('Send \u2022 ' + t.name, h('div', { class: 'knobs' }, ...ks), [{ label: 'Tutup', go: true }]);
-    } }], r.left, r.bottom + 4);
 }
 function paint(s) {
   const t = P.tr(s.i); if (!t) return;
-  s.name.textContent = nameOf(s.i);
+  if (s.name.textContent !== nameOf(s.i)) s.name.textContent = nameOf(s.i);
   const u = Math.sqrt(clamp(t.vol / VMAX, 0, 1)); s.fad.style.setProperty('--u', u.toFixed(4)); s.db.textContent = dbTxt(t.vol);
-  s.pan.style.setProperty('--a', ((clamp(t.pan || 0, -1, 1)) * 135).toFixed(1) + 'deg');
+  const pn = clamp(t.pan || 0, -1, 1); s.pan.style.setProperty('--p', ((pn + 1) / 2).toFixed(4)); const pr = Math.round(pn * 50); s.pv.textContent = pr === 0 ? 'C' : Math.abs(pr) + (pr < 0 ? 'L' : 'R');
   s.on.classList.toggle('on', !!t.mute); s.solo.classList.toggle('on', !!t.solo);
   if (s.i < MASTER) { const can = ['audio', 'midi', 'drum'].includes(t.kind); s.rec.classList.toggle('on', !!t.arm); s.rec.disabled = !can; }
   s.el.classList.toggle('sel', state.sel.track === s.i); s.el.classList.toggle('muted', !!t.mute);

@@ -1147,3 +1147,90 @@ html.ui2 #top2 .bpm { touch-action: none; } html.ui2 #top2 .bpm > * { pointer-ev
 .u2c.v3 .u2s > .u2real > * { display: block; }
 .u2c.v3 .u2s > .u2real canvas { display: block; border-radius: 12px; }
 .u2c.v3 .u2s-foot .u2chip.prog { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ===== wide track column at any zoom: nothing spills into the next row ===== */
+html.tc-wide .tc-row { overflow: hidden; }
+.tc-ctl .db { white-space: nowrap; width: 54px !important; flex: none; }
+/* short rows: one line, the fader on the left, pan + M / S / R on the right */
+html.tc-wide .tc-row.short { flex-wrap: nowrap; align-content: center; }
+html.tc-wide .tc-row.short .tc-name { width: auto; flex: none; order: 2; margin-left: 4px; height: 28px; }
+html.tc-wide .tc-row.short .tc-name .nm { display: none; }
+html.tc-wide .tc-row.short .tc-ctl { order: 1; flex: 1; width: auto; min-width: 0; }
+html.tc-wide .tc-row.short .tc-ctl .db { width: 46px !important; font-size: 10px; }
+html.tc-wide .tc-row.short .tc-b, html.tc-wide .tc-row.short .tc-bs .tc-pan.tc-ring { width: 24px !important; height: 24px !important; }
+/* tiny rows: no controls (the name is on the tile) */
+html.tc-wide .tc-row.tiny .tc-name, html.tc-wide .tc-row.tiny .tc-ctl { display: none !important; }
+
+/* ===== mixer v3: name on a colour line, a dB scale + fader + stereo meter, the value pill, a pan slider, M / S / R ===== */
+html.ui2 #mix2 .m2-list { gap: 8px !important; padding: 8px 12px 10px !important; align-items: stretch; }
+html.ui2 .m2-strip { width: 92px !important; padding: 0 0 8px !important; gap: 6px !important; overflow: hidden; position: relative; }
+html.ui2 .m2-strip::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--tc); opacity: .9; }
+.m2-head { width: 100%; display: flex; align-items: center; gap: 4px; padding: 10px 8px 0; box-sizing: border-box; }
+.m2-ic { flex: none; width: 18px; height: 18px; color: color-mix(in srgb, var(--tc) 75%, #999); display: grid; place-items: center; }
+.m2-ic svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+html.ui2 .m2-name { flex: 1; min-width: 0; border: 0; background: none; padding: 0; color: var(--text) !important; font: 600 12px/1.2 var(--font) !important; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ui2 .m2-mid { flex: 1; min-height: 70px; width: 100%; display: flex; justify-content: center; align-items: stretch; gap: 3px; padding: 0 6px; box-sizing: border-box; }
+.m2-scale { position: relative; width: 20px; flex: none; }
+.m2-scale span { position: absolute; right: 0; bottom: calc(10px + (100% - 20px) * var(--u)); transform: translateY(50%); font: 500 8.5px/1 var(--font); color: color-mix(in srgb, var(--text) 45%, transparent); font-variant-numeric: tabular-nums; }
+html.ui2 .m2-fad { width: 30px; }
+html.ui2 .m2-fad .trk { width: 6px !important; margin-left: -3px !important; border-radius: 3px; background: rgba(0, 0, 0, .4) !important; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .6); }
+html.ui2 .m2-fad .fill { width: 6px !important; margin-left: -3px !important; }
+html.ui2 .m2-fad em { width: 28px !important; height: 18px !important; margin: 0 0 -9px -14px !important; }
+html.ui2 .m2-met { padding: 10px 0 !important; gap: 2px; }
+html.ui2 .m2-met i { width: 4px !important; background-color: rgba(0, 0, 0, .35); }
+html.ui2 .m2-db { padding: 3px 10px; border-radius: 999px; background: rgba(0, 0, 0, .28); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .45); color: var(--text) !important; font: 600 11px/1.2 var(--font) !important; font-variant-numeric: tabular-nums; min-width: 40px; text-align: center; }
+.m2-panrow { width: 100%; display: flex; align-items: center; gap: 4px; padding: 0 8px; box-sizing: border-box; }
+.m2-pan2 { position: relative; flex: 1; height: 20px; touch-action: none; cursor: ew-resize; --p: .5; }
+.m2-pan2 .mid { position: absolute; left: 50%; top: 4px; bottom: 4px; width: 1px; background: rgba(255, 255, 255, .25); }
+.m2-pan2::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; border-radius: 2px; background: rgba(0, 0, 0, .4); }
+.m2-pan2 .val { position: absolute; top: 50%; height: 4px; margin-top: -2px; border-radius: 2px; background: color-mix(in srgb, var(--tc) 70%, #888);
+  left: min(50%, calc(100% * var(--p))); width: calc(100% * (var(--p) - .5) * (var(--p) > .5 ? 1 : -1)); width: max(calc(100% * var(--p) - 50%), calc(50% - 100% * var(--p))); }
+.m2-pan2 em { position: absolute; top: 50%; left: calc(100% * var(--p)); width: 10px; height: 14px; margin: -7px 0 0 -5px; border-radius: 4px; background: linear-gradient(180deg, #5a5b61, #303136); box-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
+.m2-pv { flex: none; width: 22px; text-align: right; font: 600 9.5px/1 var(--font); color: var(--dim); }
+html.ui2 .m2-row { gap: 4px !important; }
+html.ui2 .m2-b { width: 24px !important; height: 24px !important; font-size: 10.5px !important; }
+.m2-out { font: 500 10.5px/24px var(--font); color: var(--dim); }
+html.ui2 .m2-strip.sel { box-shadow: 0 0 0 2px color-mix(in srgb, var(--tc) 60%, #777), 0 4px 14px rgba(0, 0, 0, .28) !important; }
+html.ui2 .m2-strip.muted .m2-mid { opacity: .45; }
+
+/* ===== no gaps: tab rows fill their width, the controls fill the panel's height and width (cells grow, knobs grow with them) ===== */
+.u2c.v3 .u2c-tabs { width: auto !important; max-width: 420px !important; }
+.u2c.v3 .u2c-tabs button { flex: 1 1 auto; justify-content: center; text-align: center; }
+.u2c.v3 .u2c-b { flex: 1 1 auto; min-height: 0; }
+.u2c.v3 .u2c-g { flex: 1 1 auto; min-height: 0; display: flex !important; flex-direction: column; }
+.u2c.v3 .u2c-g > .u2c-dials { flex: 1 1 auto; min-height: 0; grid-template-rows: repeat(var(--rows, 1), minmax(58px, 1fr)) !important; grid-auto-rows: minmax(58px, 1fr) !important; align-content: stretch; }
+.u2c.v3 .u2c-dials > .u2d { container-type: size; }
+.u2c.v3 .u2c-dials > .u2d svg { width: clamp(31px, calc(100cqh - 30px), 52px) !important; height: clamp(31px, calc(100cqh - 30px), 52px) !important; }
+.u2c.v3 .u2c-dials > :is(.u2t, .u2dd, .u2seg-f) { align-self: stretch; }
+
+/* a divider under every track header row (tile and controls), as the lanes have */
+#tcol2 .tc-row { box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--text) 12%, transparent); }
+html.tc-wide #tcol2 .tc-row::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: color-mix(in srgb, var(--text) 12%, transparent); pointer-events: none; }
+/* long names: two lines in the taller cells instead of an ellipsis */
+.u2c.v3 .u2c-dials > .u2t > span, .u2c.v3 .u2c-dials > .u2d .n { white-space: normal !important; overflow: hidden; text-overflow: clip; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.15 !important; text-align: center; max-width: 100% !important; word-break: break-word; }
+.u2c.v3 .u2c-dials > .u2d { padding: 2px 3px !important; }
+.u2c.v3 .u2c-dials > .u2d svg { width: clamp(28px, calc(100cqh - 40px), 52px) !important; height: clamp(28px, calc(100cqh - 40px), 52px) !important; }
+
+/* horizontal slider (levels, mixes, amounts): two cells wide */
+.u2c.v3 .u2c-dials > .u2sl { grid-column: span 2; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 0 12px; border-radius: 14px !important;
+  background: rgba(0, 0, 0, .22) !important; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35), inset 0 0 0 1px rgba(255, 255, 255, .04); touch-action: none; cursor: ew-resize; --n: .5; }
+.u2sl .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.u2sl .n { font: 500 10.5px/1.1 var(--font); color: color-mix(in srgb, var(--text) 60%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.u2sl .v { font: 600 12px/1 var(--font); color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.u2sl .tr { position: relative; height: 6px; border-radius: 3px; background: rgba(0, 0, 0, .4); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .55); }
+.u2sl .f { position: absolute; left: 0; top: 0; bottom: 0; width: calc(100% * var(--n)); border-radius: 3px; background: var(--ccm, var(--accent)); }
+.u2sl em { position: absolute; top: 50%; left: calc(100% * var(--n)); width: 14px; height: 18px; margin: -9px 0 0 -7px; border-radius: 5px; background: linear-gradient(180deg, #5a5b61, #303136); box-shadow: 0 2px 4px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .15); }
+.u2sl.act em { background: linear-gradient(180deg, #6a6b72, #3a3b40); }
+/* long module names never run under the switch */
+.u2c.v3 .u2s .u2c-tt { flex: 1 1 auto !important; min-width: 0 !important; }
+.u2c.v3 .u2s .u2c-tt .u2c-name { max-width: 100%; }
+.u2c.v3 .u2s .u2c-tt .u2c-name span { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap; }
+
+/* ===== use the space: 50 px rows (two fit a phone's rack), tabs as wide as the panel, the panel at least 300 px ===== */
+.u2c.v3 .u2c-p { min-width: 300px; }
+.u2c.v3 .u2c-tabs { width: 100% !important; max-width: none !important; min-width: 0 !important; }
+.u2c.v3 .u2c-g > .u2c-dials { grid-template-rows: repeat(var(--rows, 1), minmax(50px, 1fr)) !important; grid-auto-rows: minmax(50px, 1fr) !important; }
+.u2c.v3 .u2c-dials > .u2d svg { width: clamp(26px, calc(100cqh - 36px), 52px) !important; height: clamp(26px, calc(100cqh - 36px), 52px) !important; }
+.u2c.v3 .u2c-dials > .u2t { gap: 4px; padding: 3px 4px !important; }
+.u2c.v3 .u2c-dials > .u2t > span { font-size: 10px !important; }
+.u2c.v3 .u2c-dials > .u2sl { gap: 6px; }
