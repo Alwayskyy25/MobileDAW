@@ -626,3 +626,44 @@ html.ui2 .modal.prefsw > h3 { padding-top: 22px; }
 html.ui2 .bar { gap: 6px; padding: 6px; border-radius: 999px !important; background: var(--panel2) !important; border: 0 !important; box-shadow: 0 6px 20px rgba(0, 0, 0, .4) !important; }
 html.ui2 .bar .b { height: 40px; padding: 0 18px; border-radius: 999px !important; border: 0 !important; background: transparent !important; color: var(--text) !important; font: 600 14px/1 var(--font) !important; box-shadow: none !important; }
 html.ui2 .bar .b:active { background: var(--m3-tonal) !important; }
+
+/* ===== rounding pass: every control in MobileDAW 2 has round corners ===== */
+/* (zero specificity, so the pill / segment rules above still win; the channel header tile stays square, piano keys stay keys) */
+html.ui2 :where(button, .b, select, input[type=text], input[type=number], input[type=search], input:not([type]), .vbox, .lv-fld, .fv-b, .fv-t, .lv-btn, .chip, .st)
+  :where(:not(.tc-tile, .wk, .bk, .u2seg button, .segc .b, .fw-b)) { border-radius: 12px !important; }
+html.ui2 :where(.u2seg button, .segc .b) { border-radius: 0 !important; }
+html.ui2 .u2seg, html.ui2 .segc { border-radius: 999px !important; }
+/* top bar: clock and menu */
+html.ui2 #top2 button { border-radius: 999px !important; }
+
+/* full mixer: each channel a rounded card with a gap, the name a pill in the track colour */
+html.ui2 #view-mix .mxs { gap: 6px; padding: 6px 8px; background: var(--bg) !important; }
+html.ui2 #view-mix .mx-ch { border-radius: var(--m3-m) !important; overflow: hidden; border: 0 !important; background: var(--raise) !important; box-shadow: none !important; }
+html.ui2 #view-mix .mx-title { margin: 6px 6px 2px; height: 28px; border-radius: 999px !important; border: 0 !important; font: 600 12.5px/28px var(--font) !important; }
+html.ui2 #view-mix select, html.ui2 #view-mix .mx-sec .b, html.ui2 #view-mix .vbox { border: 0 !important; background: var(--panel2) !important; }
+html.ui2 #view-mix .mx-btns .b { border-radius: 999px !important; }
+html.ui2 #view-mix .mx-fader { border-radius: 999px; }
+
+/* floating windows: a rounded sheet, the title bar part of it, round window buttons */
+html.ui2 .fw { border-radius: var(--m3-l) !important; overflow: hidden; border: 0 !important; background: var(--panel2) !important; box-shadow: 0 18px 48px rgba(0, 0, 0, .55) !important; }
+html.ui2 .fw .fw-bar { height: 40px !important; background: transparent !important; border: 0 !important; padding: 0 8px 0 14px !important; }
+html.ui2 .fw .fw-b { width: 28px !important; height: 28px !important; border-radius: 50% !important; border: 0 !important; background: color-mix(in srgb, var(--text) 10%, transparent) !important; }
+html.ui2 .fw .fw-b::before, html.ui2 .fw .fw-b::after { border-radius: 2px; }
+html.ui2 .fw-body .card { border-radius: 0 !important; background: transparent !important; }
+html.ui2 .fw-body :is(.lv-disp, .lv-well, .sp, .lk-sec, canvas) { border-radius: 14px !important; }
+html.ui2 #view-mix .mx-vals .vbox { border-radius: 10px !important; }
+html.ui2 .card > h4 :is(.dv-name, .pw, .dv-on) { border-radius: 999px !important; }
+html.ui2 .fw :is(.dv-name, .pw, .dv-on, .pre, .dv-wet, .dv-swap, .dv-more) { border-radius: 999px !important; }
+/* floating window buttons: round tonal icon buttons (minimise, maximise, close last) instead of coloured lights */
+html.ui2 .fw .fw-bs { gap: 6px; }
+html.ui2 .fw .fw-bs .fw-b::before { display: none !important; }
+html.ui2 .fw .fw-bs .fw-b { width: 32px !important; height: 32px !important; border-radius: 50% !important; background: color-mix(in srgb, var(--text) 9%, transparent) !important; color: var(--text) !important; display: grid; place-items: center; }
+html.ui2 .fw .fw-bs .fw-b svg { opacity: 1 !important; width: 12px; height: 12px; }
+html.ui2 .fw .fw-bs .fw-x { order: 9; }
+html.ui2 .fw .fw-bs .fw-b:active { background: var(--m3-tonal) !important; }
+/* full mixer: the name pill must not push the buttons off the strip */
+html.ui2 #view-mix .mx-title { margin: 4px 6px 0; height: 24px; line-height: 24px !important; }
+html.ui2 #view-mix .mxs { padding: 0 6px; }
+html.ui2 #view-mix .mx-title { margin: 2px 4px 0; height: 22px; line-height: 22px !important; font-size: 12px !important; }
+html.ui2 #view-mix .mxs { gap: 0 !important; padding: 0 0 4px !important; margin: 4px 3px; min-height: calc(100% - 8px); border-radius: var(--m3-m); border-right: 0 !important; background: var(--raise) !important; overflow: hidden; }
+html.ui2 #view-mix .mx-fader { min-height: 96px; }
