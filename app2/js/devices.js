@@ -725,6 +725,7 @@ export function render() {
   root.replaceChildren(scroll);
   requestAnimationFrame(fitKit); clearTimeout(fitLate); fitLate = setTimeout(fitKit, 350);   // again once fill displays and fonts have their final size (a card could stay taller than the rack)
   if (same) { scroll.scrollLeft = sl; flip(scroll, before); }
+  else if (!quiet()) scroll.classList.add('enter');   // MobileDAW 2: a new strip's cards come in one after another (ui2.css)
   else if (old && !quiet()) scroll.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: dur(170), easing: 'ease-out' });
   const title = document.getElementById('dtitle');
   if (title) title.textContent = stripName(i);

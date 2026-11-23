@@ -55,10 +55,18 @@ export function fxDisplay(o) {
   const cv = h('canvas', { class: 'u2fx-cv' }), lab = h('span', { class: 'u2fx-l' }), el = h('div', { class: 'u2fx' }, cv, lab);
   const ps = def.params;
   const pick = (re, from = 0) => { for (let k = from; k < ps.length; k++) if (!ps[k].hidden && re.test(ps[k].n)) return k; return -1; };
-  const txt = (k) => (k < 0 ? '' : fmtParam(ps[k], get(k)));
+  // the graphic follows a knob smoothly: numeric values ease toward their target each frame (lists switch at once)
+  const sm = new Map(); let fno = 0;
+  const sget = (k) => {
+    const t = get(k); if (ps[k].items || !Number.isFinite(t)) return t;
+    let c = sm.get(k); if (!c) { c = { v: t, f: fno }; sm.set(k, c); return t; }
+    if (c.f !== fno) { c.f = fno; c.v += (t - c.v) * 0.3; if (Math.abs(t - c.v) < Math.abs(ps[k].max - ps[k].min) * 1e-4) c.v = t; }
+    return c.v;
+  };
+  const txt = (k) => (k < 0 ? '' : fmtParam(ps[k], sget(k)));
   const val = (k, fb) => { if (k < 0) return fb; const r = parse(txt(k)); return r ? r : fb; };
-  const norm = (k, fb = 0.5) => (k < 0 ? fb : clamp((get(k) - ps[k].min) / ((ps[k].max - ps[k].min) || 1), 0, 1));
-  const hist = new Float32Array(96); let hp = 0, phase = 0, last = performance.now(), color = null;
+  const norm = (k, fb = 0.5) => (k < 0 ? fb : clamp((sget(k) - ps[k].min) / ((ps[k].max - ps[k].min) || 1), 0, 1));
+  const hist = new Float32Array(96); let hp = 0, phase = 0, last = performance.now(), color = null, mv = 0, pkv = 0;
   const level = () => { const m = state.meters || []; return Math.max(m[strip * 2] || 0, m[strip * 2 + 1] || 0) / 1000; };
   const db2 = (lv) => clamp((20 * Math.log10(Math.max(lv, 1e-5)) + 60) / 60, 0, 1);
 
@@ -68,7 +76,9 @@ export function fxDisplay(o) {
     if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
     if (!color) color = getComputedStyle(el).getPropertyValue('--cc').trim() || '#c9b3ff';
     const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-    const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
+    const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now; fno++;
+    // a soft light in the family colour from the top left
+    const glow = g.createRadialGradient(W * 0.15, 0, 4, W * 0.15, 0, Math.max(W, H) * 0.9); glow.addColorStop(0, color + '2e'); glow.addColorStop(1, color + '00'); g.fillStyle = glow; g.fillRect(0, 0, W, H);
     hist[hp] = db2(level()); hp = (hp + 1) % hist.length;
     // background: the live level as a scrolling, mirrored waveform
     g.fillStyle = color; g.globalAlpha = 0.13;
@@ -162,7 +172,7 @@ export function fxDisplay(o) {
       const fa = pick(/^(amp |master )?(attack|atk|att)$/i), fd = pick(/^(amp |master )?(decay|dec)$/i), fs = pick(/^(amp |master )?(sustain|sus)$/i), fr = pick(/^(amp |master )?(release|rel)$/i);
       if (fa >= 0 || fd >= 0) {
         const a = 0.06 + norm(fa, 0.1) * 0.8, dd = 0.06 + norm(fd, 0.3) * 0.8, sl = fs >= 0 ? norm(fs) : 0.7, rr = 0.06 + norm(fr, 0.3) * 0.8, hold = 0.45, k = (W - 12) / (a + dd + hold + rr);
-        const x1 = 6 + a * k, x2 = x1 + dd * k, x3 = x2 + hold * k, x4 = x3 + rr * k, top = 10, bot = H - 8, ys = top + (1 - sl) * (bot - top);
+        const x1 = 6 + a * k, x2 = x1 + dd * k, x3 = x2 + hold * k, x4 = x3 + rr * k, top = Math.min(52, H * 0.35), bot = Math.max(top + 20, H - 40), ys = top + (1 - sl) * (bot - top);   // between the title bar and the buttons
         fillUnder([[6, bot], [x1, top], [x2, ys], [x3, ys], [x4, bot]], bot);
         g.fillStyle = '#fff'; for (const [x, y] of [[x1, top], [x2, ys], [x3, ys]]) { g.beginPath(); g.arc(x, y, 3, 0, 6.283); g.fill(); }
         label = 'A ' + txt(fa) + (fr >= 0 ? '  R ' + txt(fr) : '');
@@ -182,6 +192,12 @@ export function fxDisplay(o) {
       g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, H - y) : g.moveTo(x, H - y))); g.stroke();
       const lv = level(); label = lv > 1e-5 ? (20 * Math.log10(lv)).toFixed(1) + ' dB' : '-∞ dB';
     }
+    // the live level: a thin meter at the right edge with a falling peak
+    const mlv = db2(level()); mv = Math.max(mlv, mv - dt * 1.2); pkv = mlv >= pkv ? mlv : Math.max(mlv, pkv - dt * 0.35);
+    g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(W - 6, 6, 3, H - 12);
+    const mg = g.createLinearGradient(0, H - 6, 0, 6); mg.addColorStop(0, color); mg.addColorStop(0.85, color); mg.addColorStop(1, '#ff6b5e');
+    g.fillStyle = mg; g.fillRect(W - 6, 6 + (1 - mv) * (H - 12), 3, mv * (H - 12));
+    if (pkv > 0.02) { g.fillStyle = "#fff"; g.fillRect(W - 7, 6 + (1 - pkv) * (H - 12), 5, 1.5); }
     if (lab.textContent !== label) lab.textContent = label;
   }
   el.sync = frame;

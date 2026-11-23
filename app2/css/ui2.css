@@ -878,3 +878,41 @@ html.ui2 .dev-scroll > .card.addcard { height: auto; align-self: stretch; }
 .u2c.v3 .u2c-dials > * { background: color-mix(in srgb, var(--text) 4.5%, transparent); }
 .u2c.v3.off .u2s { filter: grayscale(.85) brightness(.75); }
 .u2c.v3.off .u2c-p { opacity: .5; }
+
+/* ===== module cards: motion and finish ===== */
+/* cards of a newly chosen track rise in one after another */
+@keyframes u2cIn { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+html.ui2 .dev-scroll.enter > .card { animation: u2cIn calc(.34s * var(--anim, 1)) cubic-bezier(.2, 0, 0, 1) both; }
+html.ui2 .dev-scroll.enter > .card:nth-child(2) { animation-delay: calc(45ms * var(--anim, 1)); }
+html.ui2 .dev-scroll.enter > .card:nth-child(3) { animation-delay: calc(90ms * var(--anim, 1)); }
+html.ui2 .dev-scroll.enter > .card:nth-child(4) { animation-delay: calc(135ms * var(--anim, 1)); }
+html.ui2 .dev-scroll.enter > .card:nth-child(n+5) { animation-delay: calc(180ms * var(--anim, 1)); }
+/* a new tab's controls fade and slide in */
+@keyframes u2swap { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+.u2c .u2c-dials.swap > * { animation: u2swap calc(.24s * var(--anim, 1)) cubic-bezier(.2, 0, 0, 1) both; }
+.u2c .u2c-dials.swap > :nth-child(2n) { animation-delay: calc(25ms * var(--anim, 1)); }
+.u2c .u2c-dials.swap > :nth-child(3n) { animation-delay: calc(50ms * var(--anim, 1)); }
+/* tiles: a gentle press, a lit dial while it turns */
+.u2c-dials > * { transition: transform calc(.14s * var(--anim, 1)) cubic-bezier(.2, 0, 0, 1), background calc(.18s * var(--anim, 1)); }
+.u2c-dials > *:active { transform: scale(.965); }
+.u2c .u2d.act { background: color-mix(in srgb, var(--cc) 16%, transparent) !important; }
+.u2c .u2d.act svg .val { filter: drop-shadow(0 0 5px var(--cc)); }
+.u2c .u2d.act .v { color: var(--cc); }
+.u2c .u2d svg .dot { transition: r calc(.15s * var(--anim, 1)); }
+.u2c .u2d.act svg .dot { r: 4.2; }
+.u2c .u2d .trk { stroke: color-mix(in srgb, var(--text) 11%, transparent); }
+.u2c .u2d .disc { fill: color-mix(in srgb, var(--text) 6%, transparent); }
+/* the switch moves with a little spring */
+.u2sw::after { transition: left calc(.28s * var(--anim, 1)) cubic-bezier(.3, 1.6, .5, 1), width calc(.2s * var(--anim, 1)), height calc(.2s * var(--anim, 1)), margin calc(.2s * var(--anim, 1)), background calc(.2s * var(--anim, 1)) !important; }
+.u2sw-b:active .u2sw::after { width: 24px !important; }
+/* tabs: the active one slides its colour in */
+.u2c.v3 .u2c-tabs button { transition: background calc(.2s * var(--anim, 1)), color calc(.2s * var(--anim, 1)), border-color calc(.2s * var(--anim, 1)); }
+/* the card: a fine light edge, the screen with depth; bypass fades */
+html.ui2 .dev-scroll > .card.u2c.v3 { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 6px 18px rgba(0, 0, 0, .22) !important; transition: opacity calc(.25s * var(--anim, 1)); }
+.u2c.v3 .u2s { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cc) 22%, transparent), inset 0 10px 24px rgba(0, 0, 0, .35); transition: filter calc(.3s * var(--anim, 1)); }
+.u2c.v3 .u2c-p { transition: opacity calc(.3s * var(--anim, 1)); }
+.u2c.v3 .u2s > .u2fx .u2fx-l { right: 14px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.u2c.v3 .u2s .u2c-badge { box-shadow: 0 0 0 1px color-mix(in srgb, var(--cc) 35%, transparent), 0 0 14px color-mix(in srgb, var(--cc) 30%, transparent); }
+html.reduce-motion .u2c *, html.reduce-motion .dev-scroll.enter > .card { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) { .u2c *, .dev-scroll.enter > .card { animation: none !important; } }
+.u2c.v3.inst .u2s > .u2fx .u2fx-l { top: auto; bottom: 10px; right: 14px; }

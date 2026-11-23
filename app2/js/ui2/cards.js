@@ -29,11 +29,22 @@ function dial(p, label, get, set, onLong) {
   s.append(svgEl('circle', { class: 'disc', cx: 24, cy: 24, r: 13 }), trk, val, dot);
   const v = h('span', { class: 'v' }), el = h('div', { class: 'u2d', role: 'slider', 'aria-label': label, tabindex: 0 }, h('span', { class: 'n', title: p.n }, label), s, v);
   const bip = p.min < 0 && p.max > 0 && p.curve !== 'log';
-  const paint = () => {
-    const x = get(), n = toNorm(p, x), a = A0 + n * (A1 - A0), z = bip ? A0 + toNorm(p, 0) * (A1 - A0) : A0;
+  let shown = null, tw = 0;
+  const drawAt = (n, x) => {
+    const a = A0 + n * (A1 - A0), z = bip ? A0 + toNorm(p, 0) * (A1 - A0) : A0;
     val.setAttribute('d', arc(19, Math.min(a, z), Math.max(a, z)));
     const [dx, dy] = pt(13 - 5, a); dot.setAttribute('cx', dx.toFixed(2)); dot.setAttribute('cy', dy.toFixed(2));
-    v.textContent = fmtParam(p, x); el.setAttribute('aria-valuetext', v.textContent);
+    const t = fmtParam(p, x); if (v.textContent !== t) { v.textContent = t; el.setAttribute('aria-valuetext', t); }
+  };
+  const paint = () => { cancelAnimationFrame(tw); tw = 0; const x = get(); shown = toNorm(p, x); drawAt(shown, x); };
+  // a change from outside (undo, automation, preset) glides there in 180 ms; a drag shows it at once
+  const glide = () => {
+    const x = get(), n = toNorm(p, x);
+    if (shown === null || Math.abs(n - shown) < 0.003 || document.documentElement.classList.contains('reduce-motion')) { if (shown === null || Math.abs(n - shown) >= 0.0005) paint(); return; }
+    if (tw) return;
+    const from = shown, t0 = performance.now();
+    const f = (now) => { const q = Math.min(1, (now - t0) / 180), e = 1 - Math.pow(1 - q, 3); shown = from + (toNorm(p, get()) - from) * e; drawAt(shown, get()); tw = q < 1 ? requestAnimationFrame(f) : 0; };
+    tw = requestAnimationFrame(f);
   };
   let d = null, last = 0;
   el.addEventListener('pointerdown', (e) => {
@@ -57,7 +68,7 @@ function dial(p, label, get, set, onLong) {
     const k = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key]; if (!k) return; e.preventDefault();
     set(fromNorm(p, clamp(toNorm(p, get()) + k * (p.step ? p.step / (p.max - p.min) : 0.01), 0, 1))); paint();
   });
-  el.sync = () => { if (!d) paint(); };
+  el.sync = () => { if (!d) glide(); };
   paint(); return el;
 }
 function toggle(p, label, get, set) {
@@ -157,7 +168,7 @@ const tidy = (n, pf) => { let s = String(n); if (pf && s.startsWith(pf + ' ')) s
 // a card body with tabs (more than one section) and a grid of controls
 function body(key, groups, mk, every, bigTabs) {
   const box = h('div', { class: 'u2c-b' }), tabs = h('div', { class: 'u2c-tabs', role: 'tablist' }), grid = h('div', { class: 'u2c-g' });
-  let live = [];
+  let live = [], shownOnce = false;
   const show = (gi) => {
     tabMem.set(key, gi); const g = groups[gi]; live = [];
     [...tabs.children].forEach((b, j) => { b.classList.toggle('on', j === gi); b.setAttribute('aria-selected', String(j === gi)); });
@@ -169,6 +180,7 @@ function body(key, groups, mk, every, bigTabs) {
     // one grid that fills the rack's height row by row and then grows sideways (a field takes two dial cells): nothing is cut off
     if (env || rows.length || dials.length) parts.push(h('div', { class: 'u2c-dials' }, ...(env ? [env] : []), ...rows, ...dials));
     grid.replaceChildren(...parts); fit();
+    const dl = grid.firstElementChild; if (dl && shownOnce) { dl.classList.remove('swap'); void dl.offsetWidth; dl.classList.add('swap'); } shownOnce = true;
   };
   // rows: as many as the rack is tall (the card is only as tall as its controls, so measure against the rack, not the card)
   const fit = () => requestAnimationFrame(() => {
