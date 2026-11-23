@@ -32,7 +32,7 @@ ok(st.shut, 'the arrangement starts with the whole screen (the device panel is c
 await page.click('#bar2 .play'); await page.waitForTimeout(300);
 ok(await page.evaluate(async () => (await import('./js/project.js')).state.playing), 'Play in the bottom bar starts playback');
 await page.click('#bar2 .play'); await page.waitForTimeout(200);
-await page.click('#bar2 [aria-label="LOOP"]'); await page.waitForTimeout(120);
+await page.click('#tools2 [aria-label="LOOP"]'); await page.waitForTimeout(120);
 ok(await page.evaluate(async () => (await import('./js/project.js')).state.loop.on), 'LOOP switches the arrangement loop on');
 await page.click('#bar2 [aria-label="RACK"]'); await page.waitForTimeout(300);
 ok(!(await page.evaluate(() => document.querySelector('#view-arr').classList.contains('shut'))), 'RACK opens the device panel');
@@ -43,7 +43,7 @@ ok(await page.evaluate(() => document.querySelector('#view-arr').classList.conta
 const clipAt = async (i) => page.evaluate(async (i) => { const TL = await import('./js/timeline.js'), P = await import('./js/project.js'); const c = P.state.tracks[i].clips[0], bx = TL.v2ClipBox(i, c.id), r = document.querySelector('#arr canvas').getBoundingClientRect(); return { x: r.left + bx.x + 20, y: r.top + bx.y + bx.h / 2, id: c.id }; }, i);
 let p = await clipAt(0);
 await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(700);
-ok(await page.evaluate(() => !document.querySelector('#bub2').hidden && document.querySelectorAll('#bub2 .bub').length === 6), 'a tap on a clip shows 6 bubbles (Salin, Gandakan, Hapus, Snap, Edit, Lainnya)');
+ok(await page.evaluate(() => !document.querySelector('#bub2').hidden && document.querySelectorAll('#bub2 .bub').length === 6), 'a tap on a clip shows the clip tools (Edit, Salin, Gandakan, Snap, Hapus, Lainnya)');
 await page.click('#bub2 [aria-label="Salin"]'); await page.waitForTimeout(150);
 ok(await page.evaluate(async () => (await import('./js/project.js')).state.tracks[0].clips.length === 1 && (await import('./js/timeline.js')).v2HasClipboard()), 'Salin copies the clip to the clipboard (Honeydew Copy)');
 await page.click('#bub2 [aria-label="Gandakan"]'); await page.waitForTimeout(200);

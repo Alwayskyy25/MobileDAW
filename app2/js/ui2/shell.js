@@ -39,6 +39,8 @@ const IC = {
   keys: S('<rect x="3" y="6" width="18" height="12" rx="1.8"/><path d="M8 6v12M12 6v12M16 6v12"/><path d="M6.5 6v6.5M10 6v6.5M14 6v6.5M17.5 6v6.5" stroke-width="2.6"/>'),
   keysOff: S('<path d="M5 8h10.5v10.5"/><path d="M5 5l14 14" />'),
   magnet: S('<path d="M6 4v8a6 6 0 0 0 12 0V4"/><path d="M6 8h3.5M14.5 8H18"/><path d="M9.5 4v8a2.5 2.5 0 0 0 5 0V4"/>'),
+  follow: S('<path d="M4 12h11"/><path d="M11 7.5 15.5 12 11 16.5"/><path d="M19 5v14"/>'),
+  save: S('<path d="M5 4.5h11l3.5 3.5v11.5h-14.5z"/><path d="M8 4.5v5h7v-5"/><rect x="8" y="13.5" width="8" height="6" rx="1"/>'),
   plus: S('<path d="M12 5v14M5 12h14"/>'),
   close: S('<path d="M6 6l12 12M18 6 6 18"/>'),
   dup: S('<rect x="3.5" y="6" width="8" height="12" rx="1.6"/><rect x="12.5" y="6" width="8" height="12" rx="1.6" stroke-dasharray="2.2 1.8"/><path d="M16.5 10v4M14.5 12h4"/>'),
@@ -64,14 +66,13 @@ let bar, el = {};
 function buildBar() {
   bar = h('footer', { id: 'bar2' });
   const L = h('div', { class: 'b2-l' }), M = h('div', { class: 'b2-c' }), R = h('div', { class: 'b2-r' });
-  el.mix = btn('tog', IC.mixer, 'MIXER'); el.rack = btn('tog', IC.rack, 'RACK'); el.snd = btn('tog', IC.sounds, 'SUARA');
-  el.rec = btn('rec', IC.rec, 'REKAM'); el.rew = btn('', IC.rew, 'AWAL', 'Kembali ke awal'); el.play = btn('play', IC.play, '', 'Play / pause');
+  el.rack = btn('tab', IC.rack, 'Rack', 'RACK'); el.mix = btn('tab', IC.mixer, 'Mixer', 'MIXER'); el.snd = btn('tab', IC.sounds, 'Suara', 'SUARA'); el.keys = btn('tab', IC.keys, 'Keys', 'Keyboard');
+  el.rew = btn('tp', IC.rew, '', 'Kembali ke awal'); el.rec = btn('tp rec', IC.rec, '', 'Rekam'); el.play = btn('tp play', IC.play, '', 'Play / pause'); el.metro = btn('tp tog', IC.metro, '', 'Metronom');
   el.bpm = h('button', { class: 'u2b bpm', 'aria-label': 'Tempo' }, h('b', null, '120'), h('span', { class: 'lb' }, 'BPM'));
-  el.metro = btn('tog', IC.metro, 'METRO', 'Metronom'); el.loop = btn('tog', IC.loop, 'LOOP');
-  el.undo = btn('', IC.undo, '', 'Urungkan'); el.redo = btn('', IC.redo, '', 'Ulangi');
+  el.undo = btn('tab', IC.undo, 'Undo', 'Urungkan'); el.redo = btn('tab', IC.redo, 'Redo', 'Ulangi');
   el.cpu = h('div', { class: 'u2cpu', 'aria-label': 'Beban CPU audio' }, h('b', null, '0 %'), h('span', null, ''));
-  el.keys = btn('tog', IC.keys, '', 'Keyboard');
-  L.append(el.mix, el.rack, el.snd); M.append(el.rec, el.rew, el.play, el.bpm, el.metro, el.loop); R.append(el.undo, el.redo, el.cpu, el.keys);
+  for (const [b, k] of [[el.rack, 'fx'], [el.mix, 'solo']]) { b.append(h('i', { class: 'bdg', 'data-k': k })); }   // badges: effects on the track / a solo is on
+  L.append(el.rack, el.mix, el.snd, el.keys); M.append(h('div', { class: 'tpill' }, el.rew, el.rec, el.play), el.metro, el.bpm); R.append(el.undo, el.redo, el.cpu);
   bar.append(L, M, R);
   $('#app').append(bar);
   el.mix.onclick = () => { closeMenu(); api.showView(api.getView() === 'mix' ? 'arr' : 'mix'); };
@@ -82,7 +83,6 @@ function buildBar() {
   el.rew.onclick = () => P.seekTo(0);
   el.play.onclick = () => P.togglePlay();
   el.metro.onclick = () => P.toggleMetro();
-  el.loop.onclick = () => { P.setLoop({ on: !state.loop.on }); toast(state.loop.on ? 'Loop nyala.' : 'Loop mati.', 900); };
   el.undo.onclick = undoOp; el.redo.onclick = redoOp;
   { // BPM: tap = the Tempo window (tap tempo, time signature), a vertical drag = change the tempo
     const b = el.bpm; let d = null;
@@ -101,14 +101,18 @@ let last = '';
 export function readouts() {
   if (!on) return;
   const tab = api.getTab(), shut = api.isShut(), v = api.getView();
-  const k = [state.playing, P.rec.on, state.metro, state.loop.on, Math.round(state.bpm * 100), canUndo(), canRedo(), v, tab, shut, BR.isOpen(), Math.round(state.cpu * 100)].join('|');
+  const t = state.tracks[state.sel.track], nfx = t && t.devices ? t.devices.length : 0, solo = state.tracks.some((q) => q.solo);
+  { const sec = Math.max(0, P.tickToSec(Math.max(0, state.pos))), tt = Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0'), nm = state.projectName || 'Tanpa nama';
+    if (title && (title._t !== tt || title._n !== nm)) { title._t = tt; title._n = nm; title.firstChild.textContent = nm; title.lastChild.textContent = tt; } }
+  const k = [state.playing, P.rec.on, state.metro, state.loop.on, Math.round(state.bpm * 100), canUndo(), canRedo(), v, tab, shut, BR.isOpen(), Math.round(state.cpu * 100), nfx, solo].join('|');
   if (k === last) return; last = k;
   el.play.innerHTML = state.playing ? IC.pause : IC.play; el.play.classList.toggle('on', !!state.playing);
-  el.rec.classList.toggle('on', !!P.rec.on); el.metro.classList.toggle('on', !!state.metro); el.loop.classList.toggle('on', !!state.loop.on);
+  el.rec.classList.toggle('on', !!P.rec.on); el.metro.classList.toggle('on', !!state.metro); syncSnap();
   el.bpm.firstChild.textContent = Number.isInteger(state.bpm) ? String(state.bpm) : state.bpm.toFixed(1);
   el.undo.disabled = !canUndo(); el.redo.disabled = !canRedo();
   el.mix.classList.toggle('on', v === 'mix'); el.rack.classList.toggle('on', v === 'arr' && tab === 'dev' && !shut); el.keys.classList.toggle('on', v === 'arr' && tab === 'keys' && !shut);
   el.snd.classList.toggle('on', BR.isOpen());
+  { const a = el.rack.querySelector('.bdg'), b = el.mix.querySelector('.bdg'); a.textContent = nfx ? String(nfx) : ''; a.hidden = !nfx; b.textContent = 'S'; b.hidden = !solo; }
   const c = Math.round(clamp(state.cpu * 100, 0, 999)); el.cpu.firstChild.textContent = c + ' %'; el.cpu.classList.toggle('hot', c > 80); el.cpu.classList.toggle('warm', c > 55 && c <= 80);
   const m = performance.memory; el.cpu.lastChild.textContent = m ? Math.round(m.usedJSHeapSize / 1048576) + ' MB' : 'CPU';
 }
@@ -120,14 +124,10 @@ function buildCol() {
   const va = $('#view-arr');
   col = h('div', { id: 'tcol2' });
   topEl = h('div', { class: 'tc-top' });
-  const snap = btn('snap', IC.magnet, '', 'Snap ke grid'); topEl.append(snap, h('span', { class: 'tc-grid' }, ''));
+  addEl = btn('add', IC.plus, '', 'Tambah track'); topEl.append(addEl);
   rowsEl = h('div', { class: 'tc-rows' });
-  addEl = btn('add', IC.plus, '', 'Tambah track');
-  rowsEl.append(addEl);
   col.append(topEl, rowsEl);
   va.prepend(col);
-  // snap: tap = on / off, long press = the grid choices
-  holdTap(snap, () => { TL.v2SnapToggle(); syncSnap(); }, (e) => { const r = snap.getBoundingClientRect(); TL.v2SnapMenu(r.left, r.bottom + 4); });
   addEl.onclick = (e) => { const r = addEl.getBoundingClientRect(); TL.v2AddMenu(r.right + 4, r.top); };
   // a vertical drag anywhere on the column scrolls the tracks with the timeline
   let d = null;
@@ -143,7 +143,7 @@ function buildCol() {
   applyWide();
 }
 function applyWide() { document.documentElement.classList.toggle('tc-wide', wide()); colSig = ''; requestAnimationFrame(() => { TL.fitNow(); }); }
-function syncSnap() { const b = topEl.querySelector('.snap'); b.classList.toggle('on', TL.v2SnapOn()); topEl.querySelector('.tc-grid').textContent = TL.v2SnapOn() ? TL.v2SnapName() : 'Off'; }
+function syncSnap() { if (!tools) return; tools.snap.classList.toggle('on', TL.v2SnapOn()); tools.snap.querySelector('.lb').textContent = TL.v2SnapOn() ? 'Snap ' + TL.v2SnapName() : 'Snap'; tools.follow.classList.toggle('on', TL.v2Follow()); tools.loop.classList.toggle('on', !!state.loop.on); }
 // tap / long press on one element (the long press does not also fire the tap)
 function holdTap(b, tap, long) {
   let t = 0, fired = false;
@@ -206,11 +206,11 @@ function syncCol() {
     for (let i = 0; i < want; i++) {
       const kind = i < n ? 'trk' : 'x';
       let r = kids[i];
-      if (!r || r._kind !== kind) { const nr = rowEl(kind, i); nr._kind = kind; if (r) r.replaceWith(nr); else rowsEl.insertBefore(nr, addEl); r = nr; kids[i] = r; }
+      if (!r || r._kind !== kind) { const nr = rowEl(kind, i); nr._kind = kind; if (r) r.replaceWith(nr); else rowsEl.append(nr); r = nr; kids[i] = r; }
       r._i = i;
       const tile = r.firstChild;
       if (kind === 'trk') {
-        const t = state.tracks[i]; r.style.setProperty('--tc', t.color); tile.innerHTML = kindIcon(t);
+        const t = state.tracks[i]; r.style.setProperty('--tc', t.color); tile.innerHTML = kindIcon(t) + '<span class="tc-nm"></span>'; tile.lastChild.textContent = t.name;
         r.classList.toggle('sel', state.sel.track === i); r.classList.toggle('muted', !!t.mute); r.classList.toggle('auto', t.kind === 'auto'); r.classList.toggle('fold', !!t.fold);
         r.querySelector('.tc-name').textContent = t.name;
         r.querySelector('.tc-on').classList.toggle('on', !t.mute); r.querySelector('.tc-solo').classList.toggle('on', !!t.solo);
@@ -218,13 +218,12 @@ function syncCol() {
         r.querySelector('.tc-pan').style.setProperty('--a', (clamp(t.pan, -1, 1) * 135).toFixed(1) + 'deg');
         tile.setAttribute('aria-label', t.name);
       } else {
-        const x = TL.v2XRow(i); r._strip = x.strip; r.style.setProperty('--tc', x.color); tile.innerHTML = IC.bus; r.classList.toggle('sel', state.sel.track === x.strip); r.classList.add('xrow'); tile.setAttribute('aria-label', x.name);
+        const x = TL.v2XRow(i); r._strip = x.strip; r.style.setProperty('--tc', x.color); tile.innerHTML = IC.bus + '<span class="tc-nm"></span>'; tile.lastChild.textContent = x.name; r.classList.toggle('sel', state.sel.track === x.strip); r.classList.add('xrow'); tile.setAttribute('aria-label', x.name);
       }
     }
     syncSnap();
   }
   for (const r of rowsEl.querySelectorAll('.tc-row')) { const b = TL.v2Row(r._i); r.style.transform = `translateY(${Math.round(b.y - g.ruler)}px)`; r.style.height = Math.max(0, b.h - 1) + 'px'; }
-  const ab = TL.v2Row(nn); addEl.style.transform = `translateY(${Math.round(ab.y - g.ruler + 6)}px)`;
   col.style.height = g.H ? g.H + 'px' : '';
 }
 
@@ -236,11 +235,11 @@ function buildBubbles() {
   bubEl = h('div', { id: 'bub2', hidden: true });
   const mk = (ic, label, fn) => { const b = btn('bub', ic, label); b.onclick = (e) => { e.stopPropagation(); fn(e); }; return b; };
   bubEl.append(
+    mk(IC.edit, 'Edit', () => { const c = cur(); if (!c) return; hideBub(); api.openEditor(); }),
     mk(IC.copy, 'Salin', () => { const c = cur(); if (c) TL.v2CopyClip(bub.i, c); }),
     mk(IC.dup, 'Gandakan', () => { const c = cur(); if (!c) return; TL.v2Copy(bub.i, c); bub.id = state.sel.clip; }),
-    mk(IC.trash, 'Hapus', () => { const c = cur(); if (!c) return; checkpoint(); P.removeClip(bub.i, c.id); hideBub(); }),
     mk(IC.snap, 'Snap', () => { const c = cur(); if (c) TL.v2Snap(bub.i, c); }),
-    mk(IC.edit, 'Edit', () => { const c = cur(); if (!c) return; hideBub(); api.openEditor(); }),
+    mk(IC.trash, 'Hapus', () => { const c = cur(); if (!c) return; checkpoint(); P.removeClip(bub.i, c.id); hideBub(); }),
     mk(IC.more, 'Lainnya', (e) => moreMenu(e)),
   );
   insEl = h('div', { id: 'ins2', hidden: true });
@@ -277,28 +276,35 @@ function moreMenu(e) {
     { label: 'Potong rata\u2026', sub: [...[6, 4, 3, 2, 1].map((n) => ({ label: n === 1 ? 'Tiap 1 ketuk' : 'Tiap 1/' + n + ' ketuk', fn: () => TL.v2Chop(i, c, { every: n }) })), ...(audio ? [{ label: 'Di transien', fn: () => TL.v2Chop(i, c, { transients: true }) }] : [])] },
     { label: 'Ganti nama\u2026', fn: () => TL.v2Rename(i, c) },
     { sep: true },
-    { label: 'Semua perintah klip\u2026', fn: () => TL.v2ClipMenu(i, c, r.left, r.bottom + 4) },
-  ], r.left, r.bottom + 4);
+    { label: 'Semua perintah klip\u2026', fn: () => TL.v2ClipMenu(i, c, r.left - 230, r.top) },
+  ], r.left - 230, r.top - 120);
 }
 function placeBub() {
   if (!bub) return;
   const c = cur();
   if (!c || state.sel.clip !== bub.id || TL.v2Busy() || api.getView() !== 'arr') { if (!c || state.sel.clip !== bub.id) hideBub(); else bubEl.hidden = true; return; }
-  const b = TL.v2ClipBox(bub.i, bub.id), g = TL.v2Geom(); if (!b) return hideBub();
-  bubEl.hidden = false;
-  const off = col ? col.offsetWidth : 0, bw = bubEl.offsetWidth || 300, bh = bubEl.offsetHeight || 54;
-  let x = off + clamp(b.x + Math.min(b.w, 400) / 2 - bw / 2, 4, Math.max(4, g.W - bw - 4));
-  let y = b.y - bh - 6; if (y < g.ruler + 2) y = b.y + b.h + 6; if (y + bh > g.laneB) y = clamp(b.y + 6, g.ruler + 2, Math.max(g.ruler + 2, g.laneB - bh - 2));
+  const g = TL.v2Geom(); bubEl.hidden = false;
+  const off = col ? col.offsetWidth : 0, bw = bubEl.offsetWidth || 64, bh = bubEl.offsetHeight || 300;   // MobileDAW 2: the rail sits at the right edge of the lanes, centred
+  const x = off + g.W - bw - 10, y = Math.max(g.ruler + 6, g.ruler + (g.laneB - g.ruler - bh) / 2);
   bubEl.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`;
 }
 
 // ------------------------------------------------------------------ main menu (logo button, panel from the right)
-let logo, mm, mmBody, mmTab = 'lagu';
+let logo, mm, mmBody, mmTab = 'lagu', tools = null, title = null;
 const TABS = [['lagu', 'LAGU'], ['proyek', 'PROYEK'], ['ekspor', 'EKSPOR'], ['atur', 'PENGATURAN'], ['bantu', 'BANTUAN']];
 function buildMenu() {
   logo = h('button', { id: 'logo2', 'aria-label': 'Menu utama' }, h('img', { src: 'icons/icon-192.png', alt: '' }));
   logo.onclick = () => (mm.classList.contains('open') ? closeMenu() : openMenu());
-  $('#view-arr').append(logo);
+  const pill = (ic, label, aria) => { const b = btn('pill', ic, label, aria); return b; };
+  tools = { snap: pill(IC.magnet, 'Snap', 'Snap ke grid'), follow: pill(IC.follow, 'Ikuti', 'Ikuti playhead'), loop: pill(IC.loop, 'Loop', 'LOOP'), save: pill(IC.save, '', 'Simpan') };
+  const grp = h('div', { id: 'tools2' }, h('div', { class: 'tg' }, tools.snap, tools.follow, tools.loop), tools.save);
+  holdTap(tools.snap, () => { TL.v2SnapToggle(); syncSnap(); }, () => { const r = tools.snap.getBoundingClientRect(); TL.v2SnapMenu(r.left, r.bottom + 4); });
+  tools.follow.onclick = () => { TL.v2SetFollow(!TL.v2Follow()); syncSnap(); };
+  tools.loop.onclick = () => { P.setLoop({ on: !state.loop.on }); syncSnap(); toast(state.loop.on ? 'Loop nyala.' : 'Loop mati.', 900); };
+  holdTap(tools.save, () => QS.quickSave(), () => QS.saveAs());
+  title = h('button', { id: 'title2', 'aria-label': 'Nama lagu dan waktu' }, h('b', null, ''), h('span', null, '0:00'));
+  title.onclick = () => openMenu('proyek');
+  $('#view-arr').append(grp, title, logo);
   mm = h('div', { id: 'mm2', 'aria-hidden': 'true' });
   const scrim = h('div', { class: 'u2m-scrim' }), pan = h('aside', { class: 'u2m-pan' });
   const x = btn('u2m-x', IC.close, '', 'Tutup');
@@ -307,7 +313,7 @@ function buildMenu() {
   pan.append(h('header', { class: 'u2m-hd' }, h('img', { src: 'icons/icon-192.png', alt: '' }), h('div', null, h('b', null, 'MobileDAW 2'), h('span', null, 'versi 2.0')), x), tabs, mmBody);
   mm.append(scrim, pan); $('#app').append(mm);
   scrim.onclick = closeMenu; x.onclick = closeMenu;
-  QS.onSaveState((d) => logo.classList.toggle('unsaved', d));
+  QS.onSaveState((d) => { logo.classList.toggle('unsaved', d); tools.save.classList.toggle('unsaved', d); });
 }
 export function openMenu(tab) { if (tab) mmTab = tab; renderMenu(); mm.classList.add('open'); mm.setAttribute('aria-hidden', 'false'); }
 export function closeMenu() { if (!mm || !mm.classList.contains('open')) return false; mm.classList.remove('open'); mm.setAttribute('aria-hidden', 'true'); return true; }

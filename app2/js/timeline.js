@@ -98,6 +98,7 @@ const headAuto = () => (full() ? (W >= 1100 ? 262 : W >= 760 ? 240 : 208) : (W >
 const headPref = () => (full() ? prefs.headW : prefs.headWc) || 0;
 // MobileDAW 2.0 (js/ui2/shell.js): no header column on the canvas (the shell draws its own track column left of it) and no bottom time ruler
 let V2 = false;
+const PH = () => T('--accent') || '#ffa722';   // playhead, current bar, selection: the theme's accent
 export function setV2(on) { V2 = !!on; if (W) { applyHead(); clampView(); } invalidate(); }
 export const isV2 = () => V2;
 function applyHead() { BOT = V2 ? 0 : 19; if (V2) { HEAD = 0; CW = W; return; } const [lo, hi] = headLim(); HEAD = headPref() > 0 ? Math.round(clamp(headPref(), lo, Math.min(hi, Math.max(lo, W - 120)))) : headAuto(); CW = Math.max(60, W - HEAD); }
@@ -259,17 +260,19 @@ function drawClip(t, c, y, hh) {
   ctx.save();
   const cy0 = Math.max(RULER, y0), cy1 = Math.min(LANE_B(), y0 + h0);              // clipped to the clip itself and the lane area: notes never spill while it glides
   ctx.beginPath(); ctx.rect(xs, cy0, Math.max(0, xe - xs), Math.max(0, cy1 - cy0)); ctx.clip();
+  if (V2) { ctx.beginPath(); ctx.roundRect(x + 0.5, y0, Math.max(1, w - 1), h0, Math.min(5, w / 2, h0 / 2)); ctx.clip(); }   // MobileDAW 2: rounded clips
   // Live (replica of the arrangement clip, same in every theme: clip colours are not themed): title strip and body in the clip colour, the name and the
   // content (waveform / notes / envelope) in near-black on a light colour or near-white on a dark one, a thin dark edge; a selected clip turns lighter,
   // a deactivated clip is grey. Folded / short rows show only the colour + content (no strip).
   const body = c.muted ? '#9a9a9f' : t.color;                              // owner: the clip keeps exactly its track's colour (the header's) also when selected; the light edge shows the selection
   ctx.fillStyle = body; ctx.fillRect(x, y0, w, h0);
-  if (tall) { ctx.fillStyle = col; ctx.fillRect(x, y0, w, hd); ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.fillRect(x, y0 + hd, w, 1); }   // the name strip: same colour, a faint line under it
+  const strip = V2 && !c.muted ? shade(col, 0.28) : col;   // MobileDAW 2: a deeper title strip, the name in light text
+  if (tall) { ctx.fillStyle = strip; ctx.fillRect(x, y0, w, hd); ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.fillRect(x, y0 + hd, w, 1); }   // the name strip: same colour, a faint line under it
   // Live 12 (refs/live12-official/02): no outline around a clip; the arrangement grid runs through its body as faint darker lines (beats, bars)
   { const gx = gridT(), bp = BAR * view.ppt; if (gx * view.ppt >= 6) { ctx.fillStyle = 'rgba(0,0,0,.08)'; for (let tk = Math.ceil(cs / gx) * gx; tk < cs + cl; tk += gx) { const lx = Math.round(tx(tk)); if (lx > xs && lx < xe) ctx.fillRect(lx, y0 + hd, 1, h0 - hd); } }
     if (bp >= 4) { ctx.fillStyle = 'rgba(0,0,0,.12)'; for (let b = Math.max(0, P.barAt(cs)); P.barStart(b) < cs + cl; b++) { const lx = Math.round(tx(P.barStart(b))); if (lx > xs && lx < xe) ctx.fillRect(lx, y0 + hd, 1, h0 - hd); } } }
   if (tall && w > 18) {
-    ctx.fillStyle = ink(col); ctx.font = FONT(500, 10); ctx.textBaseline = 'middle';   // Live: clip names regular weight
+    ctx.fillStyle = ink(strip); ctx.font = FONT(V2 ? 600 : 500, 10); ctx.textBaseline = 'middle';   // Live: clip names regular weight
     { const room = xe - xs - 10, nm = c.name || (c.sample ? c.sample.name : t.name); if (room > 8) ctx.fillText(cut2(nm, room), xs + 5, y0 + hd / 2 + 0.5); }   // owner: cut with an ellipsis ("11 Cas…"), never squeezed
   }
   const by = y0 + hd + 2, bh = h0 - hd - 4, INK = c.muted ? 'rgba(20,20,24,.6)' : contentInk(t.color);
@@ -344,7 +347,7 @@ function drawClip(t, c, y, hh) {
   }
   if (isSel) {
     ctx.strokeStyle = shade(t.color, 0.6); ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 0.5, y0 + 0.5, Math.max(0, Math.round(w) - 1), h0 - 1);   // selected: one crisp 1 px edge (owner: thinner)
-    if (V2) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.strokeRect(Math.round(x) + 1, y0 + 1, Math.max(0, Math.round(w) - 2), h0 - 2); }   // 2.0: a white frame
+    if (V2) { ctx.strokeStyle = PH(); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.roundRect(Math.round(x) + 1.25, y0 + 1.25, Math.max(0, Math.round(w) - 2.5), h0 - 2.5, 4); ctx.stroke(); }   // MobileDAW 2: the selection in the accent colour
     if (!V2 && tall && w > 44 && !msel.size) { const mx = Math.min(x + w, CW) - 12, my = y0 + hd / 2; ctx.fillStyle = shade(t.color, 0.75); for (const d of [-4, 0, 4]) { ctx.beginPath(); ctx.arc(mx + d, my, 1.3, 0, 6.2832); ctx.fill(); } }   // ⋯ : the clip's context menu
     const hl = Math.min(26, h0 - hd - 10), hy = y0 + hd + (h0 - hd - hl) / 2, st = stretchMode && t.kind === 'audio';   // edge grips for touch: pills on both ends
     if (hl > 6 && w > 26 && st) { ctx.fillStyle = C('#ffa722'); ctx.fillRect(x + w - 6, hy, 3, hl); }   // the stretch mode's mark (the handles are drawn by drawHandles)
@@ -512,8 +515,8 @@ function drawRuler(g) {
   for (let b = Math.floor(Math.max(0, P.barAt(view.x0)) / k) * k; tx(P.barStart(b)) < CW; b++) {
     const c = chg.get(b), x = Math.round(tx(P.barStart(b)));
     if (b % k && !c) { ctx.fillStyle = `rgba(${RI},.9)`; ctx.fillRect(x, LT - 10, 1, 9); continue; }   // unlabelled bars: a longer tick
-    ctx.fillStyle = c ? C('#ffa722') : `rgb(${RI})`; ctx.fillRect(x, LT - 12, 1, 11);   // Live: a short line up from the ruler's bottom edge, the number right of it
-    const lab = String(b + 1); ctx.fillStyle = c ? C('#ffa722') : `rgba(${RI},.72)`; ctx.fillText(lab, x + 3, 4);
+    ctx.fillStyle = c ? PH() : `rgb(${RI})`; ctx.fillRect(x, LT - 12, 1, 11);   // Live: a short line up from the ruler's bottom edge, the number right of it
+    const lab = String(b + 1); ctx.fillStyle = c ? PH() : `rgba(${RI},.72)`; ctx.fillText(lab, x + 3, 4);
     if (c) { ctx.font = FONT(700, 9); ctx.fillText(c.n + '/' + c.d, x + 8 + ctx.measureText(lab).width, 5); ctx.font = FONT(400, 9.5); }
   }
   if (PUon()) { ctx.fillStyle = C('#ff3636'); ctx.fillRect(tx(state.punch.start), RULER - 3, tx(state.punch.end) - tx(state.punch.start), 2); ctx.fillRect(tx(state.punch.start) - 1, RULER - 11, 4, 9); ctx.fillRect(tx(state.punch.end) - 3, RULER - 11, 4, 9); }
@@ -610,14 +613,14 @@ function drawHead(tick) {
   octx.save(); octx.beginPath(); octx.rect(0, 0, CW, H); octx.clip();
   const x = Math.round(px * dpr) / dpr;
   // the light travels with the playhead: a glow in the colour of the clip it is crossing, breathing with the master level while playing
-  const hc = clipColorAt(tick) || '#ffa722', lv = state.playing && !calmTL() ? meterFrac(Math.max(mDisp[MASTER * 2] || 0, mDisp[MASTER * 2 + 1] || 0)) : 0.35;
+  const hc = clipColorAt(tick) || PH(), lv = state.playing && !calmTL() ? meterFrac(Math.max(mDisp[MASTER * 2] || 0, mDisp[MASTER * 2 + 1] || 0)) : 0.35;
   { const R = 20 + lv * 14, gr = octx.createRadialGradient(x, RULER, 1, x, RULER, R); gr.addColorStop(0, washRgba(hc, 0.32 + lv * 0.4)); gr.addColorStop(0.5, washRgba(hc, 0.10 + lv * 0.15)); gr.addColorStop(1, washRgba(hc, 0));   // tight: about 20..34 px around the playhead
     // only left and right of the playhead, inside the ruler (owner: no light on the bars it has passed or has yet to reach, none in the grid)
     octx.save(); octx.beginPath(); octx.rect(0, 0, CW, RULER); octx.clip(); octx.fillStyle = gr; octx.fillRect(x - R, 0, R * 2, RULER); octx.restore(); }
-  if (px >= 0) { octx.fillStyle = 'rgba(0,0,0,.35)'; octx.fillRect(x + 1.5, RULER, 1, LANE_B() - RULER); octx.fillStyle = C('#ffa722'); octx.fillRect(x, RULER, 1.5, LANE_B() - RULER); }
+  if (px >= 0) { octx.fillStyle = 'rgba(0,0,0,.35)'; octx.fillRect(x + 1.5, RULER, 1, LANE_B() - RULER); octx.fillStyle = PH(); octx.fillRect(x, RULER, 1.5, LANE_B() - RULER); }
   if (!state.playing && px >= 0) { const on = calmTL() || Math.floor(performance.now() / 530) % 2 === 0, i = state.sel.track;   // Live's flashing blue insert marker on the selected track
     if (on) { const y0 = i >= 0 && i < state.tracks.length ? rowY(i) : RULER, h0 = i >= 0 && i < state.tracks.length ? rh(i) - 2 : LANE_B() - RULER; octx.save(); octx.beginPath(); octx.rect(0, RULER, CW, LANE_B() - RULER); octx.clip(); octx.fillStyle = '#2aa7ff'; octx.fillRect(x - 0.25, y0, 2, h0); octx.restore(); } }
-  octx.save(); octx.shadowColor = washRgba(hc, 0.9); octx.shadowBlur = 4 + lv * 4; octx.fillStyle = C('#ffa722'); octx.beginPath(); octx.moveTo(x - 5.5, LT); octx.lineTo(x + 6.5, LT); octx.lineTo(x + 0.75, LT + 8); octx.closePath(); octx.fill(); octx.restore();   // the playhead flag glows
+  octx.save(); octx.shadowColor = washRgba(hc, 0.9); octx.shadowBlur = 4 + lv * 4; octx.fillStyle = PH(); octx.beginPath(); octx.moveTo(x - 5.5, LT); octx.lineTo(x + 6.5, LT); octx.lineTo(x + 0.75, LT + 8); octx.closePath(); octx.fill(); octx.restore();   // the playhead flag glows
   octx.restore();
 }
 

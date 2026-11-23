@@ -17,6 +17,9 @@ const LIB = {
   // Live 12's default dark theme (refs/live12-official 01-03): the greys a little lighter and cool - lanes about #2c2e35, panels #23252a
   // Live 12's light theme (refs/live12-official 04): cool greys - lanes / ruler / header #a1a5ae, the alternate bands #989ca5
   live12light: { name: 'Light (Live 12)', base: 'light', a: -33, b: 1.0, tint: [0, 4, 13], over: { '--line': '#3a3c43', '--sep': '#55585f', '--tb-bg': '#7d818d', '--tb-fld': '#a1a5ae', '--hd-bg': '#a1a5ae', '--hd-bgsel': '#b4b8c1', '--hd-fld': '#d2d4da', '--hd-ink': '#0f1014', '--hd-ink2': '#0f1014', '--hd-bd': '#3a3c43', '--hd-line': '#3a3c43', '--hd-well': '#e1e2e7', '--hd-vol': '#05c9d9', '--hd-vink': '#0f1014', '--hd-mw': '#a1a5ae', '--hd-mb': '#3a3c43', '--tb-line': '#3a3c43', '--tb-ico': '#0f1014', '--btn-bd': '#3a3c43' } },
+  // MobileDAW 2's own theme: warm charcoal greys, cream accent (playhead, selection, active tools), a deep red record button
+  studio:   { name: 'Studio (MobileDAW 2)', base: 'dark', a: 4, b: 0.99, tint: [9, 5, 0], over: { '--accent': '#e8dcc4', '--accent-ink': '#1c1915', '--text': '#e4dccf', '--dim': '#9b9287',
+    '--rec': '#d6303d', '--play': '#e8dcc4', '--lv-or': '#e8dcc4', '--lv-orink': '#e8dcc4', '--menu': '#36322e', '--toast': '#e8dcc4ee', '--toast-ink': '#1c1915' } },
   live12:   { name: 'Dark (Live 12)', base: 'dark', a: 10, b: 0.96, tint: [-2, 0, 12], over: { '--tb-bg': '#272a33', '--tb-fld': '#333541', '--tb-line': '#1c1e25', '--tb-ico': '#d4d5db', '--btn-bd': '#16171c' } },   // lanes / ruler #323440 as sampled from refs/live12-official/02
   lightmc:  { name: 'Light Neutral Medium Contrast', base: 'light', a: -26, b: 1.04 },
   lightlc:  { name: 'Light Neutral Low Contrast', base: 'light', a: -8, b: 0.86 },
@@ -46,7 +49,7 @@ for (const [id, t] of Object.entries(LIB)) {
 // the Light theme IS the Ableton Live reference palette (owner's request: 'pakai tema light'); the derived Mid Light / High Contrast themes were built from the old values above
 THEMES.light = THEMES.ableton; delete THEMES.ableton;
 export const THEME_TONE = { live12light: 'light', light: 'light', midlight: 'light', lighthc: 'light', lightmc: 'light', lightlc: 'light' };
-export const THEME_NAMES = { dark: 'Dark', middark: 'Mid Dark', lowc: 'Dark Neutral Low Contrast', live12: 'Dark (Live 12)', live12light: 'Light (Live 12)', medc: 'Dark Neutral Medium Contrast', highc: 'Dark Neutral High Contrast', live: 'Live Classic', black: 'Darkest (OLED)', midlight: 'Mid Light', light: 'Light (Ableton Live)', lightmc: 'Light Neutral Medium Contrast', lightlc: 'Light Neutral Low Contrast', lighthc: 'Light Neutral High Contrast' };
+export const THEME_NAMES = { studio: 'Studio (MobileDAW 2)', dark: 'Dark', middark: 'Mid Dark', lowc: 'Dark Neutral Low Contrast', live12: 'Dark (Live 12)', live12light: 'Light (Live 12)', medc: 'Dark Neutral Medium Contrast', highc: 'Dark Neutral High Contrast', live: 'Live Classic', black: 'Darkest (OLED)', midlight: 'Mid Light', light: 'Light (Ableton Live)', lightmc: 'Light Neutral Medium Contrast', lightlc: 'Light Neutral Low Contrast', lighthc: 'Light Neutral High Contrast' };
 // swatches for the theme picker: background, panel, control, text
 export const themeSwatch = (id) => { const t = THEMES[id] || THEMES.dark; return [t['--bg'], t['--panel2'], t['--raise2'], t['--text']]; };
 // ---- Live 12's theme adjustments (Settings -> Tema): every theme can be shifted without making a new one.
