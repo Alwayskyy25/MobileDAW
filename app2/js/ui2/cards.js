@@ -7,7 +7,7 @@
 // The classic full editor (with its graphs and sample zones) stays one tap away in a floating window: nothing is lost.
 import { h, clamp, menu, toNorm, fromNorm, toast } from '../ui.js';
 import * as P from '../project.js';
-import { INSTRUMENTS, DEVICES, fmtParam, NO_WET_FX, WET_PARAMS, MIX_P } from '../defs.js';
+import { INSTRUMENTS, DEVICES, fmtParam, NO_WET_FX, WET_PARAMS, MIX_P, FX_GROUPS } from '../defs.js';
 import { FLM_LAYOUT } from '../flmlayout.js';
 import { offerAutomation } from '../automate.js';
 import { gestureTiming } from '../gesture.js';
@@ -26,7 +26,7 @@ function dial(p, label, get, set, onLong) {
   const s = svgEl('svg', { viewBox: '0 0 48 48', 'aria-hidden': 'true' });
   const trk = svgEl('path', { class: 'trk', d: arc(19, A0, A1) }), val = svgEl('path', { class: 'val' }), dot = svgEl('circle', { class: 'dot', r: 3.2 });
   s.append(svgEl('circle', { class: 'disc', cx: 24, cy: 24, r: 13 }), trk, val, dot);
-  const v = h('span', { class: 'v' }), el = h('div', { class: 'u2d', role: 'slider', 'aria-label': label, tabindex: 0 }, s, v, h('span', { class: 'n', title: p.n }, label));
+  const v = h('span', { class: 'v' }), el = h('div', { class: 'u2d', role: 'slider', 'aria-label': label, tabindex: 0 }, h('span', { class: 'n', title: p.n }, label), s, v);
   const bip = p.min < 0 && p.max > 0 && p.curve !== 'log';
   const paint = () => {
     const x = get(), n = toNorm(p, x), a = A0 + n * (A1 - A0), z = bip ? A0 + toNorm(p, 0) * (A1 - A0) : A0;
@@ -169,8 +169,13 @@ function body(key, groups, mk, every, bigTabs) {
     if (env || rows.length || dials.length) parts.push(h('div', { class: 'u2c-dials' }, ...(env ? [env] : []), ...rows, ...dials));
     grid.replaceChildren(...parts); fit();
   };
-  const fit = () => requestAnimationFrame(() => { const hh = grid.clientHeight; if (hh > 0) grid.style.setProperty('--rows', String(Math.max(1, Math.floor((hh + 6) / 84)))); });
-  if (typeof ResizeObserver !== 'undefined') { let last = 0; new ResizeObserver(() => { if (grid.clientHeight !== last) { last = grid.clientHeight; fit(); } }).observe(grid); }
+  // rows: as many as the rack is tall (the card is only as tall as its controls, so measure against the rack, not the card)
+  const fit = () => requestAnimationFrame(() => {
+    const sc = grid.closest('.dev-scroll'), dl = grid.querySelector('.u2c-dials'); if (!sc) return;
+    const hh = sc.clientHeight - (grid.getBoundingClientRect().top - sc.getBoundingClientRect().top) - 22;
+    if (hh > 0) grid.style.setProperty('--rows', String(Math.max(1, Math.min(Math.floor((hh + 6) / 66), dl ? dl.children.length : 1))));
+  });
+  if (typeof ResizeObserver !== 'undefined') { let last = 0; new ResizeObserver(() => { const sc = grid.closest('.dev-scroll'), hgt = sc ? sc.clientHeight : 0; if (hgt !== last) { last = hgt; fit(); } }).observe(grid); requestAnimationFrame(() => { const sc = grid.closest('.dev-scroll'); if (sc) new ResizeObserver(fit).observe(sc); }); }
   if (groups.length > 1 || bigTabs) groups.forEach((g, gi) => tabs.append(h('button', { role: 'tab', onclick: (e) => { e.stopPropagation(); show(gi); } }, g[0])));
   if (tabs.children.length) box.append(tabs);
   box.append(grid);
@@ -188,6 +193,27 @@ function powerSwitch(on, flip, label) {
   return b;
 }
 
+// ---- the card's identity: each effect family has its own colour and icon (the instruments take their track's colour)
+const SV = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const CAT = {
+  echo: ['Echo & Reverb', '#7cc8ff', SV('<path d="M4 12h2M8 8v8M12 5v14M16 8v8M20 11v2"/>')],
+  level: ['Level & Dinamika', '#9be37a', SV('<path d="M5 19V9M10 19V5M15 19v-8M20 19v-5"/>')],
+  eq: ['EQ & Filter', '#ffc65c', SV('<path d="M3 16c3 0 4-8 7-8s3 6 6 6 3-4 5-4"/>')],
+  mod: ['Modulasi', '#c9b3ff', SV('<path d="M3 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0"/>')],
+  pitch: ['Pitch & Stereo', '#ff9ccb', SV('<path d="M8 4v16M8 4l-3 3M8 4l3 3M16 20V4M16 20l-3-3M16 20l3-3"/>')],
+  misc: ['Alat', '#a8b4c8', SV('<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>')],
+  flmnote: ['Note FX', '#6fe0cc', SV('<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>')],
+};
+const INST_IC = SV('<path d="M4 5h16v14H4zM8 5v14M12 5v14M16 5v14"/><path d="M6.6 5v7M10.6 5v7M14.6 5v7M18.2 5v7" stroke-width="2.6"/>');
+const catOf = (type) => { const g = FX_GROUPS.find((x) => x[2].includes(type)); return CAT[g ? g[0] : 'misc'] || CAT.misc; };
+// the section tabs sit in the title row, right of the title (no row of their own, no empty band)
+function inHead(head, b) { const tb = b.querySelector(':scope > .u2c-tabs'); if (tb) head.append(tb); return b; }
+// header: [icon badge] [name / family] ... [extra] [switch] [⋯]
+function header(icon, nameEl, sub, ...right) {
+  const b = h('i', { class: 'u2c-badge', 'aria-hidden': 'true' }); b.innerHTML = icon;
+  return h('div', { class: 'u2c-h' }, b, h('div', { class: 'u2c-tt' }, nameEl, h('small', {}, sub)), ...right.filter(Boolean));
+}
+
 // ---- effect card
 // api: { fxPick(rect, fn), openWindow(), stripName, every }
 export function fxCard(i, d, di, n, api) {
@@ -202,7 +228,8 @@ export function fxCard(i, d, di, n, api) {
     { sep: true },
     { label: 'Hapus', fn: () => P.removeDevice(i, di) },
   ];
-  const head = h('div', { class: 'u2c-h' }, powerSwitch(!off, () => P.toggleBypass(i, di), off ? 'Nyalakan ' + def.name : 'Matikan ' + def.name), name, moreBtn(items));
+  const cat = catOf(d.type);
+  const head = header(cat[2], name, cat[0], powerSwitch(!off, () => P.toggleBypass(i, di), off ? 'Nyalakan ' + def.name : 'Matikan ' + def.name), moreBtn(items));
   const groups = fxGroups(def);
   if (!NO_WET_FX.has(d.type)) groups.push(['Keluaran', ['mix', 'gain'], '']);
   const get = (k) => (k === 'mix' || k === 'gain' ? P.wetOf(d)[k] : (d.params[k] ?? def.params[k].def));
@@ -216,9 +243,9 @@ export function fxCard(i, d, di, n, api) {
   mk.get = get; mk.def = pdef;
   const parts = [head];
   if (d.type === 16) parts.push(h('div', { class: 'u2c-cta' }, h('p', {}, 'Meter, spektrum, osiloskop dan stereo di satu jendela.'), h('button', { class: 'u2btn fill', onclick: () => api.openWindow() }, 'Buka MiniMeters')));
-  if (groups.length) parts.push(body('d' + d.id, groups, mk, api.every));
+  if (groups.length) parts.push(inHead(head, body('d' + d.id, groups, mk, api.every)));
   else parts.push(h('div', { class: 'u2c-empty' }, 'Modul ini tidak punya parameter.'));
-  return h('div', { class: 'card u2c' + (off ? ' off' : '') }, ...parts);
+  const card = h('div', { class: 'card u2c fx' + (off ? ' off' : '') }, ...parts); card.style.setProperty('--cc', cat[1]); return card;
 }
 
 // ---- instrument card
@@ -228,7 +255,7 @@ export function instCard(i, t, api) {
   const name = midi ? h('button', { class: 'u2c-name', onclick: (e) => { e.stopPropagation(); api.pickInst(e.currentTarget.getBoundingClientRect()); } }, h('span', {}, def.name), h('i', { class: 'car', 'aria-hidden': 'true' }))
     : h('div', { class: 'u2c-name' }, h('span', {}, def.name));
   const items = () => [{ label: 'Editor lengkap…', fn: () => api.openWindow() }, ...(api.extra.length ? [{ sep: true }, ...api.extra] : [])];
-  const head = h('div', { class: 'u2c-h' }, h('i', { class: 'u2c-ic', 'aria-hidden': 'true' }), name,
+  const head = header(INST_IC, name, (t.kind === 'drum' ? 'Drum' : 'Instrumen') + ' \u2022 ' + t.name,
     midi ? h('button', { class: 'u2chip', onclick: (e) => { e.stopPropagation(); api.presetMenu(e.currentTarget.getBoundingClientRect()); } }, 'Preset') : null, moreBtn(items));
   const parts = [head];
   if (t.inst.missing) { const x = t.inst.missing; parts.push(h('div', { class: 'u2c-warn' }, (x.name || 'Instrumen') + ': ' + (x.sample ? 'sample ' + x.sample.split('/').pop() : 'program') + ' tidak tersedia')); }
@@ -241,9 +268,9 @@ export function instCard(i, t, api) {
   const mk = (k, pf) => { const p = def.params[k];
     return control(p, tidy(p.n, pf), () => get(k), (v) => P.setInstParam(i, k, v), (rect) => offerAutomation(rect, { kind: 5, strip: P.stripOf(i), param: k, def: p }, `${t.name} • ${p.n}`)); };
   mk.get = get; mk.def = (k) => def.params[k];
-  if (groups.length) parts.push(body('i' + t.id, groups, mk, api.every));
+  if (groups.length) parts.push(inHead(head, body('i' + t.id, groups, mk, api.every)));
   else if (!acts.length) parts.push(h('div', { class: 'u2c-empty' }, 'Instrumen ini diatur lewat editornya.'));
-  return h('div', { class: 'card u2c inst' }, ...parts);
+  const card = h('div', { class: 'card u2c inst' }, ...parts); card.style.setProperty('--cc', t.color || 'var(--accent)'); return card;
 }
 
 // ---- audio track: the source card

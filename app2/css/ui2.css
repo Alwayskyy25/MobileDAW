@@ -734,3 +734,83 @@ html.ui2 #top2 .bpm .lb { font: 600 10.5px/1 var(--font) !important; color: var(
 html.ui2 #top2 .bpm { padding-top: 0 !important; line-height: 34px; }
 html.ui2 #top2 .bpm { align-items: center !important; line-height: 1 !important; padding-top: 4px !important; padding-bottom: 4px !important; }
 html.ui2 #top2 .bpm > * { display: block; margin: 0 !important; position: static !important; transform: none !important; }
+
+/* ===== module cards v2: an identity per module family (colour --cc + icon badge), a two-line title, the accent of the controls in --cc ===== */
+.u2c { --cc: var(--accent); }
+html.ui2 .dev-scroll > .card.u2c { background: linear-gradient(180deg, color-mix(in srgb, var(--cc) 13%, var(--raise)) 0, var(--raise) 92px) !important; }
+.u2c-h { height: 60px; gap: 10px; padding: 0 8px 0 12px; }
+.u2c-badge { flex: none; width: 38px; height: 38px; border-radius: 13px; display: grid; place-items: center; background: color-mix(in srgb, var(--cc) 26%, transparent); color: var(--cc); }
+.u2c-badge svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.u2c-tt { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
+.u2c-tt .u2c-name { height: auto; padding: 0; margin: 0; font: 650 16px/1.2 var(--font); background: none !important; align-self: flex-start; max-width: 100%; }
+.u2c-tt small { font: 500 11.5px/1.2 var(--font); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.u2c .u2sw-b { margin-left: 2px; }
+:is(.on, [aria-checked=true]) > .u2sw { background: var(--cc, var(--accent)); border-color: var(--cc, var(--accent)); }
+:is(.on, [aria-checked=true]) > .u2sw::after { background: #15161a; }
+.u2c-tabs button.on { background: color-mix(in srgb, var(--cc) 28%, transparent) !important; color: var(--text); border-color: transparent; }
+.u2c .u2d .val, .u2c .u2d .dot { stroke: var(--cc); }
+.u2c .u2d .dot { fill: var(--cc); stroke: none; }
+.u2c .u2d .n { order: 0; font: 600 10.5px/1.2 var(--font); letter-spacing: .02em; color: var(--dim); margin-bottom: 1px; }
+.u2c .u2d .v { font: 700 12.5px/1.2 var(--font); color: var(--text); margin-top: 1px; }
+.u2c .u2seg button.on { background: color-mix(in srgb, var(--cc) 30%, transparent); }
+.u2c .u2env .l { stroke: var(--cc); }
+.u2c .u2env .f { fill: color-mix(in srgb, var(--cc) 20%, transparent); }
+.u2c .u2chip { border-color: color-mix(in srgb, var(--cc) 45%, transparent); }
+.u2c .u2btn.tonal { background: color-mix(in srgb, var(--cc) 24%, transparent); }
+html.ui2 .dev-scroll > .card.u2c.off { background: var(--raise) !important; }
+.u2c.off .u2c-badge { filter: grayscale(1); opacity: .6; }
+/* the header's controls follow the title (a wide card never pushes them off screen) */
+.u2c-tt { flex: 0 1 auto; max-width: 240px; margin-right: 6px; }
+.u2c-h > .u2chip { margin-left: 2px; }
+
+/* ===== module cards, compact: a 44 px title row (badge, small name, switch, menu, then the tabs), dense control cells ===== */
+.u2c-h { height: 46px; gap: 8px; padding: 0 10px; }
+.u2c-badge { width: 28px; height: 28px; border-radius: 9px; }
+.u2c-badge svg { width: 17px; height: 17px; }
+.u2c-tt { max-width: 150px; margin-right: 0; }
+.u2c-tt .u2c-name { font: 600 13.5px/1.15 var(--font) !important; gap: 4px; }
+.u2c-tt small { font-size: 10.5px; }
+.u2c .u2sw-b { height: 32px; }
+.u2c .u2sw { transform: scale(.82); }
+.u2c-more { width: 30px; height: 32px; }
+.u2c .u2chip { height: 28px; padding: 0 11px; font-size: 12px; border-radius: 9px; }
+.u2c-h > .u2c-tabs { flex: 1 1 auto; width: auto; min-width: 0; padding: 0 0 0 4px; margin-left: 2px; border-left: 1px solid color-mix(in srgb, var(--text) 10%, transparent); }
+.u2c-h > .u2c-tabs button { height: 28px; padding: 0 11px; font-size: 12px; border-radius: 9px; }
+html.ui2 .dev-scroll > .card.u2c { background: linear-gradient(180deg, color-mix(in srgb, var(--cc) 12%, var(--raise)) 0, var(--raise) 60px) !important; padding-bottom: 6px !important; }
+/* control cells: 64 px columns, 70 px rows, 6 px gaps */
+.u2c-g { padding: 0 10px; }
+.u2c-g > .u2c-dials { gap: 6px; grid-auto-columns: 64px; grid-template-rows: repeat(var(--rows, 1), 70px); }
+.u2c-dials > .u2d { padding: 3px 0; }
+.u2c-dials > .u2d svg { width: 36px; height: 36px; }
+.u2c .u2d .n { font-size: 10px; max-width: 60px; }
+.u2c .u2d .v { font-size: 11.5px; max-width: 62px; }
+/* a switch takes one cell: name on top, switch under it */
+.u2c-dials > .u2t { grid-column: span 1 !important; flex-direction: column; justify-content: center; align-items: center; gap: 6px; padding: 4px !important; font-size: 11px; text-align: center; }
+.u2c-dials > .u2t > span { max-width: 58px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); font-weight: 600; font-size: 10.5px; }
+.u2c-dials > .u2t .u2sw { transform: scale(.8); transform-origin: center; }
+.u2c-dials > .u2dd { padding: 0 10px; gap: 2px 6px; }
+.u2c-dials > .u2dd > b { font-size: 13px; }
+.u2c-dials > .u2seg-f { padding: 0 8px; gap: 5px; }
+.u2c-dials > .u2seg-f .u2seg { height: 30px; }
+.u2c-dials > .u2seg-f .u2seg button { font-size: 11.5px; padding: 0 3px; }
+.u2c-acts { padding: 0 10px 6px; gap: 6px; }
+.u2c-acts .u2btn { height: 30px; padding: 0 12px; font-size: 12px; }
+html.ui2 #app .dev-scroll > .card.u2c, html.ui2 .dev-scroll > .card.u2c { min-width: 0; }
+/* the card is as tall as its controls (no empty band under them); the tab row scrolls instead of widening the card */
+html.ui2 #app .dev-scroll > .card.u2c, html.ui2 .dev-scroll > .card.u2c { height: auto !important; align-self: flex-start; max-height: 100%; }
+.u2c-g { flex: none; overflow: visible; }
+.u2c-b { flex: none; }
+.u2c-h > .u2c-tabs { max-width: 330px; }
+html.ui2 .dev-scroll { align-items: flex-start !important; }
+html.ui2 .dev-scroll > .card.addcard { height: 150px; align-self: flex-start; }
+/* 60 px cells: two rows fit a phone's rack */
+.u2c-g > .u2c-dials { grid-template-rows: repeat(var(--rows, 1), 60px); grid-auto-columns: 62px; }
+.u2c-dials > .u2d { padding: 2px 0; }
+.u2c-dials > .u2d svg { width: 32px; height: 32px; }
+.u2c .u2d .n { font-size: 9.5px; line-height: 1.15; }
+.u2c .u2d .v { font-size: 11px; line-height: 1.15; }
+.u2c-dials > .u2t { gap: 4px; }
+.u2c-dials > .u2dd > .n, .u2c-dials > .u2seg-f > .n { font-size: 10.5px; }
+.u2c-dials > .u2seg-f .u2seg { height: 28px; }
+/* cells share the card's width when the title row is wider than the controls (no empty space on the right) */
+.u2c-g > .u2c-dials { grid-auto-columns: minmax(62px, 1fr); }
