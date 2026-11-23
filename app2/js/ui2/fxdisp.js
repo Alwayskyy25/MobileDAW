@@ -77,8 +77,7 @@ export function fxDisplay(o) {
     if (!color) color = getComputedStyle(el).getPropertyValue('--cc').trim() || '#c9b3ff';
     const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
     const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now; fno++;
-    // a soft light in the family colour from the top left
-    const glow = g.createRadialGradient(W * 0.15, 0, 4, W * 0.15, 0, Math.max(W, H) * 0.9); glow.addColorStop(0, color + '2e'); glow.addColorStop(1, color + '00'); g.fillStyle = glow; g.fillRect(0, 0, W, H);
+
     hist[hp] = db2(level()); hp = (hp + 1) % hist.length;
     // background: the live level as a scrolling, mirrored waveform
     g.fillStyle = color; g.globalAlpha = 0.13;
@@ -89,9 +88,9 @@ export function fxDisplay(o) {
     g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 1;
     for (let n = 1; n < 4; n++) { g.beginPath(); g.moveTo(0, Math.round(H * n / 4) + 0.5); g.lineTo(W, Math.round(H * n / 4) + 0.5); g.stroke(); }
     const fillUnder = (pts, base) => {
-      const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, color + '66'); gr.addColorStop(1, color + '05');
+      const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, color + '3a'); gr.addColorStop(1, color + '04');
       g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.lineTo(pts[pts.length - 1][0], base); g.lineTo(pts[0][0], base); g.closePath(); g.fillStyle = gr; g.fill();
-      g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.strokeStyle = color; g.lineWidth = 2; g.lineJoin = 'round'; g.stroke();
+      g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.strokeStyle = color; g.lineWidth = 1.6; g.lineJoin = 'round'; g.stroke();
     };
     let label = '';
     if (family === 'eq') {
@@ -195,9 +194,9 @@ export function fxDisplay(o) {
     // the live level: a thin meter at the right edge with a falling peak
     const mlv = db2(level()); mv = Math.max(mlv, mv - dt * 1.2); pkv = mlv >= pkv ? mlv : Math.max(mlv, pkv - dt * 0.35);
     g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(W - 6, 6, 3, H - 12);
-    const mg = g.createLinearGradient(0, H - 6, 0, 6); mg.addColorStop(0, color); mg.addColorStop(0.85, color); mg.addColorStop(1, '#ff6b5e');
+    const mg = g.createLinearGradient(0, H - 6, 0, 6); mg.addColorStop(0, 'rgba(255,255,255,.55)'); mg.addColorStop(1, 'rgba(255,255,255,.85)');
     g.fillStyle = mg; g.fillRect(W - 6, 6 + (1 - mv) * (H - 12), 3, mv * (H - 12));
-    if (pkv > 0.02) { g.fillStyle = "#fff"; g.fillRect(W - 7, 6 + (1 - pkv) * (H - 12), 5, 1.5); }
+    if (pkv > 0.02) { g.fillStyle = "rgba(255,255,255,.7)"; g.fillRect(W - 7, 6 + (1 - pkv) * (H - 12), 5, 1.5); }
     if (lab.textContent !== label) lab.textContent = label;
   }
   el.sync = frame;

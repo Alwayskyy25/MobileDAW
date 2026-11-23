@@ -22,18 +22,31 @@ const svgEl = (tag, at) => { const e = document.createElementNS(NS, tag); for (c
 const isList = (p) => Array.isArray(p.items) && p.items.length > 1;
 const isSwitch = (p) => p.fmt === 'onoff' || (p.min === 0 && p.max === 1 && p.step === 1 && !isList(p));
 
+// the knob's shading, defined once for every knob (a lit top, a darker bottom)
+function ensureKnobDefs() {
+  if (document.getElementById('u2kdefs')) return;
+  const sv = svgEl('svg', { id: 'u2kdefs', width: 0, height: 0, style: 'position:absolute;width:0;height:0', 'aria-hidden': 'true' }), defs = svgEl('defs', {});
+  const lg = (id, stops) => { const g = svgEl('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 }); for (const [o, c] of stops) g.append(svgEl('stop', { offset: o, 'stop-color': c })); defs.append(g); };
+  lg('u2kcap', [[0, '#55565c'], [0.5, '#3a3b40'], [1, '#232428']]);
+  lg('u2kface', [[0, '#2f3035'], [1, '#3b3c42']]);
+  sv.append(defs); document.body.append(sv);
+}
+
 // ---- controls (each returns an element with .sync() that re-reads the value)
 function dial(p, label, get, set, onLong) {
+  // a physical knob: a thin scale ring (value in the family colour, muted), a shaded cap with a soft shadow, a light pointer line
+  ensureKnobDefs();
   const s = svgEl('svg', { viewBox: '0 0 48 48', 'aria-hidden': 'true' });
-  const trk = svgEl('path', { class: 'trk', d: arc(19, A0, A1) }), val = svgEl('path', { class: 'val' }), dot = svgEl('circle', { class: 'dot', r: 3.2 });
-  s.append(svgEl('circle', { class: 'disc', cx: 24, cy: 24, r: 13 }), trk, val, dot);
+  const trk = svgEl('path', { class: 'trk', d: arc(20.5, A0, A1) }), val = svgEl('path', { class: 'val' }), dot = svgEl('line', { class: 'dot' });
+  s.append(trk, val, svgEl('circle', { class: 'shadow', cx: 24, cy: 25.5, r: 14.5 }), svgEl('circle', { class: 'cap', cx: 24, cy: 24, r: 14.5, fill: 'url(#u2kcap)' }),
+    svgEl('circle', { class: 'rim', cx: 24, cy: 24, r: 14 }), svgEl('circle', { class: 'face', cx: 24, cy: 24, r: 10.5, fill: 'url(#u2kface)' }), dot);
   const v = h('span', { class: 'v' }), el = h('div', { class: 'u2d', role: 'slider', 'aria-label': label, tabindex: 0 }, h('span', { class: 'n', title: p.n }, label), s, v);
   const bip = p.min < 0 && p.max > 0 && p.curve !== 'log';
   let shown = null, tw = 0;
   const drawAt = (n, x) => {
     const a = A0 + n * (A1 - A0), z = bip ? A0 + toNorm(p, 0) * (A1 - A0) : A0;
-    val.setAttribute('d', arc(19, Math.min(a, z), Math.max(a, z)));
-    const [dx, dy] = pt(13 - 5, a); dot.setAttribute('cx', dx.toFixed(2)); dot.setAttribute('cy', dy.toFixed(2));
+    val.setAttribute('d', arc(20.5, Math.min(a, z), Math.max(a, z)));
+    const [x0, y0] = pt(5, a), [x1, y1] = pt(12.5, a); dot.setAttribute('x1', x0.toFixed(2)); dot.setAttribute('y1', y0.toFixed(2)); dot.setAttribute('x2', x1.toFixed(2)); dot.setAttribute('y2', y1.toFixed(2));
     const t = fmtParam(p, x); if (v.textContent !== t) { v.textContent = t; el.setAttribute('aria-valuetext', t); }
   };
   const paint = () => { cancelAnimationFrame(tw); tw = 0; const x = get(); shown = toNorm(p, x); drawAt(shown, x); };

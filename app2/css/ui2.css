@@ -916,3 +916,41 @@ html.ui2 .dev-scroll > .card.u2c.v3 { box-shadow: inset 0 1px 0 rgba(255, 255, 2
 html.reduce-motion .u2c *, html.reduce-motion .dev-scroll.enter > .card { animation: none !important; transition: none !important; }
 @media (prefers-reduced-motion: reduce) { .u2c *, .dev-scroll.enter > .card { animation: none !important; } }
 .u2c.v3.inst .u2s > .u2fx .u2fx-l { top: auto; bottom: 10px; right: 14px; }
+
+/* ===== module controls: physical, quiet (no neon) ===== */
+/* family colours toned down everywhere on the card */
+.u2c { --ccm: color-mix(in srgb, var(--cc) 62%, #8b8d94); }
+/* dials: no tile, a real knob */
+.u2c.v3 .u2c-dials > .u2d { background: transparent !important; box-shadow: none; }
+.u2c.v3 .u2c-dials > .u2d svg { width: 40px !important; height: 40px !important; overflow: visible; }
+.u2c .u2d .trk { stroke: rgba(255, 255, 255, .09) !important; stroke-width: 2.6 !important; stroke-linecap: round; }
+.u2c .u2d .val { stroke: var(--ccm) !important; stroke-width: 2.6 !important; filter: none !important; }
+.u2c .u2d .shadow { fill: rgba(0, 0, 0, .45); filter: blur(1.6px); }
+.u2c .u2d .rim { fill: none; stroke: rgba(255, 255, 255, .10); stroke-width: .8; }
+.u2c .u2d .dot { stroke: #ececef; stroke-width: 2.2; stroke-linecap: round; fill: none !important; r: 0 !important; }
+.u2c .u2d .disc { display: none; }
+.u2c .u2d.act { background: transparent !important; }
+.u2c .u2d.act svg .val { filter: none !important; stroke: color-mix(in srgb, var(--cc) 80%, #fff) !important; }
+.u2c .u2d.act .v { color: var(--text) !important; }
+.u2c .u2d.act svg .cap { filter: brightness(1.12); }
+.u2c .u2d .n { color: color-mix(in srgb, var(--text) 58%, transparent); font-weight: 500 !important; letter-spacing: .01em; }
+.u2c .u2d .v { font-weight: 600 !important; color: color-mix(in srgb, var(--text) 88%, transparent); font-variant-numeric: tabular-nums; }
+/* fields and switches: a recessed well, a quiet border */
+.u2c.v3 .u2c-dials > :is(.u2dd, .u2t, .u2seg-f) { background: rgba(0, 0, 0, .22) !important; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35), inset 0 0 0 1px rgba(255, 255, 255, .04); }
+.u2c .u2seg { border-color: rgba(255, 255, 255, .10) !important; background: rgba(255, 255, 255, .02); }
+.u2c .u2seg button { border-left-color: rgba(255, 255, 255, .08) !important; color: color-mix(in srgb, var(--text) 78%, transparent); }
+.u2c .u2seg button.on { background: rgba(255, 255, 255, .12) !important; color: var(--text); }
+.u2c :is(.on, [aria-checked=true]) > .u2sw { background: var(--ccm) !important; border-color: transparent !important; }
+.u2c .u2sw { background: rgba(0, 0, 0, .35); border-color: rgba(255, 255, 255, .22); }
+/* tabs, badge, screen, header switch: no glow, muted colour */
+.u2c.v3 .u2c-tabs button { border-color: rgba(255, 255, 255, .10) !important; color: color-mix(in srgb, var(--text) 66%, transparent) !important; }
+.u2c.v3 .u2c-tabs button.on { background: rgba(255, 255, 255, .10) !important; color: var(--text) !important; }
+.u2c.v3 .u2s .u2c-badge { box-shadow: none !important; background: rgba(255, 255, 255, .08) !important; color: var(--ccm); }
+.u2c.v3 .u2s { background: #121316 !important; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06), inset 0 8px 18px rgba(0, 0, 0, .4) !important; }
+.u2c.v3 .u2s-foot .u2chip { border-color: rgba(255, 255, 255, .16); }
+.u2c.v3 .u2s-foot .u2chip.fill { background: rgba(255, 255, 255, .88); color: #17181b; }
+html.ui2 .dev-scroll > .card.u2c.v3 { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04) !important; }
+.u2c.v3 .u2c-dials > .u2d svg { width: 34px !important; height: 34px !important; }
+.u2c.v3 .u2c-dials > .u2d { gap: 1px; padding: 1px 0 !important; justify-content: center; }
+.u2c .u2d .n, .u2c .u2d .v { line-height: 1.1 !important; }
+.u2c.v3.inst .u2s > .u2fx .u2fx-l { display: none; }
