@@ -11,6 +11,7 @@ import { INSTRUMENTS, DEVICES, fmtParam, NO_WET_FX, WET_PARAMS, MIX_P, FX_GROUPS
 import { FLM_LAYOUT } from '../flmlayout.js';
 import { offerAutomation } from '../automate.js';
 import { gestureTiming } from '../gesture.js';
+import { fxDisplay } from './fxdisp.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const tabMem = new Map();                        // the open tab per card (device id / instrument track id), kept across re-renders
@@ -154,7 +155,7 @@ function fxGroups(def) {
 const tidy = (n, pf) => { let s = String(n); if (pf && s.startsWith(pf + ' ')) s = s.slice(pf.length + 1); s = s.trim(); return /^[A-Z0-9 .\-/]+$/.test(s) && s.length > 3 ? s[0] + s.slice(1).toLowerCase() : s; };
 
 // a card body with tabs (more than one section) and a grid of controls
-function body(key, groups, mk, every, bigTabs) {
+function body(key, groups, mk, every, bigTabs, hero) {
   const box = h('div', { class: 'u2c-b' }), tabs = h('div', { class: 'u2c-tabs', role: 'tablist' }), grid = h('div', { class: 'u2c-g' });
   let live = [];
   const show = (gi) => {
@@ -166,7 +167,7 @@ function body(key, groups, mk, every, bigTabs) {
     // order: lists and switches first (full-width rows), then the dials
     const rows = ctl.filter(({ c }) => !c.classList.contains('u2d')).map(({ c }) => c), dials = ctl.filter(({ c }) => c.classList.contains('u2d')).map(({ c }) => c);
     // one grid that fills the rack's height row by row and then grows sideways (a field takes two dial cells): nothing is cut off
-    if (env || rows.length || dials.length) parts.push(h('div', { class: 'u2c-dials' }, ...(env ? [env] : []), ...rows, ...dials));
+    if (hero || env || rows.length || dials.length) parts.push(h('div', { class: 'u2c-dials' + (hero ? ' hero' : '') }, ...(hero ? [hero] : []), ...(env ? [env] : []), ...rows, ...dials));   // the effect's graphic first, over every row
     grid.replaceChildren(...parts); fit();
   };
   // rows: as many as the rack is tall (the card is only as tall as its controls, so measure against the rack, not the card)
@@ -205,7 +206,8 @@ const CAT = {
   flmnote: ['Note FX', '#6fe0cc', SV('<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>')],
 };
 const INST_IC = SV('<path d="M4 5h16v14H4zM8 5v14M12 5v14M16 5v14"/><path d="M6.6 5v7M10.6 5v7M14.6 5v7M18.2 5v7" stroke-width="2.6"/>');
-const catOf = (type) => { const g = FX_GROUPS.find((x) => x[2].includes(type)); return CAT[g ? g[0] : 'misc'] || CAT.misc; };
+const famOf = (type) => { const g = FX_GROUPS.find((x) => x[2].includes(type)); return g && CAT[g[0]] ? g[0] : 'misc'; };
+const catOf = (type) => CAT[famOf(type)];
 // the section tabs sit in the title row, right of the title (no row of their own, no empty band)
 function inHead(head, b) { const tb = b.querySelector(':scope > .u2c-tabs'); if (tb) head.append(tb); return b; }
 // header: [icon badge] [name / family] ... [extra] [switch] [⋯]
@@ -243,7 +245,8 @@ export function fxCard(i, d, di, n, api) {
   mk.get = get; mk.def = pdef;
   const parts = [head];
   if (d.type === 16) parts.push(h('div', { class: 'u2c-cta' }, h('p', {}, 'Meter, spektrum, osiloskop dan stereo di satu jendela.'), h('button', { class: 'u2btn fill', onclick: () => api.openWindow() }, 'Buka MiniMeters')));
-  if (groups.length) parts.push(inHead(head, body('d' + d.id, groups, mk, api.every)));
+  const hero = d.type === 16 ? null : fxDisplay({ def, d, family: famOf(d.type), strip: i, every: api.every, get: (k) => d.params[k] ?? def.params[k].def });
+  if (groups.length) parts.push(inHead(head, body('d' + d.id, groups, mk, api.every, false, hero)));
   else parts.push(h('div', { class: 'u2c-empty' }, 'Modul ini tidak punya parameter.'));
   const card = h('div', { class: 'card u2c fx' + (off ? ' off' : '') }, ...parts); card.style.setProperty('--cc', cat[1]); return card;
 }

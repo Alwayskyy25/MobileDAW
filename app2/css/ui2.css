@@ -835,3 +835,10 @@ html.ui2 #top2 .bpm { padding: 3px 14px !important; }
 html.ui2 #top2 .bpm { gap: 4px !important; }
 html.ui2 #bar2 .b2-c .tab { width: auto !important; flex: 0 0 auto !important; }
 @media (max-width: 1000px) { html.ui2 #bar2 .b2-c .tab:not(.on) { width: 40px !important; padding: 0 !important; } }
+
+/* ===== effect graphic: a display panel at the left of the controls, over every row ===== */
+.u2c-dials > .u2fx { grid-row: 1 / -1; grid-column: span 4; position: relative; min-width: 248px; height: 100%; box-sizing: border-box; border-radius: 16px !important; background: color-mix(in srgb, var(--cc) 7%, #0f1013) !important; overflow: hidden; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cc) 16%, transparent); }
+.u2fx-cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.u2fx-l { position: absolute; right: 8px; top: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(0, 0, 0, .45); color: var(--text); font: 600 10.5px/1.4 var(--font); font-variant-numeric: tabular-nums; pointer-events: none; }
+.u2c-dials.hero > .u2fx { grid-row: 1 / span var(--rows, 1); }
+.u2fx-l:empty { display: none; }
