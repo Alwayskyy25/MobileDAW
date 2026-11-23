@@ -330,6 +330,10 @@ function cardV3(cls, cc, head, hero, foot, panelKids, kb) {
   if (kb && foot && foot.length) { const tt = head.querySelector('.u2c-tt'), sm = tt && tt.querySelector('small'); if (sm) sm.replaceWith(h('div', { class: 'u2c-chips' }, ...foot)); foot = null; }
   const screen = h('div', { class: 'u2s' + (kb ? ' haskb' : '') }, hero || h('div', { class: 'u2fx blank' }), head, kb || null, foot && foot.length ? h('div', { class: 'u2s-foot' }, ...foot) : null);
   const card = h('div', { class: 'card u2c v3 ' + cls }, screen, h('div', { class: 'u2c-p' }, ...panelKids.filter(Boolean)));
+  // the display comes first: on a short rack (a phone held sideways) the keyboard steps aside so the graphic keeps its room
+  // (a small button swaps the graphic and the keyboard there, so the keyboard is always one tap away)
+  if (kb) screen.append(h('button', { class: 'u2kb-tg', 'aria-label': 'Keyboard / tampilan', title: 'Keyboard', onclick: (e) => { e.stopPropagation(); screen.classList.toggle('kbshow'); } }));
+  if (kb && typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { const s = screen.clientHeight; if (s > 0) screen.classList.toggle('kbhide', s < 200); }).observe(screen);
   card.style.setProperty('--cc', cc); return card;
 }
 

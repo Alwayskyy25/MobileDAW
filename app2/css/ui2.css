@@ -1392,3 +1392,19 @@ html.ui2 .m2-fad em::after { display: none !important; }
 .u2c.v3.inst .u2cols .u2t.on::before { background: var(--ccm, var(--accent)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ccm, var(--accent)) 30%, transparent); }
 .u2c.v3.inst .u2cols .u2t.on > span { color: var(--text) !important; }
 .u2c.v3.inst .u2cols .u2t:active { transform: scale(.97); }
+/* short rack: the keyboard steps aside, the instrument's display fills the screen under the title bar */
+.u2c.v3 .u2s.haskb.kbhide > .u2kb { display: none !important; }
+.u2c.v3 .u2s.haskb.kbhide > .u2real, .u2c.v3 .u2s.haskb.kbhide > .u2fx:not(.u2real), .u2c.v3 .u2s.haskb.kbhide > .u2sf { bottom: 6px !important; }
+/* faders that fit a short panel: tight label / value, the track takes the rest */
+.u2vs { padding: 3px 2px !important; gap: 2px !important; }
+.u2vs .tr { margin: 4px 0 !important; min-height: 22px !important; }
+.u2st { padding: 3px 4px !important; gap: 0 !important; }
+.u2st .sa { height: 18px !important; }
+.u2kb-tg { display: none; }
+.u2c.v3 .u2s.haskb.kbhide > .u2kb-tg { display: grid; place-items: center; position: absolute; right: 8px; bottom: 10px; z-index: 3; width: 26px; height: 22px; padding: 0; border: 0; border-radius: 7px;
+  background: rgba(20, 21, 24, .72); color: rgba(255, 255, 255, .8); backdrop-filter: blur(4px); }
+.u2c.v3 .u2s.haskb.kbhide > .u2kb-tg::before { content: ''; width: 14px; height: 9px; border: 1.5px solid currentColor; border-radius: 2px;
+  background: linear-gradient(90deg, transparent 3px, currentColor 3px 4.5px, transparent 4.5px 7px, currentColor 7px 8.5px, transparent 8.5px) top / 100% 5px no-repeat; }
+.u2c.v3 .u2s.haskb.kbhide.kbshow > .u2kb { display: flex !important; }
+.u2c.v3 .u2s.haskb.kbhide.kbshow > :is(.u2real, .u2fx, .u2sf) { visibility: hidden; }
+.u2c.v3 .u2s.haskb.kbhide.kbshow > .u2kb-tg { color: var(--ccm, var(--accent)); bottom: auto; top: 62px; }

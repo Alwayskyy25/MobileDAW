@@ -142,7 +142,9 @@ ok(mods.fx.every(([k, , flm]) => flm || k === 16) && mods.fx.some(([k]) => k ===
   ok(rd.fx && rd.ins && rd.painted > 8, `effect and synth cards show the module's own display (synth display colours: ${rd.painted})`); }
 // the instrument card's keyboard plays the instrument (a note goes to the engine while the key is held)
 { const k = await page.evaluate(async () => { const P = await import('./js/project.js'), E = await import('./js/engine.js'); P.setInstrument(0, 32); await new Promise((r) => setTimeout(r, 400));
-    const key = document.querySelector('.dev-scroll > .card.u2c.inst .u2kb .wk'); if (!key) return 'no keyboard';
+    const scr = document.querySelector('.dev-scroll > .card.u2c.inst .u2s.haskb');   // a short rack shows the display: the keyboard is one tap away
+    if (scr && scr.classList.contains('kbhide') && !scr.classList.contains('kbshow')) scr.querySelector('.u2kb-tg').click();
+    const key = document.querySelector('.dev-scroll > .card.u2c.inst .u2kb .wk'); if (!key || !key.offsetWidth) return 'no keyboard';
     const seen = []; const orig = P.noteEvent; const b = key.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height - 4 }; });
   if (typeof k === 'string') ok(false, k); else { await page.mouse.move(k.x, k.y); await page.mouse.down(); await page.waitForTimeout(120);
     const lit = await page.evaluate(() => !!document.querySelector('.u2kb .wk.on')); await page.mouse.up(); await page.waitForTimeout(80);
