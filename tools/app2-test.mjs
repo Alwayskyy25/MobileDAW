@@ -116,7 +116,8 @@ ok(mods.fx.every(([k, , flm]) => flm || k === 16) && mods.fx.some(([k]) => k ===
     P.addDevice(0, 132); DV.render(); return { bad, active: document.querySelector('#devices, .dev-scroll') && document.querySelector('.dev-scroll').getBoundingClientRect().height };
   });
   ok(!r.bad.length, 'every instrument and effect has a Material You card' + (r.bad.length ? ': missing ' + r.bad.join(', ') : ''));
-  const dl = await page.evaluate(() => { const c = [...document.querySelectorAll('.dev-scroll > .card.u2c:not(.inst)')].pop(); c.scrollIntoView(); const d = c.querySelector('.u2d'); const b = d.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + 22 }; });
+  await page.evaluate(() => { [...document.querySelectorAll('.dev-scroll > .card.u2c:not(.inst)')].pop().scrollIntoView(); }); await page.waitForTimeout(700);   // let the rack settle on the card (scroll snap)
+  const dl = await page.evaluate(() => { const c = [...document.querySelectorAll('.dev-scroll > .card.u2c:not(.inst)')].pop(); const d = c.querySelector('.u2d'); const b = d.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + 22 }; });
   const pv = async () => page.evaluate(async () => { const P = await import('./js/project.js'); const d = P.tr(0).devices[P.tr(0).devices.length - 1]; return d.params[1] ?? null; });
   const v0 = await pv(); await page.mouse.move(dl.x, dl.y); await page.mouse.down(); await page.mouse.move(dl.x, dl.y - 40, { steps: 6 }); await page.mouse.up(); const v1 = await pv();
   ok(v1 !== null && v1 !== v0 && (v0 === null || v1 > v0), `dragging a dial up raises the value (${v0} -> ${v1})`);

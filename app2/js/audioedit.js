@@ -73,7 +73,9 @@ function draw() {
       const path = py ? wavePath(py, geo) : peaksPath(pk, geo);
       ctx.fillStyle = C('#6a6a70'); ctx.fill(path);
       ctx.save(); ctx.beginPath(); ctx.rect(Math.max(0, x0), top, Math.max(0, Math.min(W, x1) - Math.max(0, x0)), hh); ctx.clip();
-      ctx.fillStyle = C('#d2d2d6'); ctx.fill(path); ctx.restore();
+      // MobileDAW 2: the region's waveform in the track colour, the trimmed parts stay grey
+      ctx.globalAlpha = 0.92; ctx.fillStyle = state.tracks[r.track].color || C('#d2d2d6'); ctx.fill(path); ctx.globalAlpha = 1;
+      ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 0.6; ctx.stroke(path); ctx.restore();
     }
   }
   // outside the region: dim
