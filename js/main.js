@@ -33,7 +33,6 @@ import * as KM from './keymap.js';
 import { cancelGestures, gestureTiming } from './gesture.js';
 import { initTouchHit } from './touchhit.js';
 import { setOctaveNaming } from './defs.js';
-import * as UI2 from './ui2/shell.js';
 setOctaveNaming(prefs.midC);
 const { state } = P;
 
@@ -104,7 +103,6 @@ function wireTransport() {
       { label: 'Nama proyek\u2026', fn: () => ask('Nama proyek', state.projectName, (v) => { if (v && v.trim()) state.projectName = v.trim(); }) },
       { sep: true },
       { label: 'Pengaturan\u2026', fn: openSettings },
-      { label: 'Tampilan 2.0 (lebih sederhana)\u2026', fn: () => UI2.switchUi('v2') },
       { label: 'Tutorial interaktif\u2026', fn: () => import('./tutorial.js').then((m) => m.tutorialMenu()) },
       ...(isStandalone() ? [] : [{ label: 'Layar penuh', fn: toggleFullscreen }]),
     ], r.right - 200, r.bottom + 2);
@@ -422,10 +420,10 @@ let errAt = 0;
 function guard(fn) { try { fn(); } catch (e) { if (performance.now() - errAt > 3000) { errAt = performance.now(); toast('Kesalahan tampilan: ' + (e && e.message), 4000); } console.error(e); } }
 function loop(ts) {
   if (document.hidden) { requestAnimationFrame(loop); return; }
-  if (ts - lastPoll > 32) { lastPoll = ts; guard(() => { P.applyPoll(eng.poll()); readouts(); UI2.readouts(); }); }
+  if (ts - lastPoll > 32) { lastPoll = ts; guard(() => { P.applyPoll(eng.poll()); readouts(); }); }
   if (!shouldDraw(ts)) { requestAnimationFrame(loop); return; }      // frame pacing: Auto / 60 Hz / 120 Hz
   const t0 = performance.now();
-  guard(() => { if (view === 'arr') { TL.frame(); if (tab === 'clip') ED.frame(); } else MX.frame(); UI2.frame(); });
+  guard(() => { if (view === 'arr') { TL.frame(); if (tab === 'clip') ED.frame(); } else MX.frame(); });
   recordCost(performance.now() - t0);
   requestAnimationFrame(loop);
 }
@@ -455,7 +453,7 @@ function runKey(a, e) {
     case 'saveAs': QS.saveAs(); return true;
     case 'undo': undoOp(); return true;
     case 'redo': redoOp(); return true;
-    case 'escape': if (cancelGestures() || closeAll() || UI2.back()) return true; return !!edit('escape') || closeEditor();
+    case 'escape': if (cancelGestures() || closeAll()) return true; return !!edit('escape') || closeEditor();
     case 'tab': showView(view === 'arr' ? 'mix' : 'arr'); return true;
     case 'metro': P.toggleMetro(); return true;
     case 'rec': toggleRec(); return true;
@@ -488,7 +486,6 @@ function keys() {
   });
   window.onBack = () => {
     if (closeAll()) return true;
-    if (UI2.back()) return true;
     if (BR.isOpen()) { BR.closeBrowser(); return true; }
     if (closeEditor()) return true;
     if ($('#view-arr').classList.contains('max')) { setMax(false); return true; }
@@ -520,12 +517,6 @@ function boot() {
   TL.initTimeline($('#arr'), {
     openEditor,
     pickAudio: (at) => BR.openBrowser('file', { track: state.sel.track, at }),
-    clipTap: (i, c, tick) => UI2.clipTap(i, c, tick),
-  });
-  if (prefs.ui === 'v2') UI2.initUi2({   // MobileDAW 2.0: the simpler frame (js/ui2/shell.js) around the same arrangement, editors and devices
-    showView, getView: () => view, showTab, getTab: () => tab, setShut, isShut: () => $('#view-arr').classList.contains('shut'), openEditor,
-    toggleRec, exportWav, exportMidi, exportMdaw, exportZip, importDialog: () => IMP.importDialog(), openSettings,
-    tutorial: () => import('./tutorial.js').then((m) => m.tutorialMenu()), about: openSettings, sampleRate: () => (eng.info() || {}).sampleRate,
   });
   $('#btn-max').onclick = () => { const c = $('#view-arr').classList; setMax(!(c.contains('max') || c.contains('half'))); };
   window.addEventListener('applayout', () => { applyDevHeight(); });
@@ -544,8 +535,7 @@ function boot() {
     if (w === 'sel' || w === 'all' || w === 'clips') { if (tab === 'clip') { ED.refresh(); const c = P.selectedClip(); $('#dtitle').textContent = c ? (c.clip.name || state.tracks[c.track].name) : ''; } else if (tab === 'dev') DV.render(); else if (tab === 'keys') KB.render(); }
     if (w === 'sel') MX.update();
   });
-  showTab('dev'); if (UI2.active()) setShut(true);        // 2.0: the arrangement gets the whole screen (Rack / keyboard open the panel)
-  // the device panel is drawn at once (it redraws when the project is in), never a black area
+  showTab('dev');                                           // the device panel is drawn at once (it redraws when the project is in), never a black area
   Promise.resolve(eng.start()).catch((e) => showFatal(e));
   if (backendError()) showFatal(backendError());
   Promise.resolve(eng.init ? eng.init() : null).catch(() => {}).then(() => {
@@ -564,7 +554,7 @@ function boot() {
   });
   requestAnimationFrame(loop);
   window.__dawBooted = true;
-  if (!UI2.active()) setTimeout(() => import('./tutorial.js').then((m) => m.offerTutorial()).catch(() => {}), 1500);   // the 1.0 tour points at 1.0's buttons   // first start: offer the interactive tutorial
+  setTimeout(() => import('./tutorial.js').then((m) => m.offerTutorial()).catch(() => {}), 1500);   // first start: offer the interactive tutorial
 }
 // First start: ask once for a place to keep MobileDAW/ (samples, exports, presets...). The system picker needs a tap, so this is a dialog with a button.
 // When the folder was chosen earlier but the browser asks for write access again, the first tap re-confirms it.
