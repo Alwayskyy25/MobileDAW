@@ -299,7 +299,7 @@ function drawClip(t, c, y, hh) {
     }
   } else if (c.notes && bh > 6) {
     const [lo, hi] = noteBox(c), span = hi - lo + 1, nh = Math.max(2, Math.min(bh / span * 0.8, 7));   // Live: solid note bars, about 4/5 of a pitch row
-    ctx.fillStyle = c.muted ? INK : currentTone() === 'light' ? '#141414' : '#f2f2f4';   // notes: black on a light theme, white on a dark one (no colours)
+    ctx.fillStyle = c.muted ? INK : shade(t.color, 0.85);   // Live 12: notes nearly black (the clip colour's darkest tone), in every theme
     for (const g of P.loopSegs(c)) {                            // looped MIDI: the notes are drawn again in every repeat (no empty bars)
       const gx = x + g.o * view.ppt;
       if (gx > xe || gx + g.len * view.ppt < xs) continue;
