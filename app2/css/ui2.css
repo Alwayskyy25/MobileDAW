@@ -423,7 +423,7 @@ html.ui2 .tc-tile .tc-fold svg { width: 20px; height: 20px; fill: none; stroke: 
 html.ui2 .tc-tile .tc-fold svg path { fill: currentColor; stroke: none; }
 html.ui2 .tc-tile .tc-nm { display: block; min-width: 0; flex: 1; text-align: left; color: rgba(0, 0, 0, .85); font: var(--fw-m, 500) 13px/18px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html.ui2 .tc-row.xrow .tc-tile .tc-nm { color: var(--text); padding-left: 2px; }
-html.ui2 .tc-row.sel .tc-tile { box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .85); }
+html.ui2 .tc-row.sel .tc-tile { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .9); }   /* the selected track: a 1 px light edge (owner's request) */
 html.ui2 .tc-row.fold .tc-tile { padding-top: 2px; padding-bottom: 2px; align-items: center; }
 html.ui2.tc-wide .tc-row:not(.xrow) .tc-nm { display: block; }
 html.ui2.tc-wide .tc-name .nm { visibility: hidden; }
