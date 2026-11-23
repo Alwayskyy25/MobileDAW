@@ -203,8 +203,9 @@ function drawRoll(t, c) {
     const x = px(n.t), w = Math.max(3, n.d * v.ppt), y = py(n.p) - v.keyH;
     if (x + w < KEYS || x > W || y > gb || y + v.keyH < RULER) continue;
     const s = sel.has(n), nc = noteHex(t, n);
-    ctx.fillStyle = velCol(nc, n.v, s); ctx.beginPath(); ctx.roundRect(x, y + 1.5, w - 1, v.keyH - 2, Math.min(3, w / 3)); ctx.fill();
-    ctx.strokeStyle = s ? C('#ffffff') : shadeC(nc, 0.55); ctx.lineWidth = s ? 2 : 1; ctx.beginPath(); ctx.roundRect(x + 0.5, y + 2, w - 2, v.keyH - 3, Math.min(3, w / 3)); ctx.stroke();   // flat note, hairline outline (Live: no bevel)
+    ctx.fillStyle = velCol(nc, n.v, s); ctx.beginPath(); ctx.roundRect(x, y + 1.5, w - 1, v.keyH - 2, Math.min(5, w / 3)); ctx.fill();
+    { const gl = ctx.createLinearGradient(0, y + 1.5, 0, y + v.keyH); gl.addColorStop(0, 'rgba(255,255,255,.22)'); gl.addColorStop(0.45, 'rgba(255,255,255,0)'); gl.addColorStop(1, 'rgba(0,0,0,.12)'); ctx.fillStyle = gl; ctx.fill(); }   // MobileDAW 2: a soft light from above, not flat
+    ctx.strokeStyle = s ? C('#ffffff') : shadeC(nc, 0.55); ctx.lineWidth = s ? 2 : 1; ctx.beginPath(); ctx.roundRect(x + 0.5, y + 2, w - 2, v.keyH - 3, Math.min(5, w / 3)); ctx.stroke();   // flat note, hairline outline (Live: no bevel)
     if (w > 16 && (s || w > 30)) { ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x + w - 5, y + 4, 2, Math.max(2, v.keyH - 7)); }   // right edge: resize grip, kept for touch
     if (n.sl) { ctx.strokeStyle = nInk; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x + 2, y + v.keyH - 1); ctx.lineTo(x + Math.min(w - 3, v.keyH * 1.6), y + 3); ctx.stroke(); }   // slide note: a rising stroke (glide)
     if (w > 34 && v.keyH >= 13) { ctx.fillStyle = mv ? 'rgba(14,14,18,.85)' : nInk; ctx.fillText((n.sl ? '\u2197 ' : '') + (mv ? vocName(t, n.img || 0) + ' \u00b7 ' : '') + pName(n.p), x + 4 + (n.sl ? 4 : 0), y + v.keyH / 2 + 1, w - 9); }
@@ -367,7 +368,12 @@ function drawSteps(t, c) {
       if (x > W) break; if (x + sv.stepW < LANE_HEAD) continue;
       const hit = s < steps ? byRow[r].find((q) => Math.abs(q.t - s * STEP) < STEP / 2) : null, odd = Math.floor(s / SPBT) % 2;
       ctx.fillStyle = hit ? velCol(t.color, hit.v, false) : s < steps ? (odd ? C('#36363b') : C('#2d2d31')) : (odd ? C('#262629') : C('#222225'));
-      ctx.beginPath(); ctx.roundRect(x + 2, y + 2, sv.stepW - 4, sv.rowH - 4, 4); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(x + 2, y + 2, sv.stepW - 4, sv.rowH - 4, 7); ctx.fill();
+      if (hit) {   // MobileDAW 2: a lit step stands out (light from above, a darker foot)
+        const gl = ctx.createLinearGradient(0, y + 2, 0, y + sv.rowH - 2); gl.addColorStop(0, 'rgba(255,255,255,.28)'); gl.addColorStop(0.5, 'rgba(255,255,255,0)'); gl.addColorStop(1, 'rgba(0,0,0,.18)'); ctx.fillStyle = gl; ctx.fill();
+      } else if (s < steps) {   // an empty step sits a little into the panel
+        ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 8, y + 2.5); ctx.lineTo(x + sv.stepW - 8, y + 2.5); ctx.stroke();
+      }
       if (hit) { const ly = Math.round(y + 6 + (1 - Math.min(1, hit.v)) * (sv.rowH - 14)); ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x + 6, ly, sv.stepW - 12, 2); }   // the velocity line (high = near the top)
       if (hit) { if (hit.rpt > 1 && sv.stepW >= 16) { const q = hit.rpt, bw = (sv.stepW - 6) / q; ctx.fillStyle = 'rgba(0,0,0,.45)'; for (let k = 1; k < q; k++) ctx.fillRect(Math.round(x + 3 + k * bw), y + sv.rowH - 7, 1, 4); } }   // note repeat: ticks along the cell bottom
     }

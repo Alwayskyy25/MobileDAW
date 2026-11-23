@@ -305,6 +305,10 @@ export function instCard(i, t, api) {
   for (const x of api.extra.slice(0, 1)) foot.push(h('button', { class: 'u2chip', onclick: (e) => x.fn(e.currentTarget.getBoundingClientRect()) }, x.label.replace(/\u2026$/, '').replace(/^Zona sample$/, 'Zona')));
   const kids = [];
   if (t.inst.missing) { const x = t.inst.missing; kids.push(h('div', { class: 'u2c-warn' }, (x.name || 'Instrumen') + ': ' + (x.sample ? 'sample ' + x.sample.split('/').pop() : 'program') + ' tidak tersedia')); }
+  if (t.kind === 'drum') {   // the drum kit: its pads and the chosen pad's sound
+    kids.push(drumBody(i, t, api));
+    return cardV3('inst drum', t.color || 'var(--accent)', head, fxDisplay({ def, d: null, family: 'inst', strip: i, every: api.every, get: () => 0 }), foot, kids);
+  }
   const groups = instGroups(def, t.inst.type);
   const get = (k) => t.inst.params[k] ?? def.params[k].def;
   const mk = (k, pf) => { const p = def.params[k];
@@ -314,6 +318,40 @@ export function instCard(i, t, api) {
   else kids.push(h('div', { class: 'u2c-empty' }, 'Diatur lewat editornya.'));
   const hero = fxDisplay({ def, d: null, family: 'inst', strip: i, every: api.every, get });
   return cardV3('inst', t.color || 'var(--accent)', head, hero, foot, kids);
+}
+
+// ---- drum kit: a grid of pads (tap = choose + hear it), the chosen pad's Gain / Pan / Pitch / Decay (+ Start / End for a sample),
+// Mute / Solo, and its sample from the browser
+const PADK = {
+  gain: { n: 'Gain', min: -36, max: 6, def: 0, unit: 'dB' }, pan: { n: 'Pan', min: -1, max: 1, def: 0, fmt: 'pan' },
+  pit: { n: 'Pitch', min: -12, max: 12, def: 0, step: 1, unit: 'st' }, dec: { n: 'Decay', min: 0.25, max: 3, def: 1, curve: 'log', unit: 'x' },
+  start: { n: 'Start', min: 0, max: 0.95, def: 0, unit: '%' }, end: { n: 'End', min: 0.05, max: 1, def: 1, unit: '%' },
+};
+const padSel = new Map();
+function drumBody(i, t, api) {
+  const pads = P.padsOf(i), key = t.id;
+  let sel = Math.min(padSel.get(key) || 0, Math.max(0, pads.length - 1));
+  const grid = h('div', { class: 'u2pads' }), ctl = h('div', { class: 'u2c-dials u2padctl' }), live = [];
+  const paint = () => {
+    [...grid.children].forEach((b, k) => b.classList.toggle('on', k === sel));
+    const q = pads[sel]; live.length = 0; if (!q) { ctl.replaceChildren(); return; }
+    const fields = q.sample ? ['gain', 'pan', 'pit', 'start', 'end'] : ['gain', 'pan', 'pit', 'dec'];
+    const kn = fields.map((f) => { const c = control(PADK[f], PADK[f].n, () => (pads[sel] ? pads[sel][f] ?? PADK[f].def : PADK[f].def), (v) => P.setPad(i, sel, f, v)); live.push(c); return c; });
+    const tg = (f, label) => { const b = h('button', { class: 'u2padb' + (q[f] ? ' on' : ''), onclick: (e) => { e.stopPropagation(); P.setPad(i, sel, f, !pads[sel][f]); b.classList.toggle('on', !!pads[sel][f]); grid.children[sel].classList.toggle(f, !!pads[sel][f]); } }, label); return b; };
+    const smp = h('button', { class: 'u2padb wide', onclick: async (e) => { e.stopPropagation(); const DP = await import('../drumpad.js'); DP.pickPadSample(i, sel, () => P.emit('devices')); } }, q.sample ? (q.sample.name || 'Sample').replace(/\.[^.]+$/, '') : 'Pilih sample\u2026');
+    ctl.replaceChildren(h('div', { class: 'u2padhead' }, h('b', {}, q.name || 'Pad ' + (sel + 1)), h('div', { class: 'u2padbs' }, tg('mute', 'M'), tg('solo', 'S')), smp), ...kn);
+  };
+  pads.forEach((q, k) => {
+    const b = h('button', { class: 'u2pad' + (q.mute ? ' mute' : '') + (q.solo ? ' solo' : '') }, h('span', {}, q.name || 'Pad ' + (k + 1)));
+    b.addEventListener('pointerdown', (e) => { e.stopPropagation(); sel = k; padSel.set(key, k); paint(); P.noteEvent(i, q.pitch, 0.85, true); b.classList.add('hit'); });
+    const off = () => { if (!b.classList.contains('hit')) return; b.classList.remove('hit'); P.noteEvent(i, q.pitch, 0, false); };
+    b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('pointerleave', off);
+    grid.append(b);
+  });
+  if (!pads.length) grid.append(h('div', { class: 'u2c-empty' }, 'Belum ada pad.'));
+  api.every(150, () => { for (const c of live) if (c.sync) c.sync(); });
+  paint();
+  return h('div', { class: 'u2c-b u2drum' }, grid, ctl);
 }
 
 // ---- audio track: the source card

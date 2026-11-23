@@ -1098,3 +1098,44 @@ html.ui2 .ae-info > span { flex: none; display: inline-flex; align-items: center
 html.ui2 .ae-info > span > i { font-style: normal; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 html.ui2 .ae-info > span.hot { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 html.ui2 .ae-info > span { margin: 0 !important; }
+
+/* ===== drum kit card: pads on the left of the panel, the chosen pad's controls on the right ===== */
+.u2c.v3 .u2drum { flex-direction: row !important; gap: 10px; align-items: stretch; }
+.u2pads { flex: none; display: grid; grid-template-columns: repeat(4, 64px); grid-auto-rows: minmax(30px, 1fr); gap: 5px; align-content: start; max-height: 100%; overflow-y: auto; scrollbar-width: none; }
+.u2pad { position: relative; height: 34px; padding: 0 8px; border: 1px solid rgba(255, 255, 255, .07); border-radius: 10px; background: rgba(0, 0, 0, .25);
+  color: color-mix(in srgb, var(--text) 80%, transparent); font: 600 11px/1 var(--font); text-align: left; overflow: hidden; touch-action: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04); transition: background calc(.12s * var(--anim, 1)), transform calc(.1s * var(--anim, 1)); }
+.u2pad span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.u2pad::before { content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: 0 2px 2px 0; background: color-mix(in srgb, var(--cc) 60%, #888); opacity: .5; }
+.u2pad.on { background: rgba(255, 255, 255, .10); border-color: color-mix(in srgb, var(--cc) 45%, transparent); color: var(--text); }
+.u2pad.on::before { opacity: 1; }
+.u2pad.hit { background: color-mix(in srgb, var(--cc) 35%, #2a2b30); transform: scale(.96); }
+.u2pad.mute { opacity: .45; }
+.u2pad.solo::after { content: 'S'; position: absolute; right: 5px; top: 4px; font-size: 8.5px; color: var(--cc); }
+.u2padctl { display: grid !important; grid-auto-flow: row !important; grid-template-columns: repeat(5, 60px) !important; grid-template-rows: none !important; grid-auto-rows: 58px !important; gap: 4px 3px !important; align-content: start; }
+.u2padhead { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; height: 32px !important; background: none !important; box-shadow: none !important; }
+.u2padhead > b { font: 600 13px/1 var(--font); color: var(--text); margin-right: 4px; white-space: nowrap; }
+.u2padbs { display: flex; gap: 4px; }
+.u2padb { height: 26px; min-width: 26px; padding: 0 8px; border: 1px solid rgba(255, 255, 255, .12); border-radius: 999px; background: transparent; color: var(--dim); font: 700 11px/1 var(--font); }
+.u2padb.on { background: rgba(255, 255, 255, .14); color: var(--text); }
+.u2padb.wide { font-weight: 500; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.u2pads { grid-auto-rows: 34px !important; grid-template-columns: repeat(4, 76px) !important; align-self: flex-start; }
+
+/* ===== full editor in a floating window: the same quiet language as the cards ===== */
+html.ui2 .fw-body { --lv-or: #e4e4e8; --lv-orink: #17181b; --lv-arc: color-mix(in srgb, var(--accent) 62%, #8b8d94); --lv-trk: rgba(255, 255, 255, .10);
+  --lv-sel: color-mix(in srgb, var(--accent) 62%, #8b8d94); --lv-well: #141518; --lv-ctl: #2a2b30; }
+html.ui2 .fw-body :is(.lv-disp, .lv-well, .flm-ds, .lk-dk, .sp, .flm-dt) { background: #121316 !important; border: 1px solid rgba(255, 255, 255, .08) !important; border-radius: 14px !important; box-shadow: inset 0 6px 14px rgba(0, 0, 0, .35) !important; }
+html.ui2 .fw-body :is(.lv-sec, .lk-sec, .flm-sec) { background: rgba(0, 0, 0, .14) !important; border: 1px solid rgba(255, 255, 255, .05) !important; border-radius: 14px !important; }
+html.ui2 .fw-body :is(.lv-fld, .fv-b, .flm-c .v, .lk-num, .num) { background: rgba(0, 0, 0, .28) !important; color: var(--text) !important; border: 0 !important; border-radius: 9px !important; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .45); font-variant-numeric: tabular-nums; }
+html.ui2 .fw-body :is(.lv-fld, .lk-num) * { color: inherit !important; }
+html.ui2 .fw-body .knob svg path:last-of-type { stroke-width: 2.6 !important; }
+html.ui2 .fw-body .knob svg path { stroke-linecap: round !important; stroke-width: 2.6 !important; }
+html.ui2 .fw-body .knob .k-n, html.ui2 .fw-body .k-n, html.ui2 .fw-body .lk-lb, html.ui2 .fw-body .lv-lb { color: color-mix(in srgb, var(--text) 62%, transparent) !important; font-weight: 500 !important; }
+html.ui2 .fw-body .knob .k-v { color: var(--text) !important; font-weight: 600 !important; }
+html.ui2 .fw-body :is(.lv-tab, .lv-btn).on, html.ui2 .fw .lv-tabs .on { background: rgba(255, 255, 255, .12) !important; color: var(--text) !important; }
+html.ui2 .fw-body :is(.lv-tab, .lv-btn) .led, html.ui2 .fw .lv-tab::before { background: color-mix(in srgb, var(--accent) 55%, #888) !important; box-shadow: none !important; }
+
+/* the bottom bar matches the top bar: 52 px (plus the phone's safe area), the pills centred in the 52 px */
+html.ui2 #bar2 { height: calc(52px + var(--sab, 0px)) !important; min-height: 0 !important; padding-top: 0 !important; padding-bottom: var(--sab, 0px) !important; box-sizing: border-box; align-items: center !important; }
+html.ui2 #bar2 > div, html.ui2 #bar2 > nav { align-self: center !important; }
+html.ui2 #bar2 { height: calc(52px + max(0px, var(--sab, 0px) - 10px)) !important; padding-bottom: max(0px, calc(var(--sab, 0px) - 10px)) !important; }

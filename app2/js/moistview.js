@@ -20,7 +20,7 @@ function customFrames(id) {   // a loaded wavetable (sample id) as 24 frames x 1
 
 const C01 = (v) => Math.min(1, Math.max(0, v));
 const PAGE = new Map(), SEL = new Map();
-const AC = '#38c8ff', AC2 = '#7be2c8', OR = '#ffb347', INK = '#cfd8e3', DIM = '#7d8a99';
+const AC = '#8cbfdc', AC2 = '#8fcfbf', OR = '#d9b37a', INK = '#cfd8e3', DIM = '#7d8a99';
 
 export function moistureView(k) {
   const key = k.d.id, def = k.def;

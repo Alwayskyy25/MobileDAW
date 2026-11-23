@@ -9,7 +9,7 @@ import { Biquad, clamp, TWO_PI } from './engine/dsp.js';
 import { noteName, DEVICES } from './defs.js';
 import * as P from './project.js';
 
-const CY = '#5fd0e0', OR = '#ffa722', RD = '#e5484d', YL = '#e8d040', GN = '#5fd08a', PU = '#c9a0ff';
+const CY = '#8cbfdc', OR = '#d9b37a', RD = '#d97a7a', YL = '#d6c46a', GN = '#7cc495', PU = '#b9a3e3';   // MobileDAW 2: muted (no neon)
 const mem = new Map();                                   // per device id: tab / options, survives card rebuilds
 const st = (d, init) => { let s = mem.get(d.id); if (!s) { s = { ...init }; mem.set(d.id, s); } return s; };
 const f1 = (x) => (x <= -99 ? '\u2014' : x.toFixed(1));

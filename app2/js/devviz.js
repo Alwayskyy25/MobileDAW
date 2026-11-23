@@ -70,7 +70,7 @@ function begin(c) {
   g.fillStyle = DISP.bg; g.fillRect(0, 0, c._w, c._h);
   return g;
 }
-const CY = '#5fd0e0', OR = '#ffa722';
+const CY = '#8cbfdc', OR = '#d9b37a';   // MobileDAW 2: muted (no neon)
 // Live 12 handle: a hollow orange ring on the curve (numbered for EQ bands), the curve itself cyan
 export function ring(g, x, y, r = 5, label = null) {
   g.beginPath(); g.arc(x, y, r, 0, TWO_PI); g.fillStyle = DISP.bg; g.fill(); g.strokeStyle = OR; g.lineWidth = 1.6; g.stroke();

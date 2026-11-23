@@ -15,7 +15,7 @@ import { gmShape, GM_RATE_BEATS } from './engine/hdgms.js';
 import { MS_RATE_BEATS, MS_RATES, MS_DELAY_BEATS, msRateIndex, msHarmonic, msAttackRate, msDecayRate, msAmpReleaseRate } from './engine/hdmini.js';
 import * as P from './project.js';
 
-const SR = 48000, F0 = 20, F1 = 20000, CY = '#4fc3f0', OR = '#ffad32', WH = '#f2f2f2', DIM = '#3d3d42';
+const SR = 48000, F0 = 20, F1 = 20000, CY = '#8cbfdc', OR = '#d9b37a', WH = '#ececef', DIM = '#3d3d42';   // MobileDAW 2: muted (no neon)
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lx = (f, w) => Math.log(f / F0) / Math.log(F1 / F0) * w, xl = (x, w) => F0 * Math.pow(F1 / F0, clamp(x / w, 0, 1));
 const mag = (b, f) => { const w = 2 * Math.PI * f / SR, c1 = Math.cos(w), c2 = Math.cos(2 * w), s1 = Math.sin(w), s2 = Math.sin(2 * w);
