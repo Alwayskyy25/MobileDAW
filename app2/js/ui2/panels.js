@@ -105,3 +105,16 @@ export function openPerfPanel() {
   const tick = setInterval(() => { paint(); }, 250), slow = setInterval(poll, 1000); poll();
   card('pf2c', 'Performa', body, () => { clearInterval(tick); clearInterval(slow); }); requestAnimationFrame(paint);
 }
+
+// ---------------------------------------------------------------- the piano roll's More... (two columns of commands + a transpose stepper)
+// cols: [[{ label, fn }]...]; step(d): transpose the selection by d semitones (the panel shows the total since it opened)
+export function moreGrid(cols, step) {
+  let total = 0;
+  const val = h('b', { class: 'mg-val' }, '0');
+  const arrow = (d) => { const b = h('button', { class: 'mg-arr', 'aria-label': d > 0 ? 'Naik 1 semitone' : 'Turun 1 semitone' }); b.innerHTML = `<svg viewBox="0 0 24 24"><path d="${d > 0 ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}"/></svg>`; b.onclick = () => { step(d); total += d; val.textContent = (total > 0 ? '+' : '') + total; }; return b; };
+  let done = () => {};
+  const col = (items) => h('div', { class: 'mg-col' }, ...items.map((it) => { const b = h('button', { class: 'mg-it' + (it.dim ? ' dim' : '') }, it.label); b.onclick = () => { if (it.dim) return; done(); it.fn(); }; return b; }));
+  const body = h('div', { class: 'mg' }, ...cols.map(col), h('div', { class: 'mg-step' }, arrow(1), val, arrow(-1)));
+  done = card('mgc', 'Aksi not', body);
+  return done;
+}

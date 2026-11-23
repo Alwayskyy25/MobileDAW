@@ -194,14 +194,14 @@ function rowEl(kind, i) {
   r.append(tile);
   if (kind === 'trk') {
     const name = h('button', { class: 'tc-name' }), pw = btn('tc-on', IC.power, '', 'Nyala / mati'), so = h('button', { class: 'u2b tc-solo' }, 'S');
-    const pan = h('div', { class: 'tc-pan', 'aria-label': 'Pan' }, h('i')), vol = h('div', { class: 'tc-vol', 'aria-label': 'Volume' }, h('i'), h('b'));
+    const pan = h('div', { class: 'tc-pan', 'aria-label': 'Pan' }, h('i')), vol = h('div', { class: 'tc-vol', 'aria-label': 'Volume' }, h('i'), h('em'));
+    name.append(h('span', { class: 'nm' }), h('span', { class: 'db' }));
     r.append(name, h('div', { class: 'tc-ctl' }, pw, so, pan, vol));
     pw.onclick = () => { P.toggleMute(r._i); colSig = ''; };
     so.onclick = () => { P.toggleSolo(r._i); colSig = ''; };
-    name.onclick = () => { P.selectTrack(r._i); };
     holdTap(name, () => P.selectTrack(r._i), () => { const b = name.getBoundingClientRect(); TL.v2HeadMenu(r._i, b.left + 20, b.bottom); });
     dragVal(vol, 'x', () => Math.sqrt(clamp(state.tracks[r._i].vol / VMAX, 0, 1)), (u) => P.setVol(r._i, u * u * VMAX), () => P.setVol(r._i, 1 / 1));
-    dragVal(pan, 'y', () => (clamp(state.tracks[r._i].pan, -1, 1) + 1) / 2, (u) => P.setPan(r._i, Math.round((u * 2 - 1) * 100) / 100), () => P.setPan(r._i, 0));
+    dragVal(pan, 'x', () => (clamp(state.tracks[r._i].pan, -1, 1) + 1) / 2, (u) => P.setPan(r._i, Math.round((u * 2 - 1) * 100) / 100), () => P.setPan(r._i, 0));
   }
   // the tile: tap = widen / narrow the column (and select the track), long press = the track menu
   holdTap(tile, () => {
@@ -245,15 +245,15 @@ function syncCol() {
       r._i = i;
       const tile = r.firstChild;
       if (kind === 'trk') {
-        const t = state.tracks[i]; r.style.setProperty('--tc', t.color); tile.innerHTML = kindIcon(t) + '<span class="tc-nm"></span>'; tile.lastChild.textContent = t.name;
+        const t = state.tracks[i]; r.style.setProperty('--tc', t.color); tile.innerHTML = kindIcon(t);
         r.classList.toggle('sel', state.sel.track === i); r.classList.toggle('muted', !!t.mute); r.classList.toggle('auto', t.kind === 'auto'); r.classList.toggle('fold', !!t.fold);
-        r.querySelector('.tc-name').textContent = t.name;
+        r.querySelector('.tc-name .nm').textContent = t.name;
         r.querySelector('.tc-on').classList.toggle('on', !t.mute); r.querySelector('.tc-solo').classList.toggle('on', !!t.solo);
-        const u = Math.sqrt(clamp(t.vol / VMAX, 0, 1)), v = r.querySelector('.tc-vol'); v.firstChild.style.width = (u * 100).toFixed(1) + '%'; v.lastChild.textContent = t.vol > 1e-4 ? (20 * Math.log10(t.vol)).toFixed(1) + ' dB' : '-∞';
-        r.querySelector('.tc-pan').style.setProperty('--a', (clamp(t.pan, -1, 1) * 135).toFixed(1) + 'deg');
+        const u = Math.sqrt(clamp(t.vol / VMAX, 0, 1)), v = r.querySelector('.tc-vol'); v.style.setProperty('--u', u.toFixed(4)); r.querySelector('.tc-name .db').textContent = t.vol > 1e-4 ? (20 * Math.log10(t.vol)).toFixed(1) + ' dB' : '-∞';
+        r.querySelector('.tc-pan').style.setProperty('--u', ((clamp(t.pan, -1, 1) + 1) / 2).toFixed(4));
         tile.setAttribute('aria-label', t.name);
       } else {
-        const x = TL.v2XRow(i); r._strip = x.strip; r.style.setProperty('--tc', x.color); tile.innerHTML = IC.bus + '<span class="tc-nm"></span>'; tile.lastChild.textContent = x.name; r.classList.toggle('sel', state.sel.track === x.strip); r.classList.add('xrow'); tile.setAttribute('aria-label', x.name);
+        const x = TL.v2XRow(i); r._strip = x.strip; r.style.setProperty('--tc', x.color); tile.innerHTML = IC.bus; r.classList.toggle('sel', state.sel.track === x.strip); r.classList.add('xrow'); tile.setAttribute('aria-label', x.name);
       }
     }
     syncSnap();
@@ -270,12 +270,11 @@ function buildBubbles() {
   bubEl = h('div', { id: 'bub2', hidden: true });
   const mk = (ic, label, fn) => { const b = btn('bub', ic, label); b.onclick = (e) => { e.stopPropagation(); fn(e); }; return b; };
   bubEl.append(
-    mk(IC.edit, 'Edit', () => { const c = cur(); if (!c) return; hideBub(); api.openEditor(); }),
-    mk(IC.copy, 'Salin', () => { const c = cur(); if (c) TL.v2CopyClip(bub.i, c); }),
-    mk(IC.dup, 'Gandakan', () => { const c = cur(); if (!c) return; TL.v2Copy(bub.i, c); bub.id = state.sel.clip; }),
-    mk(IC.snap, 'Snap', () => { const c = cur(); if (c) TL.v2Snap(bub.i, c); }),
-    mk(IC.trash, 'Hapus', () => { const c = cur(); if (!c) return; checkpoint(); P.removeClip(bub.i, c.id); hideBub(); }),
-    mk(IC.more, 'Lainnya', (e) => moreMenu(e)),
+    mk('', 'Salin', () => { const c = cur(); if (c) TL.v2CopyClip(bub.i, c); }),
+    mk('', 'Hapus', () => { const c = cur(); if (!c) return; checkpoint(); P.removeClip(bub.i, c.id); hideBub(); }),
+    mk('', 'Snap', () => { const c = cur(); if (c) TL.v2Snap(bub.i, c); }),
+    mk('', 'Edit', () => { const c = cur(); if (!c) return; hideBub(); api.openEditor(); }),
+    mk('', 'Lainnya', (e) => moreMenu(e)),
   );
   insEl = h('div', { id: 'ins2', hidden: true });
   insEl.append(mk(IC.plus, 'Klip baru', () => { const q = ins; hideIns(); if (q) TL.v2NewClip(q.i, q.tick, q.sub); }), mk(IC.paste, 'Tempel', () => { const q = ins; hideIns(); if (q) TL.v2Paste(q.i, q.tick); }));
@@ -303,6 +302,7 @@ function placeIns() {
 function moreMenu(e) {
   const c = cur(); if (!c) return; const i = bub.i, r = e.currentTarget.getBoundingClientRect(), audio = state.tracks[i].kind === 'audio';
   menu([
+    { label: 'Gandakan', fn: () => { TL.v2Copy(i, c); if (bub) bub.id = state.sel.clip; } },
     { label: 'Potong di playhead', dim: !TL.v2CanSlice(c), fn: () => TL.v2Slice(i, c) },
     { label: 'Lepas loop', dim: !TL.v2CanUnlink(c), fn: () => TL.v2Unlink(i, c) },
     { label: 'Gabung', dim: !TL.v2CanCombine(i, c), fn: () => TL.v2Combine(i, c) },
@@ -311,16 +311,18 @@ function moreMenu(e) {
     { label: 'Potong rata\u2026', sub: [...[6, 4, 3, 2, 1].map((n) => ({ label: n === 1 ? 'Tiap 1 ketuk' : 'Tiap 1/' + n + ' ketuk', fn: () => TL.v2Chop(i, c, { every: n }) })), ...(audio ? [{ label: 'Di transien', fn: () => TL.v2Chop(i, c, { transients: true }) }] : [])] },
     { label: 'Ganti nama\u2026', fn: () => TL.v2Rename(i, c) },
     { sep: true },
-    { label: 'Semua perintah klip\u2026', fn: () => TL.v2ClipMenu(i, c, r.left - 230, r.top) },
-  ], r.left - 230, r.top - 120);
+    { label: 'Semua perintah klip\u2026', fn: () => TL.v2ClipMenu(i, c, r.left, r.bottom + 4) },
+  ], r.left, r.bottom + 4);
 }
-function placeBub() {
+function placeBub() {   // the bubbles float just above the selected clip (below it when there is no room), centred on its visible part
   if (!bub) return;
   const c = cur();
   if (!c || state.sel.clip !== bub.id || TL.v2Busy() || api.getView() !== 'arr') { if (!c || state.sel.clip !== bub.id) hideBub(); else bubEl.hidden = true; return; }
-  const g = TL.v2Geom(); bubEl.hidden = false;
-  const off = col ? col.offsetWidth : 0, bw = bubEl.offsetWidth || 64, bh = bubEl.offsetHeight || 300;   // MobileDAW 2: the rail sits at the right edge of the lanes, centred
-  const x = off + g.W - bw - 10, y = Math.max(g.ruler + 6, g.ruler + (g.laneB - g.ruler - bh) / 2);
+  const b = TL.v2ClipBox(bub.i, bub.id), g = TL.v2Geom(); if (!b) return hideBub();
+  bubEl.hidden = false;
+  const off = col ? col.offsetWidth : 0, bw = bubEl.offsetWidth || 260, bh = bubEl.offsetHeight || 46, vx0 = Math.max(0, b.x), vx1 = Math.min(g.W, b.x + b.w);
+  const x = off + clamp((vx0 + vx1) / 2 - bw / 2, 6, Math.max(6, g.W - bw - 6));
+  let y = b.y - bh - 6; if (y < g.ruler + 2) y = b.y + b.h + 6; if (y + bh > g.laneB) y = clamp(b.y + 6, g.ruler + 2, Math.max(g.ruler + 2, g.laneB - bh - 2));
   bubEl.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`;
 }
 

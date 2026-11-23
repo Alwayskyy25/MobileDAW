@@ -1,6 +1,6 @@
 /* MobileDAW 2 (js/ui2/shell.js): the frame around the arrangement. Warm, quiet surfaces from the theme (Studio by default), the accent for
    what is on, round transport, text tabs, pill tools. Every value comes from the theme tokens, so the other themes work too. */
-html.ui2 { --b2-h: 56px; --tc-w: 66px; --tc-ww: 252px; --u2-r: 10px; --u2-pill: 999px; }
+html.ui2 { --b2-h: 56px; --tc-w: 66px; --tc-ww: 300px; --u2-r: 10px; --u2-pill: 999px; }
 html.ui2.tc-wide { --tc-cur: var(--tc-ww); }
 html.ui2:not(.tc-wide) { --tc-cur: var(--tc-w); }
 html.ui2 #top { display: none; }
@@ -19,63 +19,61 @@ html.ui2 #view-arr.edfull :is(#tcol2, #bub2, #ins2) { display: none; }
 .u2b:active { background: color-mix(in srgb, var(--text) 10%, transparent); }
 .u2b:disabled { opacity: .32; }
 
-/* ---- left track column */
+/* ---- left track column: icon tiles (narrow) or icon + name + on / solo / pan / volume (wide); the colours are the clips' colours */
 #tcol2 { position: absolute; left: 0; top: 0; width: var(--tc-cur); z-index: 2; background: var(--panel); border-right: 1px solid color-mix(in srgb, var(--line) 80%, transparent); overflow: hidden;
   transition: width calc(var(--t-med, .2s) * var(--anim, 1)) var(--ease, ease); }
-#tcol2 .tc-top { display: flex; align-items: center; justify-content: center; background: var(--panel); border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent); }
-#tcol2 .tc-top .add { width: 34px; min-width: 34px; height: 28px; padding: 0; border-radius: 9px; color: var(--dim); border: 1px dashed color-mix(in srgb, var(--text) 25%, transparent); }
-#tcol2 .tc-top .add svg { width: 16px; height: 16px; }
+#tcol2 .tc-top { background: var(--panel); border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent); }
 #tcol2 .tc-rows { position: absolute; left: 0; right: 0; bottom: 0; top: var(--tc-top, 38px); touch-action: none; }
 .tc-row { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: stretch; --tc: #888; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
-/* the tile: a coloured corner (the track's colour), the kind's icon, the name under it */
-.tc-tile { flex: none; width: var(--tc-w); border: 0; padding: 4px 4px 3px 7px; isolation: isolate; background: transparent; color: var(--text); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  position: relative; cursor: pointer; -webkit-tap-highlight-color: transparent; overflow: hidden; }
-.tc-tile::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; border-radius: 0 3px 3px 0; background: var(--tc); }
-.tc-tile::after { content: ""; position: absolute; inset: 3px 4px 3px 7px; border-radius: 9px; background: color-mix(in srgb, var(--tc) 16%, transparent); opacity: 0; z-index: -1; }
-.tc-tile svg { width: 22px; height: 22px; fill: none; stroke: var(--tc); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-.tc-nm { max-width: 100%; font: var(--fw-m, 500) 9.5px/1.15 var(--font); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tc-row.sel { background: color-mix(in srgb, var(--tc) 7%, var(--panel)); }
-.tc-row.sel .tc-tile::after { opacity: 1; }
-.tc-row.sel .tc-nm { color: var(--text); }
-.tc-row.muted .tc-tile svg, .tc-row.muted .tc-nm { opacity: .4; }
-.tc-row.xrow .tc-tile svg { stroke: var(--dim); }
-.tc-row.xrow .tc-tile::before { background: var(--dim); }
-.tc-row.fold .tc-nm, .tc-row.short .tc-nm { display: none; }
-.tc-row.fold .tc-tile svg { width: 16px; height: 16px; }
-/* wide column: name + on / solo / pan / volume */
+.tc-tile { flex: none; width: var(--tc-w); border: 0; padding: 0; background: transparent; color: var(--tc); display: flex; align-items: center; justify-content: center; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: background calc(.15s * var(--anim, 1)); }
+.tc-tile svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.tc-tile:active svg { transform: scale(.92); }
+.tc-row.sel .tc-tile { background: var(--tc); color: rgba(0, 0, 0, .78); }
+.tc-row.muted .tc-tile { opacity: .4; }
+.tc-row.xrow .tc-tile { color: var(--dim); }
+.tc-row.xrow.sel .tc-tile { background: var(--raise2); color: var(--text); }
+.tc-row.fold .tc-tile svg { width: 17px; height: 17px; }
+.tc-nm { display: none; }
 .tc-name, .tc-ctl { display: none; }
-html.tc-wide .tc-row:not(.xrow) .tc-name { display: block; }
+html.tc-wide .tc-row:not(.xrow) .tc-name { display: flex; }
 html.tc-wide .tc-row:not(.xrow):not(.fold) .tc-ctl { display: flex; }
-html.tc-wide .tc-row { flex-wrap: wrap; align-content: center; padding-right: 8px; }
+html.tc-wide .tc-row { flex-wrap: wrap; align-content: center; row-gap: 4px; padding-right: 10px; }
 html.tc-wide .tc-row .tc-tile { position: absolute; left: 0; top: 0; bottom: 0; }
-html.tc-wide .tc-row:not(.xrow) .tc-nm { display: none; }
-.tc-name { width: calc(100% - var(--tc-w) - 2px); margin-left: calc(var(--tc-w) + 2px); height: 22px; border: 0; background: none; padding: 0; text-align: left; color: var(--text);
-  font: var(--fw-sb, 600) 13px/22px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-.tc-ctl { width: calc(100% - var(--tc-w) - 2px); margin-left: calc(var(--tc-w) + 2px); align-items: center; gap: 6px; height: 30px; }
-.tc-ctl .u2b { min-width: 28px; width: 28px; height: 24px; border-radius: 7px; background: color-mix(in srgb, var(--text) 8%, transparent); padding: 0; font: var(--fw-sb, 600) 11px/1 var(--font); }
-.tc-ctl .u2b svg { width: 15px; height: 15px; }
-.tc-ctl .tc-on { color: var(--dim); }
-.tc-ctl .tc-on.on { color: var(--tc); }
-.tc-ctl .tc-solo.on { background: var(--accent); color: var(--accent-ink); }
-.tc-pan { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--text) 18%, transparent); position: relative; touch-action: none; cursor: ns-resize; }
-.tc-pan i { position: absolute; left: 50%; top: 50%; width: 2px; height: 9px; margin-left: -1px; background: var(--tc); border-radius: 1px; transform-origin: 50% 100%; transform: translateY(-100%) rotate(var(--a, 0deg)); }
-.tc-vol { flex: 1; min-width: 40px; height: 24px; border-radius: 7px; background: color-mix(in srgb, var(--text) 8%, transparent); position: relative; overflow: hidden; touch-action: none; cursor: ew-resize; }
-.tc-vol i { position: absolute; left: 0; top: 0; bottom: 0; background: color-mix(in srgb, var(--tc) 45%, transparent); border-right: 2px solid var(--tc); }
-.tc-vol b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: var(--fw-m, 500) 10.5px/1 var(--font); color: var(--text); font-variant-numeric: tabular-nums; pointer-events: none; }
+html.tc-wide .tc-row.sel { background: color-mix(in srgb, var(--tc) 6%, var(--panel)); }
+.tc-name { width: calc(100% - var(--tc-w) - 10px); margin-left: calc(var(--tc-w) + 10px); height: 18px; align-items: baseline; justify-content: space-between; gap: 8px; border: 0; background: none; padding: 0; cursor: pointer; }
+.tc-name .nm { min-width: 0; color: var(--tc); font: var(--fw-sb, 600) 12.5px/18px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-name .db { flex: none; color: var(--dim); font: var(--fw-m, 500) 10.5px/18px var(--font); font-variant-numeric: tabular-nums; }
+.tc-ctl { width: calc(100% - var(--tc-w) - 10px); margin-left: calc(var(--tc-w) + 10px); align-items: center; gap: 6px; height: 22px; }
+/* on / off: a small switch in the track colour; solo: a word that lights up */
+.tc-ctl .tc-on { flex: none; width: 26px; min-width: 26px; height: 16px; padding: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 14%, transparent); position: relative; }
+.tc-ctl .tc-on svg { display: none; }
+.tc-ctl .tc-on::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--dim); transition: left calc(.15s * var(--anim, 1)); }
+.tc-ctl .tc-on.on { background: color-mix(in srgb, var(--tc) 40%, transparent); }
+.tc-ctl .tc-on.on::after { left: 12px; background: var(--tc); }
+.tc-ctl .tc-solo { flex: none; flex-direction: row; gap: 0; min-width: 0; width: auto; height: 20px; padding: 0 7px; border-radius: 6px; background: none; color: var(--dim); font: var(--fw-m, 500) 11.5px/1 var(--font); white-space: nowrap; }
+.tc-ctl .tc-solo::after { content: "olo"; }
+.tc-ctl .tc-solo.on { background: var(--tc); color: rgba(0, 0, 0, .8); }
+/* pan and volume: a line with a round thumb in the track colour (volume filled from the left, pan from the centre) */
+.tc-pan, .tc-vol { position: relative; height: 22px; touch-action: none; cursor: ew-resize; --u: .5; }
+.tc-pan { flex: none; width: 36px; }
+.tc-vol { flex: 1; min-width: 70px; }
+.tc-pan::before, .tc-vol::before { content: ""; position: absolute; left: 6px; right: 6px; top: 50%; height: 4px; margin-top: -2px; border-radius: 2px; background: color-mix(in srgb, var(--text) 13%, transparent); }
+.tc-vol i { position: absolute; left: 6px; top: 50%; height: 4px; margin-top: -2px; width: calc((100% - 12px) * var(--u)); border-radius: 2px; background: var(--tc); }
+.tc-pan i, .tc-vol em { position: absolute; top: 50%; left: calc(6px + (100% - 12px) * var(--u)); width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--tc); box-shadow: 0 1px 3px rgba(0, 0, 0, .45); }
+.tc-pan i { width: 10px; height: 10px; margin: -5px 0 0 -5px; }
 
-/* ---- clip tools: a vertical rail at the right edge of the lanes; the insert menu (Klip baru / Tempel) is a small bar at the tapped beat */
-#bub2, #ins2 { position: absolute; left: 0; top: 0; z-index: 5; display: flex; gap: 0; padding: 4px; border-radius: 16px; background: color-mix(in srgb, var(--menu, var(--panel2)) 96%, transparent);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, .45), 0 0 0 1px color-mix(in srgb, var(--text) 9%, transparent); will-change: transform; animation: u2pop calc(.14s * var(--anim, 1)) var(--ease, ease); }
-#bub2 { flex-direction: column; }
+/* ---- clip bubbles (above the clip) and the insert menu: round light chips with a word, as on a touch DAW */
+#bub2, #ins2 { position: absolute; left: 0; top: 0; z-index: 5; display: flex; gap: 8px; padding: 0; will-change: transform; animation: u2pop calc(.14s * var(--anim, 1)) var(--ease, ease); }
 #bub2[hidden], #ins2[hidden] { display: none; }
-#bub2 .bub, #ins2 .bub { min-width: 58px; height: 48px; padding: 0 4px; border-radius: 11px; color: var(--dim); font: var(--fw-m, 500) 10px/1 var(--font); }
-#bub2 .bub svg, #ins2 .bub svg { color: var(--text); width: 19px; height: 19px; }
-#bub2 .bub + .bub { box-shadow: 0 -1px 0 color-mix(in srgb, var(--text) 7%, transparent); }
-#ins2 .bub + .bub { box-shadow: -1px 0 0 color-mix(in srgb, var(--text) 7%, transparent); }
-#bub2 .bub[aria-label="Edit"] svg, #ins2 .bub svg { color: var(--accent); }
-#bub2 .bub[aria-label="Hapus"], #bub2 .bub[aria-label="Hapus"] svg { color: var(--rec); }
-#ins2 .bub { min-width: 72px; color: var(--text); }
-@keyframes u2pop { from { opacity: 0; transform: scale(.96); } }
+#bub2 .bub, #ins2 .bub, html.ui2 .bar .b, html.ui2 .selbar .b { min-width: 54px; width: auto; height: 46px; padding: 0 12px; border: 0; border-radius: 999px; background: #e3e5ea; color: #1d2026;
+  font: var(--fw-sb, 600) 12px/1 var(--font); box-shadow: 0 4px 12px rgba(0, 0, 0, .4); }
+#bub2 .bub svg, #ins2 .bub svg { display: none; }
+#bub2 .bub:active, #ins2 .bub:active, html.ui2 .bar .b:active { background: var(--accent); color: var(--accent-ink); }
+#ins2 .bub:disabled { opacity: .55; }
+html.ui2 .bar { gap: 8px; padding: 0; background: none; border: 0; box-shadow: none; overflow: visible; }
+html.ui2 .selbar { gap: 8px; background: none; border: 0; box-shadow: none; }
+@keyframes u2pop { from { opacity: 0; transform: scale(.94); } }
 
 /* ---- logo button + main menu */
 #mm2 { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
@@ -222,3 +220,44 @@ html[data-w="s"] :is(#bar2 .tab .lb, #top2 .pill .lb, #title2), html[data-w="xs"
 .pf2-cell { display: flex; flex-direction: column; gap: 5px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--text) 5%, transparent); }
 .pf2-cell span { font: 11px/1 var(--font); color: var(--dim); }
 .pf2-cell b { font: var(--fw-sb, 600) 14px/1.1 var(--font); color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ---- the piano roll's More... panel: two columns of commands, the transpose stepper on the right */
+.mg { display: grid; grid-template-columns: 1fr 1fr auto; gap: 4px 22px; align-items: center; }
+.mg-col { display: flex; flex-direction: column; }
+.mg-it { height: 38px; padding: 0 4px; border: 0; background: none; color: var(--text); text-align: left; font: var(--fw-m, 500) 14px/1 var(--font); cursor: pointer; border-radius: 8px; white-space: nowrap; }
+.mg-it:active { background: color-mix(in srgb, var(--text) 8%, transparent); }
+.mg-it.dim { opacity: .35; }
+.mg-step { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-left: 8px; }
+.mg-arr { width: 54px; height: 54px; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--text) 30%, transparent); background: none; color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.mg-arr svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mg-arr:active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.mg-val { font: var(--fw-sb, 600) 22px/1 var(--font); color: var(--text); font-variant-numeric: tabular-nums; min-width: 40px; text-align: center; }
+
+/* ---- the other views in MobileDAW 2's colours and shapes: menus, dialogs, settings, browser, mixer */
+html.ui2 .menu { border-radius: 14px; padding: 6px; background: var(--menu); border: 0; box-shadow: 0 14px 34px rgba(0, 0, 0, .5), 0 0 0 1px color-mix(in srgb, var(--text) 8%, transparent); }
+html.ui2 .menu .mi { border-radius: 8px; min-height: 36px; padding: 0 14px; font: var(--fw-m, 500) 13.5px/36px var(--font); }
+html.ui2 .menu .mi:active, html.ui2 .menu .mi:hover { background: color-mix(in srgb, var(--text) 9%, transparent); }
+html.ui2 .menu .mi.sep { min-height: 0; height: 1px; margin: 4px 8px; padding: 0; background: color-mix(in srgb, var(--text) 9%, transparent); }
+html.ui2 .modal, html.ui2 .dlg { border-radius: 18px !important; background: var(--panel) !important; border: 0 !important; box-shadow: 0 20px 50px rgba(0, 0, 0, .55), 0 0 0 1px color-mix(in srgb, var(--text) 8%, transparent) !important; }
+html.ui2 .modal h3, html.ui2 .modal > header { font: var(--fw-sb, 600) 15px/1.2 var(--font); }
+html.ui2 .modal .b, html.ui2 .settings .b { border-radius: 999px; border: 0; background: color-mix(in srgb, var(--text) 9%, transparent); color: var(--text); box-shadow: none; }
+html.ui2 .modal .b.pri, html.ui2 .modal .b.primary { background: var(--accent); color: var(--accent-ink); }
+html.ui2 .settings { font-family: var(--font); }
+html.ui2 .settings section, html.ui2 .settings .sec { border-radius: 14px; background: color-mix(in srgb, var(--text) 4%, transparent); border: 0; }
+html.ui2 #browser { background: var(--panel); border-right: 1px solid color-mix(in srgb, var(--line) 80%, transparent); box-shadow: 10px 0 30px rgba(0, 0, 0, .35); }
+html.ui2 #browser .b { border-radius: 999px; border: 0; box-shadow: none; }
+html.ui2 #view-mix { background: var(--bg); }
+html.ui2 #detail { background: var(--panel); border-top: 1px solid color-mix(in srgb, var(--line) 80%, transparent); }
+html.ui2 #dtabs .b { border-radius: 999px; border: 0; box-shadow: none; }
+html.ui2 #dtabs .b.on { background: var(--accent); color: var(--accent-ink); }
+
+/* ---- the clip editor (piano roll / drum steps) full screen: the properties panel only on request, the toolbar as pills */
+html.ui2 .ed-root:not(.props-on) .cp { display: none !important; }
+html.ui2 #app .ed-tools { background: var(--panel); border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent); gap: 6px; }
+html.ui2 #app .ed-tools .b, html.ui2 #app .ed-tools .ed-g .b { height: 28px; padding: 0 12px; border: 0; border-radius: 999px !important; background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); font: var(--fw-m, 500) 12px/1 var(--font); }
+html.ui2 #app .ed-tools .ed-g { gap: 2px; padding: 2px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 6%, transparent); }
+html.ui2 #app .ed-tools .ed-g .b + .b { border-left: 0; }
+html.ui2 #app .ed-tools .b.on, html.ui2 #app .ed-tools .ed-g .b.on { background: var(--accent) !important; color: var(--accent-ink) !important; }
+html.ui2 #app .ed-tools .b.on::before { display: none; }
+html.ui2 #app .ed-tools .ed-sep { background: none; width: 4px; }
+html.ui2 #dtabs { background: var(--panel); border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent); }

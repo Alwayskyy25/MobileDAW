@@ -43,11 +43,11 @@ ok(await page.evaluate(() => document.querySelector('#view-arr').classList.conta
 const clipAt = async (i) => page.evaluate(async (i) => { const TL = await import('./js/timeline.js'), P = await import('./js/project.js'); const c = P.state.tracks[i].clips[0], bx = TL.v2ClipBox(i, c.id), r = document.querySelector('#arr canvas').getBoundingClientRect(); return { x: r.left + bx.x + 20, y: r.top + bx.y + bx.h / 2, id: c.id }; }, i);
 let p = await clipAt(0);
 await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(700);
-ok(await page.evaluate(() => !document.querySelector('#bub2').hidden && document.querySelectorAll('#bub2 .bub').length === 6), 'a tap on a clip shows the clip tools (Edit, Salin, Gandakan, Snap, Hapus, Lainnya)');
+ok(await page.evaluate(() => !document.querySelector('#bub2').hidden && document.querySelectorAll('#bub2 .bub').length === 5), 'a tap on a clip shows the bubbles over it (Salin, Hapus, Snap, Edit, Lainnya)');
 await page.click('#bub2 [aria-label="Salin"]'); await page.waitForTimeout(150);
 ok(await page.evaluate(async () => (await import('./js/project.js')).state.tracks[0].clips.length === 1 && (await import('./js/timeline.js')).v2HasClipboard()), 'Salin copies the clip to the clipboard (Honeydew Copy)');
-await page.click('#bub2 [aria-label="Gandakan"]'); await page.waitForTimeout(200);
-ok(await page.evaluate(async () => (await import('./js/project.js')).state.tracks[0].clips.length === 2), 'Gandakan puts a copy right after the clip (Honeydew Duplicate)');
+await page.click('#bub2 [aria-label="Lainnya"]'); await page.waitForTimeout(600); await page.click('.menu .mi:text-is("Gandakan")'); await page.waitForTimeout(250);
+ok(await page.evaluate(async () => (await import('./js/project.js')).state.tracks[0].clips.length === 2), 'Lainnya > Gandakan puts a copy right after the clip');
 await page.click('#bub2 [aria-label="Hapus"]'); await page.waitForTimeout(200);
 ok(await page.evaluate(async () => (await import('./js/project.js')).state.tracks[0].clips.length === 1 && document.querySelector('#bub2').hidden), 'Hapus deletes the clip and hides the bubbles');
 await page.click('#top2 [aria-label="Urungkan"]'); await page.waitForTimeout(200);

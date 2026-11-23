@@ -264,15 +264,15 @@ function drawClip(t, c, y, hh) {
   // Live (replica of the arrangement clip, same in every theme: clip colours are not themed): title strip and body in the clip colour, the name and the
   // content (waveform / notes / envelope) in near-black on a light colour or near-white on a dark one, a thin dark edge; a selected clip turns lighter,
   // a deactivated clip is grey. Folded / short rows show only the colour + content (no strip).
-  const body = c.muted ? (V2 ? '#3a3a3e' : '#9a9a9f') : V2 ? shade(t.color, 0.62) : t.color;   // MobileDAW 2: a deep tone of the track colour, the content bright on it                              // owner: the clip keeps exactly its track's colour (the header's) also when selected; the light edge shows the selection
+  const body = c.muted ? (V2 ? shade(t.color, 0.6) : '#9a9a9f') : t.color;   // MobileDAW 2 (as FL Studio Mobile): the whole clip in the track colour, a muted clip in a dark tone of it                              // owner: the clip keeps exactly its track's colour (the header's) also when selected; the light edge shows the selection
   ctx.fillStyle = body; ctx.fillRect(x, y0, w, h0);
-  const strip = V2 ? (c.muted ? '#55555b' : t.color) : col;   // MobileDAW 2: the title strip in the full track colour
-  if (tall) { ctx.fillStyle = strip; ctx.fillRect(x, y0, w, hd); ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.fillRect(x, y0 + hd, w, 1); }   // the name strip: same colour, a faint line under it
+  const strip = V2 ? body : col;   // MobileDAW 2: no separate title strip, the name sits on the clip colour
+  if (tall && !V2) { ctx.fillStyle = strip; ctx.fillRect(x, y0, w, hd); ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.fillRect(x, y0 + hd, w, 1); }   // the name strip: same colour, a faint line under it
   // Live 12 (refs/live12-official/02): no outline around a clip; the arrangement grid runs through its body as faint darker lines (beats, bars)
   { const gx = gridT(), bp = BAR * view.ppt; if (gx * view.ppt >= 6) { ctx.fillStyle = 'rgba(0,0,0,.08)'; for (let tk = Math.ceil(cs / gx) * gx; tk < cs + cl; tk += gx) { const lx = Math.round(tx(tk)); if (lx > xs && lx < xe) ctx.fillRect(lx, y0 + hd, 1, h0 - hd); } }
     if (bp >= 4) { ctx.fillStyle = 'rgba(0,0,0,.12)'; for (let b = Math.max(0, P.barAt(cs)); P.barStart(b) < cs + cl; b++) { const lx = Math.round(tx(P.barStart(b))); if (lx > xs && lx < xe) ctx.fillRect(lx, y0 + hd, 1, h0 - hd); } } }
   if (tall && w > 18) {
-    ctx.fillStyle = ink(strip); ctx.font = FONT(V2 ? 600 : 500, 10); ctx.textBaseline = 'middle';   // Live: clip names regular weight
+    ctx.fillStyle = V2 ? shade(t.color, c.muted ? 0.82 : 0.6) : ink(strip); ctx.font = FONT(V2 ? 600 : 500, V2 ? 10.5 : 10); ctx.textBaseline = 'middle';   // Live: clip names regular weight
     { const room = xe - xs - 10, nm = c.name || (c.sample ? c.sample.name : t.name); if (room > 8) ctx.fillText(cut2(nm, room), xs + 5, y0 + hd / 2 + 0.5); }   // owner: cut with an ellipsis ("11 Cas…"), never squeezed
   }
   const by = y0 + hd + 2, bh = h0 - hd - 4, INK = c.muted ? 'rgba(20,20,24,.6)' : contentInk(t.color);
@@ -286,7 +286,7 @@ function drawClip(t, c, y, hh) {
     ctx.fillStyle = INK; for (const p of pts) { const px = x + p.t * view.ppt; if (px >= xs - 3 && px <= xe + 3) ctx.fillRect(px - 2, yy(p.v) - 2, 4, 4); }   // breakpoints, as in Live's automation
   } else if (t.kind === 'audio' && (c.dsample || c.sample) && ((c.dsample || c.sample).pyr || (c.dsample || c.sample).peaks) && bh > 8) {
     const es = c.dsample || c.sample, lk = live.get(c.id) || 1, o = c.offset || 0;
-    ctx.fillStyle = V2 ? (c.muted ? 'rgba(200,200,205,.45)' : tint(t.color, 0.15)) : c.muted ? INK : shade(t.color, 0.72);   // Live 12 (refs/live12-official 02, 03): the waveform in a deep tone of the clip colour, not black
+    ctx.fillStyle = V2 ? shade(t.color, c.muted ? 0.82 : 0.58) : c.muted ? INK : shade(t.color, 0.72);   // Live 12 (refs/live12-official 02, 03): the waveform in a deep tone of the clip colour, not black
     for (const g of P.loopSegs(c)) {                            // a clip longer than its audio repeats it: every repeat is drawn from the start of the content
       const sx = x + g.o * view.ppt, sw = g.len * view.ppt;
       if (sx > xe || sx + sw < xs) continue;
@@ -306,7 +306,7 @@ function drawClip(t, c, y, hh) {
     }
   } else if (c.notes && bh > 6) {
     const [lo, hi] = noteBox(c), span = hi - lo + 1, nh = Math.max(2, Math.min(bh / span * 0.8, 7));   // Live: solid note bars, about 4/5 of a pitch row
-    ctx.fillStyle = V2 ? (c.muted ? 'rgba(200,200,205,.45)' : tint(t.color, 0.1)) : c.muted ? INK : shade(t.color, 0.85);   // Live 12: notes nearly black (the clip colour's darkest tone), in every theme
+    ctx.fillStyle = V2 ? shade(t.color, c.muted ? 0.82 : 0.58) : c.muted ? INK : shade(t.color, 0.85);   // Live 12: notes nearly black (the clip colour's darkest tone), in every theme
     for (const g of P.loopSegs(c)) {                            // looped MIDI: the notes are drawn again in every repeat (no empty bars)
       const gx = x + g.o * view.ppt;
       if (gx > xe || gx + g.len * view.ppt < xs) continue;
@@ -347,7 +347,7 @@ function drawClip(t, c, y, hh) {
   }
   if (isSel) {
     ctx.strokeStyle = shade(t.color, 0.6); ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 0.5, y0 + 0.5, Math.max(0, Math.round(w) - 1), h0 - 1);   // selected: one crisp 1 px edge (owner: thinner)
-    if (V2) { ctx.strokeStyle = PH(); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.roundRect(Math.round(x) + 1.25, y0 + 1.25, Math.max(0, Math.round(w) - 2.5), h0 - 2.5, 4); ctx.stroke(); }   // MobileDAW 2: the selection in the accent colour
+    if (V2) { ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.roundRect(Math.round(x) + 2.5, y0 + 2.5, Math.max(0, Math.round(w) - 5), h0 - 5, 4); ctx.stroke(); ctx.strokeStyle = '#eef0f4'; ctx.lineWidth = 3; ctx.stroke(); }   // MobileDAW 2: a light frame inside the selected clip
     if (!V2 && tall && w > 44 && !msel.size) { const mx = Math.min(x + w, CW) - 12, my = y0 + hd / 2; ctx.fillStyle = shade(t.color, 0.75); for (const d of [-4, 0, 4]) { ctx.beginPath(); ctx.arc(mx + d, my, 1.3, 0, 6.2832); ctx.fill(); } }   // ⋯ : the clip's context menu
     const hl = Math.min(26, h0 - hd - 10), hy = y0 + hd + (h0 - hd - hl) / 2, st = stretchMode && t.kind === 'audio';   // edge grips for touch: pills on both ends
     if (hl > 6 && w > 26 && st) { ctx.fillStyle = C('#ffa722'); ctx.fillRect(x + w - 6, hy, 3, hl); }   // the stretch mode's mark (the handles are drawn by drawHandles)

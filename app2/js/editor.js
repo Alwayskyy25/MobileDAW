@@ -2,6 +2,7 @@
 // Gestures follow FL Studio Mobile: tap grid = add note, tap note = controls, long-press note = delete menu,
 // one-finger drag on empty = scroll, long press (1 s, vibration) + drag on empty = rubber-band select, ruler drag = time selection,
 // drag-up lane = velocity.
+import { moreGrid } from './ui2/panels.js';
 import { C, T } from './theme.js';
 import { attachGestures, gestureTiming, haptic } from './gesture.js';
 import { bar, menu, ask, modal, closeAll, toast, h, clamp } from './ui.js';
@@ -602,14 +603,13 @@ function noteBar(n, x, y) {
   if (!sel.size) return;
   const o = ops(), r = canvas.getBoundingClientRect(), ax = r.left + x, ay = r.top + y;
   bar([
-    { label: 'Copy', fn: o.copy }, { label: 'Del', fn: o.del }, { label: 'Snap', fn: o.snap }, ...(P.state.tracks[cur().track] && P.state.tracks[cur().track].kind === 'midi' ? [{ label: 'Slide', fn: o.slide }] : []),
-    { label: 'More\u2026', keep: true, fn: () => menu([
-      { label: 'Legato', fn: o.legato }, { label: 'Snap ke skala', fn: o.scale }, { label: 'Tebak skala?', fn: () => guessMenu(selNotes(), ax, ay) }, { label: 'Humanize', fn: o.humanize },
-      { label: 'Double up (+1 oktaf)', fn: () => o.double(1) }, { label: 'Double down (\u22121 oktaf)', fn: () => o.double(-1) },
-      { label: 'Panjang not\u2026', fn: () => menu([['1/16', 240], ['1/8', 480], ['1/4', 960], ['1/2', 1920], ['Whole', 3840]].map(([l, d]) => ({ label: l, fn: () => o.length(d) })), ax, ay) },
-      { label: 'Transpose\u2026', fn: () => ask('Transpose (semitone)', 0, (q) => Number.isFinite(q) && o.shift(Math.round(q)), 'number') },
-      { label: '+1 / \u22121 semitone', fn: () => bump(o, ax, ay) },
-    ], ax, ay) },
+    { label: 'Salin', fn: o.copy }, { label: 'Hapus', fn: o.del }, { label: 'Snap', fn: o.snap },
+    { label: 'Lainnya', keep: true, fn: () => moreGrid([   // MobileDAW 2: the FL Studio Mobile More... set as a panel, the transpose stepper on the right
+      [{ label: 'Legato', fn: o.legato }, { label: 'Snap ke skala', fn: o.scale }, { label: 'Tebak skala\u2026', fn: () => guessMenu(selNotes(), ax, ay) }, { label: 'Humanize', fn: o.humanize },
+        { label: 'Double up', fn: () => o.double(1) }, { label: 'Double down', fn: () => o.double(-1) }, { label: 'Toggle slide', dim: !(P.state.tracks[cur().track] && P.state.tracks[cur().track].kind === 'midi'), fn: o.slide }],
+      [...[['1/16', 240], ['1/8', 480], ['1/4', 960], ['1/2', 1920], ['1/1', 3840]].map(([l, d]) => ({ label: 'Panjang ' + l, fn: () => o.length(d) })),
+        { label: 'Transpose\u2026', fn: () => ask('Transpose (semitone)', 0, (q) => Number.isFinite(q) && o.shift(Math.round(q)), 'number') }, { label: 'Pilih semua', fn: () => { sel = new Set(cur().clip.notes); invalidate(); } }],
+    ], (d) => o.shift(d)) },
   ], r.left + clamp(x - 90, 6, Math.max(6, W - 250)), r.top + Math.max(RULER, y - 46));
 }
 
@@ -1252,6 +1252,8 @@ function toolbar() {
   const t = state.tracks[c.track];
   const B = (label, fn, on) => h('button', { class: 'b' + (on ? ' on' : ''), onclick: fn }, label);
   const SEP = () => h('i', { class: 'ed-sep', 'aria-hidden': 'true' });   // hairline between the toolbar groups
+  // MobileDAW 2: the editor is full screen (the clip / note properties are a panel you open with this button, as FL Studio Mobile keeps them out of the way)
+  tools.append(B('Properti', () => { root.classList.toggle('props-on'); toolbar(); requestAnimationFrame(() => fit()); }, root.classList.contains('props-on')), SEP());
   if (t.kind === 'audio') return;
   if (t.kind === 'auto') { tools.append(snapButton()); return; }
   if (t.kind === 'drum') tools.append(h('div', { class: 'ed-g' }, B('Step', () => { if (!stepsMode()) { cfg.mode = 'steps'; sel.clear(); refresh(); } }, stepsMode()), B('Notes', () => { if (stepsMode()) { cfg.mode = 'notes'; sel.clear(); refresh(); } }, !stepsMode())));
