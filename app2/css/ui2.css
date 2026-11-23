@@ -432,3 +432,14 @@ html.ui2 #main { background: var(--bg); }
 html.ui2 #view-arr:not(.shut):not(.edfull) #arr { border-bottom-right-radius: var(--m3-l); overflow: hidden; }
 html.ui2 #view-arr:not(.shut):not(.edfull) #tcol2 { border-bottom-left-radius: var(--m3-l); }
 html.ui2 #view-arr:not(.shut) #detail { margin-top: 8px; }
+
+/* ---- one background everywhere behind the surfaces (the marked spots showed #app's panel colour), the bottom bar's items on one centre line */
+html.ui2 #app, html.ui2 #body, html.ui2 #main, html.ui2 #view-arr { background: var(--bg); }
+html.ui2 #bar2 { height: calc(60px + var(--sab)); align-items: center; }
+html.ui2 #bar2 > div, html.ui2 #bar2 > nav { height: 44px; align-self: center; }
+html.ui2 #bar2 .b2-c { height: 44px; box-sizing: border-box; padding: 4px; }
+html.ui2 #bar2 .b2-c .tab { height: 36px; }
+html.ui2 #bar2 .add { height: 44px; padding: 0 18px; }
+html.ui2 #bar2 .b2-l, html.ui2 #bar2 .b2-r { align-items: center; }
+/* the track rows never show above the column's top area (the coloured block in the corner) */
+#tcol2 .tc-rows { overflow: hidden; }
