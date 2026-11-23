@@ -814,3 +814,24 @@ html.ui2 .dev-scroll > .card.addcard { height: 150px; align-self: flex-start; }
 .u2c-dials > .u2seg-f .u2seg { height: 28px; }
 /* cells share the card's width when the title row is wider than the controls (no empty space on the right) */
 .u2c-g > .u2c-dials { grid-auto-columns: minmax(62px, 1fr); }
+
+/* ===== smaller toolbar buttons: everything stays inside its pill, also on a narrow phone ===== */
+html.ui2 #bar2 .b2-c, html.ui2 #top2 .tg, html.ui2 #top2 .tpill, html.ui2 #top2 .bpm { height: 40px !important; padding: 3px !important; gap: 1px !important; }
+html.ui2 #bar2 .b2-c .tab, html.ui2 #top2 .tg > button { height: 32px !important; padding: 0 11px 0 9px !important; gap: 5px !important; font-size: 12.5px !important; flex: 0 1 auto; min-width: 0; overflow: hidden; }
+html.ui2 #bar2 .b2-c .tab svg, html.ui2 #top2 .tg > button svg { width: 16px !important; height: 16px !important; }
+html.ui2 #top2 .tg > button:not(:has(.lb)):not(:has(span)) { width: 32px; }
+html.ui2 #top2 .tpill button { height: 32px !important; }
+html.ui2 #bar2 .b2-c { min-width: 0; max-width: 100%; overflow: hidden; }
+html.ui2 #bar2 .add { height: 40px !important; padding: 0 16px !important; font-size: 13px !important; }
+html.ui2 #top2 .bpm { padding: 3px 14px !important; }
+/* narrow phones: the bottom navigation shows the label of the selected tab only */
+@media (max-width: 1000px) {
+  html.ui2 #bar2 .b2-c .tab:not(.on) .lb, html.ui2 #bar2 .b2-c .tab:not(.on) > span:not(.bdg) { display: none; }
+  html.ui2 #bar2 .b2-c .tab:not(.on) { padding: 0 10px !important; }
+}
+/* the instrument's action chips in the title row */
+.u2c-h > .u2c-acts { padding: 0; flex: none; }
+.u2c-h > .u2c-acts .u2btn { height: 28px; padding: 0 11px; font-size: 12px; white-space: nowrap; }
+html.ui2 #top2 .bpm { gap: 4px !important; }
+html.ui2 #bar2 .b2-c .tab { width: auto !important; flex: 0 0 auto !important; }
+@media (max-width: 1000px) { html.ui2 #bar2 .b2-c .tab:not(.on) { width: 40px !important; padding: 0 !important; } }

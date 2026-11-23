@@ -262,7 +262,7 @@ export function instCard(i, t, api) {
   const acts = [];
   if (def.zones || def.floatOnly || t.inst.type === 6 || t.inst.type === 35 || t.inst.type === 38 || !midi) acts.push(h('button', { class: 'u2btn tonal', onclick: () => api.openWindow() }, t.inst.type === 6 ? 'File SoundFont & program' : def.zones ? 'Sample & zona' : t.inst.type === 35 ? 'Sample & irisan' : !midi ? 'Pad & sample' : 'Editor lengkap'));
   for (const x of api.extra.slice(0, 2)) acts.push(h('button', { class: 'u2btn', onclick: (e) => x.fn(e.currentTarget.getBoundingClientRect()) }, x.label.replace(/…$/, '')));
-  if (acts.length) parts.push(h('div', { class: 'u2c-acts' }, ...acts));
+  if (acts.length) head.append(h('div', { class: 'u2c-acts' }, ...acts));   // the instrument's own actions (sample, SoundFont file...) sit in the title row
   const groups = instGroups(def, t.inst.type);
   const get = (k) => t.inst.params[k] ?? def.params[k].def;
   const mk = (k, pf) => { const p = def.params[k];
