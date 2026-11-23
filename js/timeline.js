@@ -26,7 +26,7 @@ const { state, PPQ, SWATCHES } = P;
 // and a level meter along the right edge of every header.
 let HEAD = 140;                                                 // header width: prefs.headW (drag the header's left edge), else chosen from the canvas width
 const OV = 0, RULER = 38, MROW = 12, LT = 21;   // Live 12 order: the beat-time ruler (bar numbers) on top [0, LT), the scrub area with the locators and the loop brace under it [LT, RULER)
-const BOT = 19, HANDLE = 18, TH = 20, METW = 9;   // top ruler (locators + beats) / bottom time ruler / header title bar / meter strip
+let BOT = 19; const HANDLE = 18, TH = 20, METW = 9;   // top ruler (locators + beats) / bottom time ruler / header title bar / meter strip
 const FOLD_H = 24, MIN_ROW = 52, ADD_H = 44, XROW_H = 26;                // folded row (title bar only) / smallest open row (title + buttons) / "+" row / Master + FX rows (thin, as Live's return / main rows)
 export const view = { x0: 0, ppt: 0.06, y0: 0, rowH: 60 };   // 60: the three header rows (buttons, volume + pan, sends + output) fit with their borders
 let CW = 0;                                                    // width of the clip area = canvas width - HEAD
@@ -84,7 +84,7 @@ const snapRect = () => cornerRects().snap;
 const songEnd = () => state.tracks.reduce((m, t) => t.clips.reduce((a, c) => Math.max(a, c.start + c.len), m), 0);
 
 const followRect = () => ({ x: CW + 6, y: H - BOT + 3, w: HEAD - 12, h: BOT - 6 });
-const badges = () => (CW < 170 ? [] : [['gridbtn', 'Grid ' + (SNAPS[cfg.snap][0] === 'Auto' ? gridName() : SNAPS[cfg.snap][0]), { x: CW - 150, y: H - BOT + 3, w: 92, h: BOT - 6 }], ['zoombtn', (view.ppt / 0.06).toFixed(2) + 'x', { x: CW - 54, y: H - BOT + 3, w: 50, h: BOT - 6 }], ...(CW < 420 ? [] : [['wzoom', '\u2248' + (prefs.waveZoom || 1) + 'x', { x: CW - 242, y: H - BOT + 3, w: 38, h: BOT - 6 }]]), ...(CW < 330 ? [] : [['fith', 'H', { x: CW - 198, y: H - BOT + 3, w: 19, h: BOT - 6 }], ['fitw', 'W', { x: CW - 177, y: H - BOT + 3, w: 19, h: BOT - 6 }]])]);
+const badges = () => (V2 || CW < 170 ? [] : [['gridbtn', 'Grid ' + (SNAPS[cfg.snap][0] === 'Auto' ? gridName() : SNAPS[cfg.snap][0]), { x: CW - 150, y: H - BOT + 3, w: 92, h: BOT - 6 }], ['zoombtn', (view.ppt / 0.06).toFixed(2) + 'x', { x: CW - 54, y: H - BOT + 3, w: 50, h: BOT - 6 }], ...(CW < 420 ? [] : [['wzoom', '\u2248' + (prefs.waveZoom || 1) + 'x', { x: CW - 242, y: H - BOT + 3, w: 38, h: BOT - 6 }]]), ...(CW < 330 ? [] : [['fith', 'H', { x: CW - 198, y: H - BOT + 3, w: 19, h: BOT - 6 }], ['fitw', 'W', { x: CW - 177, y: H - BOT + 3, w: 19, h: BOT - 6 }]])]);
 let pressed = null;                                           // which corner / badge button is under the finger (drawn highlighted)
 const nX = () => 1 + Math.max(0, state.returns.length - 2);
 const xInfo = (i) => { const j = i - state.tracks.length; return j === 0 ? { master: true, strip: MASTER, name: 'Master', color: state.master.color || '#4cd964', obj: state.master } : { master: false, k: j + 1, strip: RET0 + j + 1, name: state.returns[j + 1].name, color: state.returns[j + 1].color || '#35d0e0', obj: state.returns[j + 1] }; };
@@ -96,7 +96,11 @@ const compact = () => !full();
 const headLim = () => (full() ? [150, 460] : [56, 160]);
 const headAuto = () => (full() ? (W >= 1100 ? 262 : W >= 760 ? 240 : 208) : (W >= 760 ? 96 : 84));   // about a fifth of the screen, as Live's track header
 const headPref = () => (full() ? prefs.headW : prefs.headWc) || 0;
-function applyHead() { const [lo, hi] = headLim(); HEAD = headPref() > 0 ? Math.round(clamp(headPref(), lo, Math.min(hi, Math.max(lo, W - 120)))) : headAuto(); CW = Math.max(60, W - HEAD); }
+// MobileDAW 2.0 (js/ui2/shell.js): no header column on the canvas (the shell draws its own track column left of it) and no bottom time ruler
+let V2 = false;
+export function setV2(on) { V2 = !!on; if (W) { applyHead(); clampView(); } invalidate(); }
+export const isV2 = () => V2;
+function applyHead() { BOT = V2 ? 0 : 19; if (V2) { HEAD = 0; CW = W; return; } const [lo, hi] = headLim(); HEAD = headPref() > 0 ? Math.round(clamp(headPref(), lo, Math.min(hi, Math.max(lo, W - 120)))) : headAuto(); CW = Math.max(60, W - HEAD); }
 const nameW = () => (full() ? Math.max(76, Math.round((HEAD - METW) * 0.46)) : HEAD - METW);   // Live 12 (refs/live12-official): the coloured name block takes nearly half the header; coloured column width: only the name; the rest, left of the meter, is the wide mixer column
 export const headWidth = () => HEAD;
 export const headerLayout = (i) => (state.tracks[i] ? hdr(i) : null);
@@ -340,7 +344,8 @@ function drawClip(t, c, y, hh) {
   }
   if (isSel) {
     ctx.strokeStyle = shade(t.color, 0.6); ctx.lineWidth = 1; ctx.strokeRect(Math.round(x) + 0.5, y0 + 0.5, Math.max(0, Math.round(w) - 1), h0 - 1);   // selected: one crisp 1 px edge (owner: thinner)
-    if (tall && w > 44 && !msel.size) { const mx = Math.min(x + w, CW) - 12, my = y0 + hd / 2; ctx.fillStyle = shade(t.color, 0.75); for (const d of [-4, 0, 4]) { ctx.beginPath(); ctx.arc(mx + d, my, 1.3, 0, 6.2832); ctx.fill(); } }   // ⋯ : the clip's context menu
+    if (V2) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.strokeRect(Math.round(x) + 1, y0 + 1, Math.max(0, Math.round(w) - 2), h0 - 2); }   // 2.0: a white frame
+    if (!V2 && tall && w > 44 && !msel.size) { const mx = Math.min(x + w, CW) - 12, my = y0 + hd / 2; ctx.fillStyle = shade(t.color, 0.75); for (const d of [-4, 0, 4]) { ctx.beginPath(); ctx.arc(mx + d, my, 1.3, 0, 6.2832); ctx.fill(); } }   // ⋯ : the clip's context menu
     const hl = Math.min(26, h0 - hd - 10), hy = y0 + hd + (h0 - hd - hl) / 2, st = stretchMode && t.kind === 'audio';   // edge grips for touch: pills on both ends
     if (hl > 6 && w > 26 && st) { ctx.fillStyle = C('#ffa722'); ctx.fillRect(x + w - 6, hy, 3, hl); }   // the stretch mode's mark (the handles are drawn by drawHandles)
   }
@@ -932,7 +937,7 @@ function hit(x, y) {
   }
   if (x < CW) { const hh = handleHit(x, y); if (hh) return hh; }                                // the selected clip's handles reach outside it
   const i = rowAt(y);
-  if (Math.abs(x - CW) <= 4) return { type: 'headw' };                                         // the header column's left edge: drag = its width
+  if (!V2 && Math.abs(x - CW) <= 4) return { type: 'headw' };                                         // the header column's left edge: drag = its width
   if (x >= CW) {
     const n0 = state.tracks.length;
     if (i === n0 + nX()) return y - rowY(i) < 8 + 28 + 6 ? { type: 'add' } : { type: 'none' };   // the "+ Track" button at the top of the (stretched) drop area
@@ -1038,7 +1043,17 @@ function selMenu() {
     { label: 'Delete', fn: () => { checkpoint(); cutAll(a); cutAll(b); delRange(a, b); sel = null; } },
     { label: 'Delete space', fn: () => { checkpoint(); cutAll(a); cutAll(b); delRange(a, b); shift(b, -len); sel = null; } },
     { label: 'Trim', fn: () => { checkpoint(); cutAll(a); cutAll(b); delRange(0, a); delRange(b, 1e9); shift(a, -a); sel = null; } },
+    ...(V2 ? [{ sep: true }, { label: 'Salin ke playhead', fn: () => { checkpoint(); cutAll(a); cutAll(b); toPlayhead(a, b, false); sel = null; } }, { label: 'Pindah ke playhead', fn: () => { checkpoint(); cutAll(a); cutAll(b); toPlayhead(a, b, true); sel = null; } }] : []),
   ], r.left + clamp(tx(a), 0, Math.max(0, CW - 200)), r.top + RULER + 4);
+}
+// 2.0: the clips inside [a, b] copied (or moved) so that a lands on the playhead
+function toPlayhead(a, b, move) {
+  const at = Math.max(0, Math.round(snapT(P.currentTick()))), d = at - a;
+  if (!d) return toast('Playhead sudah di awal seleksi.', 1400);
+  const L = state.tracks.map((t) => t.clips.filter((c) => c.start >= a && c.start + c.len <= b).map((c) => ({ ...c, notes: c.notes && c.notes.map((n) => ({ ...n })) })));
+  if (move) delRange(a, b);
+  state.tracks.forEach((t, i) => { if (!L[i].length) return; for (const c of L[i]) P.pasteClip(i, { kind: t.kind, clip: c }, c.start + d); P.syncClips(i); });
+  P.emit('clips'); invalidate(); toast(move ? 'Seleksi dipindah ke playhead.' : 'Seleksi disalin ke playhead.', 1400);
 }
 function cutAll(tick) {
   state.tracks.forEach((t, i) => { if (t.kind !== 'audio') for (const c of [...t.clips]) if (tick > c.start && tick < c.start + c.len) P.splitClip(i, c.id, tick); });
@@ -1468,6 +1483,7 @@ function setup() {
           return invalidate();
         case 'clip':
           if (msel.size) { if (msel.has(t.c.id)) msel.delete(t.c.id); else msel.add(t.c.id); P.selectClip(t.i, t.c.id); updateBar(); return invalidate(); }   // a selection exists: taps add / remove clips
+          if (V2 && hooks.clipTap) { P.selectClip(t.i, t.c.id); const { i, c, tick } = t; clearTimeout(menuWait); menuWait = setTimeout(() => { menuWait = 0; if (state.sel.clip === c.id && !drag) hooks.clipTap(i, c, tick); }, dtapMs()); return invalidate(); }   // 2.0: the bubbles (Copy / Delete / Snap / Edit / More)
           if (t.zone === 'menu') { const r = canvasOrigin(); clipMenu(t.i, t.c, t.tick, r.left + x, r.top + y); return invalidate(); }   // its ⋯ = the context menu at once
           // FL Studio Mobile: a tap selects the clip at once and opens its Clip Controls, held back for the double-tap window (a double tap
           // opens the editor instead). Settings -> Sentuhan can make the first tap select only (Live: then tap the selected clip again).
@@ -1755,3 +1771,33 @@ export function initTimeline(host, h) {
     e.preventDefault(); P.selectClip(t.i, t.c.id); invalidate(); clipMenu(t.i, t.c, t.tick, e.clientX, e.clientY);
   });
 }
+
+// ------------------------------------------------------------------ MobileDAW 2.0 shell (js/ui2/shell.js): geometry and actions it needs
+// rows in canvas coordinates: tracks 0..n-1, then the Master / FX rows n..n+nX()-1, then the "+" row n+nX()
+export const v2Geom = () => ({ ruler: RULER, laneB: LANE_B(), W, H, n: state.tracks.length, nx: nX() });
+export const v2Row = (i) => ({ y: rowY(i), h: rh(i) });
+export const v2XRow = (i) => { const x = xInfo(i); return { master: x.master, strip: x.strip, name: x.name, color: x.color }; };
+export function v2ClipBox(i, id) { const t = state.tracks[i], c = t && t.clips.find((q) => q.id === id); if (!c) return null; const b = laneBox(i, c); return { x: tx(c.start), w: c.len * view.ppt, y: b.y, h: b.h, c }; }
+export function v2Scroll(dy) { view.y0 += dy; clampView(); invalidate(); }
+export const v2Busy = () => !!drag;
+export function v2ClipMenu(i, c, sx, sy) { clipMenu(i, c, c.start, sx, sy); }
+export function v2Snap(i, c) { snapClip(i, c); }
+export function v2Copy(i, c) { checkpoint(); const n = P.duplicateClip(i, c.id); invalidate(); return n; }
+export function v2SnapToggle() { toggleSnap(); }
+export const v2SnapOn = () => cfg.snap !== SNAP_OFF;
+export const v2SnapName = () => (cfg.snap === SNAP_OFF ? 'Off' : SNAPS[cfg.snap][0] === 'Auto' ? gridName() : SNAPS[cfg.snap][0]);
+export function v2SnapMenu(sx, sy) { menu(gridMenu(), sx, sy); }
+export function v2HeadMenu(i, sx, sy) { const r = canvasOrigin(); headMenu(i, sx - r.left, sy - r.top); }
+export function v2XHeadMenu(i, sx, sy) { const r = canvasOrigin(); xheadMenu(xInfo(i), sx - r.left, sy - r.top); }
+export function v2AddMenu(sx, sy) { const r = canvasOrigin(); addMenu(sx - r.left, sy - r.top); }
+export function v2Fold(i) { toggleFold(i); }
+export const v2Follow = () => cfg.follow;
+export function v2SetFollow(on) { prefs.follow = cfg.follow = !!on; savePrefs(); invalidate(); }
+export function v2FitAll() { const e = songEnd(); if (e) fitTo(0, e); fitHeight(); }
+export function v2Split(i, c, tick) { const k = snapT(tick); if (k <= c.start || k >= c.start + c.len) return toast('Ketuk di dalam klip untuk memotongnya di titik itu.', 1800); checkpoint(); P.splitClip(i, c.id, k); invalidate(); }
+export function v2Unlink(i, c) { if (!(c.notes && P.loopOf(c))) return toast('Klip ini tidak berulang.', 1400); checkpoint(); P.bakeLoop(c, i); P.emit('clips'); invalidate(); toast('Pengulangan jadi not biasa.', 1600); }
+export const v2CanUnlink = (c) => !!(c.notes && P.loopOf(c));
+export const v2CanCombine = (i, c) => !!(c.notes && nextClip(i, c));
+export function v2Combine(i, c) { combineNext(i, c); }
+export function v2Mute(i, c) { checkpoint(); P.setClipsMuted([{ i, c }], !c.muted); invalidate(); }
+export function v2Rename(i, c) { renameClip(i, c); }

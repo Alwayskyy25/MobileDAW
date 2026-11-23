@@ -1420,13 +1420,13 @@ VI[25] = (k) => {
 VI[6] = (k) => {
   const i = k.ctx.i, t = P.state.tracks[i], sf = t.inst.sf;
   const file = lvBtn(sf ? sf.path.split('/').pop() : 'Pilih .sf2\u2026', () => BR.openBrowser('file', { track: i, sf: true }), { cls: 'lk-sfile' });
-  const list = h('div', { class: 'lk-sflist' }, ...(sf ? sf.presets.map((n, q) => h('button', { class: 'lk-sfp' + (q === sf.preset ? ' on' : ''), onclick: () => P.setSfPreset(i, q) }, h('span', {}, String(q + 1).padStart(3, '0')), n))
+  const list = h('div', { class: 'lk-sflist' }, ...(sf ? (sf.presets || []).map((n, q) => h('button', { class: 'lk-sfp' + (q === sf.preset ? ' on' : ''), onclick: () => P.setSfPreset(i, q) }, h('span', {}, String(q + 1).padStart(3, '0')), n))
     : [h('div', { class: 'lk-hint' }, 'Belum ada file SoundFont. Ketuk tombol di atas, atau seret berkas .sf2 dari Browser ke sini.')]));
   if (sf) requestAnimationFrame(() => { const on = list.querySelector('.on'); if (on) list.scrollTop = Math.max(0, on.offsetTop - list.clientHeight / 2 + 10); });
   const pitch = knob({ ...P.PITCH_PARAM, fmt: 'st' }, () => t.inst.pitch || 0, (v) => P.setPitch(i, v), fmtParam, C('#ffa722'));
   pitch.classList.add('lk-k');
   // Live device: the preset browser is the dark display (file button and preset count in its title line), Pitch knob, Gain as the level fader
-  const root = k.row(h('div', { class: 'lk-col lk-sfc' }, h('div', { class: 'lk-dk lk-sfdk fl-dk' }, h('div', { class: 'lk-sfh' }, file, h('span', { class: 'lk-grow' }), h('span', {}, sf ? sf.presets.length + ' preset' : 'Preset')), list)), k.col(pitch), k.col(k.F(0, { n: 'Gain', w: 56 })));
+  const root = k.row(h('div', { class: 'lk-col lk-sfc' }, h('div', { class: 'lk-dk lk-sfdk fl-dk' }, h('div', { class: 'lk-sfh' }, file, h('span', { class: 'lk-grow' }), h('span', {}, sf ? (sf.presets || []).length + ' preset' : 'Preset')), list)), k.col(pitch), k.col(k.F(0, { n: 'Gain', w: 56 })));
   root.classList.add('fl-live', 'lk-sf'); return root;
 };
 VI[26] = (k) => h('div', { class: 'lk-row lk-phys lk-tens' },
