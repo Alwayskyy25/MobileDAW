@@ -20,7 +20,7 @@ const { state } = P;
 import { BAR, BEAT } from './project.js';   // live bindings (they follow the time signature)
 
 let KEYS = 36, VEL = 64;   // key strip width / lane height: set by dims() (narrow piano for MIDI notes, wider for drum names and automation values)
-const RULER = 22, LANE_HEAD = 92, STEP = 240;
+const RULER = 22, LANE_HEAD = 150, STEP = 240;   // MobileDAW 2: a wide name column (big pad names, the sample under them)
 // Snap values exactly as FL Studio Mobile lists them: fractions of a step (1 step = 1/16 note), fractions of a beat, and a bar.
 const sn = (n, f) => ({ 0: n, get 1() { return f(); } });   // read live: BAR / BEAT change with the time signature
 const SNAPS = [sn('1/6 Step', () => STEP / 6), sn('1/4 Step', () => STEP / 4), sn('1/3 Step', () => STEP / 3), sn('1/2 Step', () => STEP / 2), sn('1 Step', () => STEP), sn('1/6 Beat', () => BEAT / 6), sn('1/4 Beat', () => BEAT / 4), sn('1/3 Beat', () => BEAT / 3), sn('1/2 Beat', () => BEAT / 2), sn('1 Beat', () => BEAT), sn('Bar', () => BAR)];
@@ -29,8 +29,8 @@ const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const BLACK = new Set([1, 3, 6, 8, 10]);
 
 const cfg = { vokFocus: -1, snap: 6, snapOn: true, fold: false, key: 0, scale: 'Chromatic', lastScale: 'Major', lock: false, vel: true, velH: 0, lane: 'vel', cc: { k: 'bend', n: 0 }, ccErase: false, mode: 'auto', lastLen: [60, 120, 240, 480, 960, 1920, 3840].includes(+prefs.defLen) ? +prefs.defLen : STEP, follow: true };   // velH: lane height dragged by the user (0 = automatic)
-const v = { x0: 0, ppt: 0.12, top: 84, keyH: 16 };
-const sv = { x0: 0, stepW: 30, y0: 0, rowH: 38 };
+const v = { x0: 0, ppt: 0.12, top: 84, keyH: 22 };
+const sv = { x0: 0, stepW: 34, y0: 0, rowH: 48 };
 let side = null, padSel = -1, padTrack = -1;   // drum pad panel (right of the step grid) and the pad it shows
 let props = null, fitId = null, needFit = false, lastHx = 0, asel = null, root, tools, host, canvas, ctx, W = 0, H = 0, dpr = 1, dirty = true, sel = new Set(), tsel = null, clipboard = null, drag = null, previewOff = 0;
 
@@ -83,7 +83,7 @@ const padList = () => { const c = cur(); return c && state.tracks[c.track].kind 
 const keyLabel = (p) => { if (isDrum()) { const d = padList().find((x) => x.pitch === p); if (d) return d.name; } return pName(p); };
 const pan0 = (n) => n.pan || 0;
 function dims() {
-  KEYS = isDrum() || isAuto() ? 54 : 48;   // v66: wider piano ruler (Live's is wider than a thumb); every hit test and drawing uses KEYS
+  KEYS = isDrum() ? 84 : isAuto() ? 54 : 66;   // MobileDAW 2: wide keys with their names (a thumb-sized keyboard)   // v66: wider piano ruler (Live's is wider than a thumb); every hit test and drawing uses KEYS
   VEL = cfg.velH ? clamp(cfg.velH, 40, Math.max(40, Math.round(H * 0.75))) : clamp(Math.round(H * 0.24), 44, 84);   // small panel: the lane shrinks so the note grid is not eaten by it
 }
 
@@ -203,8 +203,8 @@ function drawRoll(t, c) {
     const x = px(n.t), w = Math.max(3, n.d * v.ppt), y = py(n.p) - v.keyH;
     if (x + w < KEYS || x > W || y > gb || y + v.keyH < RULER) continue;
     const s = sel.has(n), nc = noteHex(t, n);
-    ctx.fillStyle = velCol(nc, n.v, s); ctx.fillRect(x, y + 1, w - 1, v.keyH - 1);
-    ctx.strokeStyle = s ? C('#ffffff') : shadeC(nc, 0.6); ctx.lineWidth = s ? 1.5 : 1; ctx.strokeRect(x + 0.5, y + 1.5, w - 2, v.keyH - 2);   // flat note, hairline outline (Live: no bevel)
+    ctx.fillStyle = velCol(nc, n.v, s); ctx.beginPath(); ctx.roundRect(x, y + 1.5, w - 1, v.keyH - 2, Math.min(3, w / 3)); ctx.fill();
+    ctx.strokeStyle = s ? C('#ffffff') : shadeC(nc, 0.55); ctx.lineWidth = s ? 2 : 1; ctx.beginPath(); ctx.roundRect(x + 0.5, y + 2, w - 2, v.keyH - 3, Math.min(3, w / 3)); ctx.stroke();   // flat note, hairline outline (Live: no bevel)
     if (w > 16 && (s || w > 30)) { ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x + w - 5, y + 4, 2, Math.max(2, v.keyH - 7)); }   // right edge: resize grip, kept for touch
     if (n.sl) { ctx.strokeStyle = nInk; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x + 2, y + v.keyH - 1); ctx.lineTo(x + Math.min(w - 3, v.keyH * 1.6), y + 3); ctx.stroke(); }   // slide note: a rising stroke (glide)
     if (w > 34 && v.keyH >= 13) { ctx.fillStyle = mv ? 'rgba(14,14,18,.85)' : nInk; ctx.fillText((n.sl ? '\u2197 ' : '') + (mv ? vocName(t, n.img || 0) + ' \u00b7 ' : '') + pName(n.p), x + 4 + (n.sl ? 4 : 0), y + v.keyH / 2 + 1, w - 9); }
@@ -242,7 +242,7 @@ function drawRoll(t, c) {
       if (!lit) { ctx.fillStyle = C('#3a3a40'); ctx.fillRect(bw - 2, y + 1, 2, v.keyH - 2); }
     } else if (pc === 0 || pc === 5) { ctx.fillStyle = C('#9c9ca3'); ctx.fillRect(0, y + v.keyH - 1, KEYS, 1); }   // B|C and E|F: no black key between
     if (isDrum() && padList().some((d) => d.pitch === p)) { ctx.fillStyle = blk && !lit ? '#eeeeee' : '#111111'; ctx.font = FONT(600, 9); ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(keyLabel(p), 3, y + v.keyH / 2, KEYS - 5); }
-    else if (pc === 0 || (v.keyH >= 24 && !blk)) { ctx.fillStyle = T('--key-ink'); ctx.font = FONT(600, 9.5); ctx.textBaseline = 'middle'; ctx.textAlign = 'right'; ctx.fillText(pName(p), KEYS - 5, y + v.keyH / 2); ctx.textAlign = 'left'; }
+    else if (!blk && (pc === 0 || v.keyH >= 15)) { ctx.fillStyle = pc === 0 ? T('--key-ink') : 'rgba(60,62,70,.75)'; ctx.font = FONT(pc === 0 ? 700 : 600, 10.5); ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(pc === 0 ? pName(p) : pName(p).replace(/-?\d+$/, ''), 6, y + v.keyH / 2 + 0.5); }   // every white key named (C with its octave), on the left as on a phone keyboard
   }
   ctx.fillStyle = C('#141415'); ctx.fillRect(KEYS - 1, RULER, 1, gb - RULER);
   ctx.restore();
@@ -366,9 +366,10 @@ function drawSteps(t, c) {
       const x = LANE_HEAD + s * sv.stepW - sv.x0;
       if (x > W) break; if (x + sv.stepW < LANE_HEAD) continue;
       const hit = s < steps ? byRow[r].find((q) => Math.abs(q.t - s * STEP) < STEP / 2) : null, odd = Math.floor(s / SPBT) % 2;
-      ctx.fillStyle = hit ? velCol(t.color, hit.v, false) : s < steps ? (odd ? C('#303034') : C('#28282b')) : (odd ? C('#252528') : C('#212123'));
-      ctx.fillRect(x + 1, y + 1, sv.stepW - 2, sv.rowH - 2);
-      if (hit) { ctx.strokeStyle = shadeC(t.color, 0.6); ctx.lineWidth = 1; ctx.strokeRect(x + 1.5, y + 1.5, sv.stepW - 3, sv.rowH - 3); if (hit.rpt > 1 && sv.stepW >= 16) { const q = hit.rpt, bw = (sv.stepW - 6) / q; ctx.fillStyle = 'rgba(0,0,0,.45)'; for (let k = 1; k < q; k++) ctx.fillRect(Math.round(x + 3 + k * bw), y + sv.rowH - 7, 1, 4); } }   // note repeat: ticks along the cell bottom
+      ctx.fillStyle = hit ? velCol(t.color, hit.v, false) : s < steps ? (odd ? C('#36363b') : C('#2d2d31')) : (odd ? C('#262629') : C('#222225'));
+      ctx.beginPath(); ctx.roundRect(x + 2, y + 2, sv.stepW - 4, sv.rowH - 4, 4); ctx.fill();
+      if (hit) { const ly = Math.round(y + 6 + (1 - Math.min(1, hit.v)) * (sv.rowH - 14)); ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x + 6, ly, sv.stepW - 12, 2); }   // the velocity line (high = near the top)
+      if (hit) { if (hit.rpt > 1 && sv.stepW >= 16) { const q = hit.rpt, bw = (sv.stepW - 6) / q; ctx.fillStyle = 'rgba(0,0,0,.45)'; for (let k = 1; k < q; k++) ctx.fillRect(Math.round(x + 3 + k * bw), y + sv.rowH - 7, 1, 4); } }   // note repeat: ticks along the cell bottom
     }
   }
   ctx.fillStyle = C('#46464d');                       // v71: bar boundaries, so long patterns read in bars like FL Studio's step sequencer
@@ -388,11 +389,12 @@ function drawSteps(t, c) {
   ctx.save(); ctx.beginPath(); ctx.rect(0, hdr, LANE_HEAD, GB - hdr); ctx.clip();
   for (let r = 0; r < n; r++) {
     const y = hdr + r * sv.rowH - sv.y0;
-    ctx.fillStyle = r === padSel ? C('#3c3c40') : C('#2c2c2f'); ctx.fillRect(0, y, LANE_HEAD - 1, sv.rowH - 1);
-    ctx.fillStyle = t.color; ctx.fillRect(0, y, r === padSel ? 6 : 3, sv.rowH - 1);
+    const selR = r === padSel, dim = PD[r].mute, smp = (PD[r].sample && PD[r].sample.name) || '';   // MobileDAW 2: the pad name big in the track colour, the sample under it; the selected pad filled
+    ctx.fillStyle = selR ? t.color : C('#2c2c2f'); ctx.fillRect(0, y, LANE_HEAD - 1, sv.rowH - 1);
     ctx.fillStyle = C('#141415'); ctx.fillRect(0, y + sv.rowH - 1, LANE_HEAD, 1);
-    const dim = PD[r].mute;
-    ctx.fillStyle = dim ? C('#6a6a72') : (r === padSel ? C('#ffad32') : C('#d6d6da')); ctx.font = FONT(600, 11.5); ctx.textBaseline = 'middle'; ctx.fillText(PD[r].name, 12, y + sv.rowH / 2, LANE_HEAD - 16);
+    const ink = selR ? 'rgba(10,10,12,.88)' : dim ? C('#6a6a72') : t.color;
+    ctx.textBaseline = 'middle'; ctx.fillStyle = ink; ctx.font = FONT(700, sv.rowH >= 40 ? 15 : 12.5); ctx.fillText(PD[r].name, 10, y + (smp && sv.rowH >= 36 ? sv.rowH / 2 - 6 : sv.rowH / 2), LANE_HEAD - 16);
+    if (smp && sv.rowH >= 36) { ctx.fillStyle = selR ? 'rgba(10,10,12,.65)' : C('#8b8b92'); ctx.font = FONT(500, 9.5); ctx.fillText(smp, 10, y + sv.rowH / 2 + 10, LANE_HEAD - 16); }
   }
   ctx.restore();
   if (LH) {                                                                           // velocity lane of the selected pad (FL Studio Mobile graph editor)

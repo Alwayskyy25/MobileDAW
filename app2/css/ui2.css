@@ -25,13 +25,13 @@ html.ui2 #view-arr.edfull :is(#tcol2, #bub2, #ins2) { display: none; }
 #tcol2 .tc-top { background: var(--panel); border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent); }
 #tcol2 .tc-rows { position: absolute; left: 0; right: 0; bottom: 0; top: var(--tc-top, 38px); touch-action: none; }
 .tc-row { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: stretch; --tc: #888; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
-.tc-tile { flex: none; width: var(--tc-w); border: 0; padding: 0; background: transparent; color: var(--tc); display: flex; align-items: center; justify-content: center; cursor: pointer;
+.tc-tile { flex: none; width: var(--tc-w); border: 0; padding: 0; background: var(--tc); color: rgba(0, 0, 0, .78); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .25); display: flex; align-items: center; justify-content: center; cursor: pointer;
   -webkit-tap-highlight-color: transparent; transition: background calc(.15s * var(--anim, 1)); }
 .tc-tile svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .tc-tile:active svg { transform: scale(.92); }
-.tc-row.sel .tc-tile { background: var(--tc); color: rgba(0, 0, 0, .78); }
-.tc-row.muted .tc-tile { opacity: .4; }
-.tc-row.xrow .tc-tile { color: var(--dim); }
+.tc-row.sel .tc-tile { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .9); }
+.tc-row.muted .tc-tile { background: color-mix(in srgb, var(--tc) 35%, var(--panel)); }
+.tc-row.xrow .tc-tile { background: var(--raise2); color: var(--text); }
 .tc-row.xrow.sel .tc-tile { background: var(--raise2); color: var(--text); }
 .tc-row.fold .tc-tile svg { width: 17px; height: 17px; }
 .tc-nm { display: none; }
@@ -42,7 +42,7 @@ html.tc-wide .tc-row { flex-wrap: wrap; align-content: center; row-gap: 4px; pad
 html.tc-wide .tc-row .tc-tile { position: absolute; left: 0; top: 0; bottom: 0; }
 html.tc-wide .tc-row.sel { background: color-mix(in srgb, var(--tc) 6%, var(--panel)); }
 .tc-name { width: calc(100% - var(--tc-w) - 10px); margin-left: calc(var(--tc-w) + 10px); height: 22px; align-items: center; justify-content: space-between; gap: 6px; border: 0; background: none; padding: 0; cursor: pointer; }
-.tc-name .nm { flex: 1; min-width: 0; text-align: left; color: var(--tc); font: var(--fw-sb, 600) 12.5px/18px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-name .nm { flex: 1; min-width: 0; text-align: left; color: var(--text); font: var(--fw-sb, 600) 12.5px/18px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tc-ctl .db { flex: none; width: 46px; text-align: right; color: var(--dim); font: var(--fw-m, 500) 10.5px/22px var(--font); font-variant-numeric: tabular-nums; }
 .tc-ctl { width: calc(100% - var(--tc-w) - 10px); margin-left: calc(var(--tc-w) + 10px); align-items: center; gap: 6px; height: 22px; }
 /* on / off: a small switch in the track colour; solo: a word that lights up */
@@ -264,11 +264,65 @@ html.ui2 #dtabs { background: var(--panel); border-bottom: 1px solid color-mix(i
 
 /* ---- the editor in MobileDAW 2: only the grid, the keys and the ruler; three small buttons at the top right */
 html.ui2 #view-arr.edfull #dtabs, html.ui2 #view-arr.edfull .ed-tools { display: none !important; }
-#edf2 { position: absolute; top: 4px; right: max(10px, var(--sar)); z-index: 7; display: flex; gap: 6px; }
+#edf2 { position: absolute; top: 50%; right: max(10px, var(--sar)); transform: translateY(-50%); z-index: 7; display: flex; flex-direction: column; gap: 8px; }
 #edf2[hidden] { display: none; }
-#edf2 .ef { flex-direction: row; gap: 5px; height: 30px; min-width: 34px; padding: 0 10px; border-radius: 999px; background: color-mix(in srgb, var(--panel) 92%, transparent); color: var(--text);
+#edf2 .ef { flex-direction: column; gap: 2px; width: 46px; height: 46px; min-width: 46px; padding: 0; border-radius: 999px; background: color-mix(in srgb, var(--panel) 92%, transparent); color: var(--text);
   box-shadow: 0 3px 10px rgba(0, 0, 0, .35), 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent); font: var(--fw-m, 500) 12px/1 var(--font); }
 #edf2 .ef svg { width: 16px; height: 16px; }
 #edf2 .ef.on { background: var(--accent); color: var(--accent-ink); }
 #edf2 .ef.shut { background: var(--accent); color: var(--accent-ink); }
 #edf2 .ef[hidden] { display: none; }
+
+/* ---- the browser in MobileDAW 2's surfaces: the sidebar on the panel colour, the open section in the accent */
+html.ui2 #browser { background: var(--panel); }
+html.ui2 #browser .bside { background: var(--bg); border-right: 1px solid color-mix(in srgb, var(--line) 80%, transparent); padding: 8px 6px; }
+html.ui2 #browser .bs-i { border-radius: 10px; margin: 1px 0; height: 36px; color: var(--text); }
+html.ui2 #browser .bs-i.on { background: var(--accent); color: var(--accent-ink); }
+html.ui2 #browser .bs-i:active { background: color-mix(in srgb, var(--text) 9%, transparent); }
+html.ui2 #browser .bs-h { color: var(--dim); }
+html.ui2 #browser input { border-radius: 999px; border: 0; background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
+html.ui2 #browser .b.on { background: var(--accent); color: var(--accent-ink); }
+
+/* ---- device cards (Rack), the mixer and the keys in MobileDAW 2's shapes: rounded cards, pill buttons, no hard outlines */
+html.ui2 #app .card, html.ui2 .fw-body .card { border-radius: 14px; border: 0 !important; overflow: hidden; box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 7%, transparent); }
+html.ui2 #app .card > h4, html.ui2 .fw-body .card > h4 { background: var(--raise); border: 0; }
+html.ui2 #app .card :is(.lv-btn, .fv-b, .fv-t, .lv-tab, .lv-fld, .st), html.ui2 .fw-body .card :is(.lv-btn, .fv-b, .fv-t, .lv-tab, .lv-fld, .st) { border-radius: 7px; border-color: transparent; }
+html.ui2 #app .card .lv-btn.on, html.ui2 #app .card .fv-b.on { background: var(--accent); color: var(--accent-ink); }
+html.ui2 #dbody { background: var(--bg); }
+html.ui2 #dbody .pane { padding: 8px; gap: 8px; }
+html.ui2 #view-mix .strip, html.ui2 #view-mix .mx-strip { border-radius: 12px; margin: 4px 2px; overflow: hidden; }
+html.ui2 #view-mix { padding: 4px 6px; }
+html.ui2 .keys-bar, html.ui2 .kb-bar { background: var(--panel); }
+html.ui2 #app .b { border-radius: 8px; }
+
+/* ---- MobileDAW 2's mixer: strips with a tall fader, the meter beside it, a pan ring, on / solo, the kind icon (selected strip filled) */
+#mix2 { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg); }
+#mix2[hidden] { display: none; }
+#mix2 .m2-list { flex: 1; min-height: 0; display: flex; gap: 6px; padding: 8px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.m2-strip { --tc: #888; flex: none; width: 96px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px 6px; border-radius: 14px; background: var(--panel); }
+.m2-strip.bus { background: color-mix(in srgb, var(--panel) 80%, var(--bg)); }
+.m2-strip.sel { box-shadow: inset 0 0 0 2px var(--tc); }
+.m2-name { width: 100%; text-align: center; color: var(--tc); font: var(--fw-sb, 600) 12.5px/1.2 var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.m2-mid { flex: 1; min-height: 80px; width: 100%; display: flex; justify-content: center; gap: 8px; }
+.m2-fad { position: relative; width: 34px; touch-action: none; cursor: ns-resize; --u: .8; }
+.m2-fad .trk { position: absolute; left: 50%; top: 10px; bottom: 10px; width: 6px; margin-left: -3px; border-radius: 3px; background: color-mix(in srgb, var(--text) 12%, transparent); }
+.m2-fad .fill { position: absolute; left: 50%; bottom: 10px; width: 6px; margin-left: -3px; height: calc((100% - 20px) * var(--u)); border-radius: 3px; background: var(--tc); }
+.m2-fad em { position: absolute; left: 50%; bottom: calc(10px + (100% - 20px) * var(--u)); width: 30px; height: 18px; margin: 0 0 -9px -15px; border-radius: 6px; background: var(--tc); box-shadow: 0 2px 6px rgba(0, 0, 0, .45), inset 0 -2px 0 rgba(0, 0, 0, .2); }
+.m2-met { display: flex; gap: 2px; padding: 10px 0; }
+.m2-met i { width: 4px; height: 0; border-radius: 2px; background: #5bd876; }
+.m2-met { position: relative; height: 100%; align-items: flex-end; }
+.m2-db { color: var(--dim); font: var(--fw-m, 500) 11px/1 var(--font); font-variant-numeric: tabular-nums; }
+.m2-pan { position: relative; width: 40px; height: 40px; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--text) 14%, transparent); touch-action: none; cursor: ew-resize; }
+.m2-pan i { position: absolute; left: 50%; top: 50%; width: 3px; height: 14px; margin-left: -1.5px; background: var(--tc); border-radius: 2px; transform-origin: 50% 100%; transform: translateY(-100%) rotate(var(--a, 0deg)); }
+.m2-row { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 22px; }
+.m2-on { width: 28px; height: 16px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 14%, transparent); position: relative; cursor: pointer; }
+.m2-on::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--dim); transition: left calc(.15s * var(--anim, 1)); }
+.m2-on.on { background: color-mix(in srgb, var(--tc) 40%, transparent); }
+.m2-on.on::after { left: 14px; background: var(--tc); }
+.m2-solo { height: 20px; padding: 0 7px; border: 0; border-radius: 6px; background: none; color: var(--dim); font: var(--fw-m, 500) 11px/1 var(--font); cursor: pointer; }
+.m2-solo.on { background: var(--tc); color: rgba(0, 0, 0, .8); }
+.m2-kind { width: 100%; height: 34px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--tc); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.m2-kind svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.m2-strip.sel .m2-kind { background: var(--tc); color: rgba(0, 0, 0, .8); }
+.m2-strip.muted :is(.m2-fad, .m2-name) { opacity: .45; }
+.m2-full { flex: none; align-self: flex-end; margin: 0 10px 8px; height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); font: var(--fw-m, 500) 12px/1 var(--font); cursor: pointer; }

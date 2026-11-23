@@ -48,6 +48,13 @@ for (const [id, t] of Object.entries(LIB)) {
 }
 // the Light theme IS the Ableton Live reference palette (owner's request: 'pakai tema light'); the derived Mid Light / High Contrast themes were built from the old values above
 THEMES.light = THEMES.ableton; delete THEMES.ableton;
+// MobileDAW 2: every view uses the same surfaces. The device cards, the mixer, the browser and the editors read the Live tokens (--lv-*, --mx-*):
+// here they follow each theme's own panel / background / text / accent, so modules and mixer look like the rest of the app in every theme.
+for (const t of Object.values(THEMES)) {
+  Object.assign(t, { '--lv-title': t['--raise'], '--lv-body': t['--panel2'], '--lv-well': t['--bg'], '--lv-ctl': t['--raise'], '--lv-ctl2': t['--raise2'], '--lv-ink': t['--text'], '--lv-dim': t['--dim'],
+    '--lv-edge': t['--line'], '--lv-div': t['--line'], '--lv-sel': t['--accent'], '--lv-or': t['--accent'], '--lv-orink': t['--accent'], '--lv-arc': t['--accent'], '--lv-trk': t['--raise2'],
+    '--mx-bg': t['--bg'], '--mx-strip': t['--panel'], '--mx-strip-sel': t['--panel2'], '--mx-well': t['--bg'], '--menu': t['--menu'] || t['--panel2'] });
+}
 export const THEME_TONE = { live12light: 'light', light: 'light', midlight: 'light', lighthc: 'light', lightmc: 'light', lightlc: 'light' };
 export const THEME_NAMES = { studio: 'Studio (MobileDAW 2)', dark: 'Dark', middark: 'Mid Dark', lowc: 'Dark Neutral Low Contrast', live12: 'Dark (Live 12)', live12light: 'Light (Live 12)', medc: 'Dark Neutral Medium Contrast', highc: 'Dark Neutral High Contrast', live: 'Live Classic', black: 'Darkest (OLED)', midlight: 'Mid Light', light: 'Light (Ableton Live)', lightmc: 'Light Neutral Medium Contrast', lightlc: 'Light Neutral Low Contrast', lighthc: 'Light Neutral High Contrast' };
 // swatches for the theme picker: background, panel, control, text

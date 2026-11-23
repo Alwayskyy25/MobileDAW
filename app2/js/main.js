@@ -34,6 +34,7 @@ import { cancelGestures, gestureTiming } from './gesture.js';
 import { initTouchHit } from './touchhit.js';
 import { setOctaveNaming } from './defs.js';
 import * as UI2 from './ui2/shell.js';
+import * as M2 from './ui2/mixer2.js';
 setOctaveNaming(prefs.midC);
 const { state } = P;
 
@@ -291,9 +292,11 @@ function readouts() {
 }
 
 // ------------------------------------------------------------------ views + tabs
+let mixFull = false;
 function showView(v) {
   view = v;
-  $('#view-arr').hidden = v !== 'arr'; $('#view-mix').hidden = v !== 'mix';
+  if (v !== 'mix') mixFull = false;   // MobileDAW 2: the simple mixer (ui2/mixer2.js) unless "Mixer lengkap" was chosen
+  $('#view-arr').hidden = v !== 'arr'; $('#view-mix').hidden = !(v === 'mix' && mixFull); M2.show(v === 'mix' && !mixFull);
   for (const b of document.querySelectorAll('.seg .b')) b.classList.toggle('on', b.dataset.view === v);
   if (v === 'mix') MX.update();
   TL.invalidate();
@@ -424,7 +427,7 @@ function loop(ts) {
   if (ts - lastPoll > 32) { lastPoll = ts; guard(() => { P.applyPoll(eng.poll()); readouts(); UI2.readouts(); }); }
   if (!shouldDraw(ts)) { requestAnimationFrame(loop); return; }      // frame pacing: Auto / 60 Hz / 120 Hz
   const t0 = performance.now();
-  guard(() => { if (view === 'arr') { TL.frame(); if (tab === 'clip') ED.frame(); } else MX.frame(); UI2.frame(); });
+  guard(() => { if (view === 'arr') { TL.frame(); if (tab === 'clip') ED.frame(); } else { MX.frame(); M2.frame(); } UI2.frame(); });
   recordCost(performance.now() - t0);
   requestAnimationFrame(loop);
 }
@@ -514,6 +517,7 @@ function boot() {
   for (const k of ['dev', 'clip', 'keys']) { const el = h('div', { class: k === 'clip' ? 'ed-root' : 'pane', style: 'position:absolute;inset:0' }); dbody.append(el); panes[k] = el; }
   DV.initDevices(panes.dev); KB.initKeys(panes.keys); ED.initEditor(panes.clip);
   MX.initMixer($('#view-mix'));
+  M2.initMixer2($('#main'), () => { mixFull = true; showView('mix'); });
   BR.initBrowser($('#browser'));
   initTopbar({ tap: tapTempo });
   TL.initTimeline($('#arr'), {
