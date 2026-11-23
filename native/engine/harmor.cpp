@@ -78,7 +78,7 @@ struct EnvDef { bool on = false; double depth = 0; int n = 0, sus = -1, loop = -
 struct EnvState { int i = 1; double t = 0, from = 0, val = 0; bool done = false, rel = false; };
 
 struct Voice {
-  bool on = false, held = false, fresh = false; int pitch = 0; double vel = 0; uint32_t age = 0;
+  bool on = false, held = false, fresh = false; int pitch = 0; double vel = 0; uint32_t age = 0; int img = 0, pImg = 0;   // img: the image this note plays
   Adsr env; double f0 = 0, fcur = 0, bend = 1, t = 0;   // f0: the note's frequency, fcur: after glide; t: seconds since the start
   int nu = 1;                                         // unison copies of this voice
   float gl[HM_UNI] = {}, gr[HM_UNI] = {}, um[HM_UNI] = {};   // per copy: pan gains, frequency ratio
@@ -112,6 +112,7 @@ class Harmor : public Instrument {
     for (int k = 0; k < HM_MAXP; k++) l2k[k] = (float)std::log2((double)(k + 1));
     l2k[HM_MAXP] = -1; l2k[HM_MAXP + 1] = -2;
     p[HM_MAP_A] = p[HM_MAP_B] = p[HM_MAP_N] = p[HM_MAP_W] = -1; p[HM_MAP_NOISE] = 1; p[HM_MAP_END] = 1; p[HM_MAP_SPEED] = 1; p[HM_MAP_LOOP] = 1; p[HM_MAP_INTERP] = 1; p[HM_MAP_FDEV] = 1; p[HM_MAP_LEVEL] = 1; p[HM_MAP_PHASE] = 1;
+    for (int g = 1; g < HM_IMGS; g++) { const int b0 = HM_IMG + HM_IMG_STRIDE * (g - 1); p[b0 + HM_I_A] = p[b0 + HM_I_B] = p[b0 + HM_I_N] = p[b0 + HM_I_W] = -1; p[b0 + HM_I_END] = 1; p[b0 + HM_I_LOOP] = 1; p[b0 + HM_I_LEVEL] = 1; p[b0 + HM_I_NOISE] = 1; }
     p[HM_PLUCK_TIME] = 1; p[HM_PLUCK_DAMP] = 0.5; p[HM_SPH_DENS] = 1; p[HM_SPH_SPEED] = 0.2; p[HM_SPH_SHARP] = 0.5;
     for (int k = 0; k < HM_FX_N; k++) { p[HM_FX_ORDER + k] = k; p[HM_FX + HM_FX_STRIDE * k + 1] = 1; fx[k] = makeDevice(HM_FX_TYPES[k], sr, nullptr); }
     upOrder();
@@ -135,15 +136,20 @@ class Harmor : public Instrument {
       case HM_T_TABLE: case HM_T_TABLE + 10: loadTable(i == HM_T_TABLE ? 0 : 1, (int)v); break;
       case HM_T_PRND: case HM_T_PRND + 10: for (int k = 0; k < HM_POLY; k++) voices[k].dirty = true; break;
       case HM_ATT: case HM_DEC: case HM_SUS: case HM_REL: upEnv(); break;
-      case HM_MAP_A: case HM_MAP_B: loadMap(i == HM_MAP_A ? 0 : 1, (int)v); break;
-      case HM_MAP_N: loadNoise((int)v); break;
-      case HM_MAP_W: loadWave((int)v); break;
+      case HM_MAP_A: case HM_MAP_B: loadMap(0, i == HM_MAP_A ? 0 : 1, (int)v); break;
+      case HM_MAP_N: loadNoise(0, (int)v); break;
+      case HM_MAP_W: loadWave(0, (int)v); break;
       case HM_MAP_PHASE: for (int k = 0; k < HM_POLY; k++) voices[k].dirty = true; break;
       default:
+        if (i >= HM_IMG && i < HM_IMG + HM_IMG_STRIDE * (HM_IMGS - 1)) { const int g = 1 + (i - HM_IMG) / HM_IMG_STRIDE, o = (i - HM_IMG) % HM_IMG_STRIDE;
+          if (o == HM_I_A || o == HM_I_B) loadMap(g, o == HM_I_A ? 0 : 1, (int)v); else if (o == HM_I_N) loadNoise(g, (int)v); else if (o == HM_I_W) loadWave(g, (int)v); else for (int k = 0; k < HM_POLY; k++) voices[k].dirty = true; break; }
         if (i >= HM_F_ON && i < HM_F_ON + 20) { int f = (i - HM_F_ON) / 10, k = (i - HM_F_ON) % 10; if (k == 9) loadFilterTable(f, (int)v); else if (k == 1 || k == 3 || k == 4 || k == 5 || k == 6) buildFilter(f); }
         break;
     }
   }
+  // the note's image (its 6th event value): set for the noteOn that follows
+  void noteOnSt(int pitch, double vel, double st) override { nImg = std::max(0, std::min(HM_IMGS - 1, (int)std::lround(st))); noteOn(pitch, vel); nImg = 0; }
+  int nImg = 0;
   void noteOn(int pitch, double vel) override {
     pitch = std::max(0, std::min(127, pitch));
     if (p[HM_MONO] > 0.5) { monoOn(pitch, vel); return; }
@@ -157,7 +163,7 @@ class Harmor : public Instrument {
         if (!v || x.age < v->age) v = &x;
       }
       if (!v) v = &voices[0];
-      if (v->on) { v->pPitch = pitch; v->pVel = vel; v->fade = std::max(v->fade, (int)(sr * 0.003)); v->held = false; return; }
+      if (v->on) { v->pPitch = pitch; v->pVel = vel; v->pImg = nImg; v->fade = std::max(v->fade, (int)(sr * 0.003)); v->held = false; return; }
     }
     start(*v, pitch, vel, -1);
   }
@@ -234,30 +240,37 @@ class Harmor : public Instrument {
   float ft[2][FT_N]; float fcustom[2][256]; bool fcHas[2] = { false, false };
   float fmt[FM_N]; double fmtVowel = -1, fmtRes = -1;
   EnvDef ed[HM_ENVS];
-  struct Map { int frames = 0, bins = 0, layout = 0; double hop = 0.01, base = 0, flo = 20, fhi = 20000; std::vector<float> aL, aR, dev, ph; bool stereo = false, hasDev = false, hasPh = false; } mp;
+  struct Map { int frames = 0, bins = 0, layout = 0; double hop = 0.01, base = 0, flo = 20, fhi = 20000; std::vector<float> aL, aR, dev, ph; bool stereo = false, hasDev = false, hasPh = false; } mpz[HM_IMGS];
   float bufR[HM_UNI][SUB];
   // the residual noise map (slot N) and its band-pass bank: band j = two equal biquads centred in the band (geometric centre), each with
   // the band's width in octaves; nPg = 1 / sqrt(the cascade's power gain for unit white noise), measured once, so a band plays the RMS
   // the analysis measured
-  struct NMap { int frames = 0, bands = 0; double hop = 0.01, flo = 40, fhi = 20000; std::vector<float> aL, aR; bool stereo = false, ms = false; } nm;
-  float nb0[HM_NB_MAX] = {}, na1[HM_NB_MAX] = {}, na2[HM_NB_MAX] = {}, nPg[HM_NB_MAX] = {}; bool nOn[HM_NB_MAX] = {};
+  struct NMap { int frames = 0, bands = 0; double hop = 0.01, flo = 40, fhi = 20000; std::vector<float> aL, aR; bool stereo = false, ms = false; float nb0[HM_NB_MAX] = {}, na1[HM_NB_MAX] = {}, na2[HM_NB_MAX] = {}, nPg[HM_NB_MAX] = {}; bool nOn[HM_NB_MAX] = {}; } nmz[HM_IMGS];
   // the map's play range: from Map Start to Map End (frames); past the end it holds the end frame, or loops back to the start
-  double mapPos(double fp, int frames, bool loop) const {
-    const double a = clampd(p[HM_MAP_START], 0, 1) * (frames - 1), z = std::max(a, clampd(p[HM_MAP_END], 0, 1) * (frames - 1));
+  double iP(int g, int o, int legacy) const { return g ? p[HM_IMG + HM_IMG_STRIDE * (g - 1) + o] : p[legacy]; }
+  double iStart(int g) const { return clampd(iP(g, HM_I_START, HM_MAP_START), 0, 1); }
+  double iEnd(int g) const { return clampd(iP(g, HM_I_END, HM_MAP_END), 0, 1); }
+  bool iLoop(int g) const { return iP(g, HM_I_LOOP, HM_MAP_LOOP) > 0.5; }
+  double iLevel(int g) const { return std::max(0.0, p[HM_MAP_LEVEL]) * (g ? std::max(0.0, p[HM_IMG + HM_IMG_STRIDE * (g - 1) + HM_I_LEVEL]) : 1.0); }
+  double iNoise(int g) const { return std::max(0.0, p[HM_MAP_NOISE]) * (g ? std::max(0.0, p[HM_IMG + HM_IMG_STRIDE * (g - 1) + HM_I_NOISE]) : 1.0); }
+  double iShift(int g) const { return clampd(p[HM_MAP_SHIFT] + (g ? p[HM_IMG + HM_IMG_STRIDE * (g - 1) + HM_I_SHIFT] : 0), -48, 48); }
+  int imgOf(const Voice& v) const { return v.img > 0 && v.img < HM_IMGS && mpz[v.img].frames > 0 ? v.img : 0; }   // an image without a map: image 0
+  double mapPos(int g, double fp, int frames, bool loop) const {
+    const double a = iStart(g) * (frames - 1), z = std::max(a, iEnd(g) * (frames - 1));
     if (loop && frames > 1) { const double len = std::max(1.0, z - a + 1); if (fp > z) fp = a + std::fmod(fp - a, len); return clampd(fp, 0, frames - 1); }
     return clampd(fp, 0, z);
   }
-  struct WMap { int n = 0; double sr = 48000; std::vector<float> l, r; } wv;
-  void loadWave(int id) {
-    const Sample* s = id >= 0 && id < 256 && bank ? bank->s[id] : nullptr;
+  struct WMap { int n = 0; double sr = 48000; std::vector<float> l, r; } wvz[HM_IMGS];
+  void loadWave(int g, int id) {
+    const Sample* s = id >= 0 && id < 256 && bank ? bank->s[id] : nullptr; WMap& wv = wvz[g];
     wv.n = 0; wv.l.clear(); wv.r.clear();
     if (!s || s->frames < HM_MAP_HDR || std::fabs(s->l[0] - HM_MAP_MAGIC) > 1e-3 || std::lround(s->l[4]) != HM_MAP_WAVE) return;
     const int n = (int)std::lround(s->l[1]); if (n < 1 || (long)n + HM_MAP_HDR > s->frames) return;
     wv.n = n; wv.sr = std::max(1000.0, (double)s->l[3]); wv.l.assign(s->l + HM_MAP_HDR, s->l + HM_MAP_HDR + n);
     if (s->r && s->r != s->l) wv.r.assign(s->r + HM_MAP_HDR, s->r + HM_MAP_HDR + n);
   }
-  void loadNoise(int id) {
-    const Sample* s = id >= 0 && id < 256 && bank ? bank->s[id] : nullptr;
+  void loadNoise(int g, int id) {
+    const Sample* s = id >= 0 && id < 256 && bank ? bank->s[id] : nullptr; NMap& nm = nmz[g]; float* nb0 = nm.nb0; float* na1 = nm.na1; float* na2 = nm.na2; float* nPg = nm.nPg; bool* nOn = nm.nOn;
     nm.frames = 0; nm.aL.clear(); nm.aR.clear();
     if (!s || s->frames < HM_MAP_HDR || std::fabs(s->l[0] - HM_MAP_MAGIC) > 1e-3 || std::lround(s->l[4]) != HM_MAP_NOISEB) return;
     const int fr = (int)std::lround(s->l[1]), bn = (int)std::lround(s->l[2]);
@@ -304,8 +317,8 @@ class Harmor : public Instrument {
     fr = (int)std::lround(s->l[1]); bn = (int)std::lround(s->l[2]);
     return fr >= 1 && bn >= 1 && bn <= HM_MAXP && fr <= 8192 && (long)fr * bn + HM_MAP_HDR <= s->frames;
   }
-  void loadMap(int which, int id) {
-    const Sample* s = id >= 0 && id < 256 && bank ? bank->s[id] : nullptr; int fr = 0, bn = 0;
+  void loadMap(int g, int which, int id) {
+    const Sample* s = id >= 0 && id < 256 && bank ? bank->s[id] : nullptr; int fr = 0, bn = 0; Map& mp = mpz[g];
     if (which == 0) {
       if (!mapHeader(s, fr, bn)) { mp.frames = 0; mp.aL.clear(); mp.aR.clear(); mp.hasDev = mp.hasPh = false; }
       else {
@@ -452,7 +465,7 @@ class Harmor : public Instrument {
   // ---- voices
   void start(Voice& v, int pitch, double vel, double fromF) {
     bool wasOn = v.on && fromF > 0;
-    v.on = v.held = true; v.fresh = !wasOn; v.pitch = pitch; v.vel = vel; v.age = ++counter; v.bend = 1; v.dirty = true; v.fade = 0; v.pPitch = -1;
+    v.on = v.held = true; v.fresh = !wasOn; v.img = nImg; v.pitch = pitch; v.vel = vel; v.age = ++counter; v.bend = 1; v.dirty = true; v.fade = 0; v.pPitch = -1;
     v.f0 = 440.0 * std::pow(2.0, (pitch - 69) / 12.0); v.fcur = fromF > 0 ? fromF : v.f0; v.t = 0;
     if (!wasOn) {
       v.nu = std::max(1, std::min(HM_UNI, (int)std::lround(p[HM_U_VOICES])));
@@ -488,7 +501,7 @@ class Harmor : public Instrument {
     if (nHeld < 128) held[nHeld++] = pitch;
     Voice& v = voices[0]; for (int k = 1; k < HM_POLY; k++) if (voices[k].on) release(voices[k]);
     const bool glide = v.on && p[HM_GLIDE] > 0;
-    if (v.on && v.held && p[HM_LEGATO] > 0.5) { v.pitch = pitch; v.f0 = 440.0 * std::pow(2.0, (pitch - 69) / 12.0); if (!glide) v.fcur = v.f0; v.age = ++counter; return; }   // legato: no retrigger
+    if (v.on && v.held && p[HM_LEGATO] > 0.5) { const bool sw = v.img != nImg; if (sw) { v.img = nImg; v.dirty = true; v.t = 0; } v.pitch = pitch; v.f0 = 440.0 * std::pow(2.0, (pitch - 69) / 12.0); if (!glide || sw) v.fcur = v.f0; /* another vocal: from its Start, no glide */ v.age = ++counter; return; }   // legato: no retrigger
     start(v, pitch, vel, glide ? v.fcur : -1);
   }
   void monoOff(int pitch) {
@@ -504,8 +517,9 @@ class Harmor : public Instrument {
       for (int k = 0; k < HM_MAXP; k++) { double ph = T.ph[k] + r * v.u[k]; ex[k] = (float)std::cos(ph); ey[k] = (float)std::sin(ph); }
     }
     // the map's phases at its start frame (resynthesis), else timbre 1's
+    const int g = imgOf(v); const Map& mp = mpz[g];
     const bool mph = mp.frames > 0 && mp.hasPh && p[HM_MAP_PHASE] > 0.5 && mp.layout == HM_MAP_HARM;
-    const int f0 = mph ? std::max(0, std::min(mp.frames - 1, (int)std::lround(clampd(p[HM_MAP_START], 0, 1) * (mp.frames - 1)))) : 0;
+    const int f0 = mph ? std::max(0, std::min(mp.frames - 1, (int)std::lround(iStart(g) * (mp.frames - 1)))) : 0;
     for (int k = 0; k < HM_MAXP; k++) { if (mph && k < mp.bins) { const double ph = TAU * mp.ph[(size_t)f0 * mp.bins + k]; v.emx[k] = (float)std::cos(ph); v.emy[k] = (float)std::sin(ph); } else { v.emx[k] = v.e1x[k]; v.emy[k] = v.e1y[k]; } }
     v.dirty = false;
   }
@@ -527,6 +541,7 @@ class Harmor : public Instrument {
 
   void renderVoice(Voice& v, float* L, float* R, int m, int want) {
     if (v.dirty) phaseVectors(v);
+    const int g = imgOf(v); const Map& mp = mpz[g]; NMap& nm = nmz[g]; const WMap& wv = wvz[g]; const float* nPg = nm.nPg; const bool* nOn = nm.nOn; const float* nb0 = nm.nb0; const float* na1 = nm.na1; const float* na2 = nm.na2; (void)nb0; (void)na1; (void)na2;   // the note's image
     const double dt = m / sr;
     // modulation for this step: articulators, LFOs, vibrato, glide
     double ev[HM_ENVS];
@@ -557,13 +572,13 @@ class Harmor : public Instrument {
     int mf0 = 0, mf1 = 0; double mff = 0, mshift = 0, mMix = 0, mLev = 0, fbase = 0;
     if (mapOn) {
       const double tm = (v.t - dt) * clampd(p[HM_MAP_SPEED], 0, 16);
-      double fp = clampd(p[HM_MAP_START], 0, 1) * (mp.frames - 1) + tm / mp.hop;
-      const bool loop = p[HM_MAP_LOOP] > 0.5 && mp.frames > 1;
-      fp = mapPos(fp, mp.frames, loop);
+      double fp = iStart(g) * (mp.frames - 1) + tm / mp.hop;
+      const bool loop = iLoop(g) && mp.frames > 1;
+      fp = mapPos(g, fp, mp.frames, loop);
       mf0 = (int)fp; mff = p[HM_MAP_INTERP] > 0.5 ? fp - mf0 : 0; mf1 = loop ? (mf0 + 1) % mp.frames : std::min(mf0 + 1, mp.frames - 1);
       mMix = clampd(p[HM_MAP_MIX], 0, 1);
-      mLev = std::max(0.0, p[HM_MAP_LEVEL]) * (ed[HM_E_IMGGAIN].on ? (1 - clampd(ed[HM_E_IMGGAIN].depth, 0, 1)) + clampd(ed[HM_E_IMGGAIN].depth, 0, 1) * ev[HM_E_IMGGAIN] : 1);
-      mshift = clampd(p[HM_MAP_SHIFT], -48, 48) / 12 + (ed[HM_E_IMGFREQ].on ? ev[HM_E_IMGFREQ] * ed[HM_E_IMGFREQ].depth * 4 : 0);
+      mLev = iLevel(g) * (ed[HM_E_IMGGAIN].on ? (1 - clampd(ed[HM_E_IMGGAIN].depth, 0, 1)) + clampd(ed[HM_E_IMGGAIN].depth, 0, 1) * ev[HM_E_IMGGAIN] : 1);
+      mshift = iShift(g) / 12 + (ed[HM_E_IMGFREQ].on ? ev[HM_E_IMGFREQ] * ed[HM_E_IMGFREQ].depth * 4 : 0);
       fbase = mp.base > 0 ? 440.0 * std::pow(2.0, (mp.base - 69) / 12.0) : 0;
     }
     const bool devOn = mapOn && mp.hasDev && mp.layout == HM_MAP_HARM && p[HM_MAP_FDEV] > 0;
@@ -672,25 +687,25 @@ class Harmor : public Instrument {
       } }
     // the resynthesis residual: one noise source through the band bank, each band's gain ramping to the noise map at this step's map time
     float nzL[SUB], nzR[SUB]; bool nzOn = false;
-    const bool wvOn = mapOn && wv.n > 0 && p[HM_MAP_NOISE] > 0 && std::fabs(p[HM_MAP_SPEED] - 1) < 1e-3;
+    const bool wvOn = mapOn && wv.n > 0 && iNoise(g) > 0 && std::fabs(p[HM_MAP_SPEED] - 1) < 1e-3;
     if (wvOn) {                                        // the residual waveform on the map's timeline (same start / loop as the map)
-      const float lev = (float)(std::max(0.0, p[HM_MAP_NOISE]) * mMix * mLev); const bool loop = p[HM_MAP_LOOP] > 0.5;
-      const double t0 = clampd(p[HM_MAP_START], 0, 1) * std::max(0, mp.frames - 1) * mp.hop + (v.t - dt), step = wv.sr / sr; double pos = t0 * wv.sr;
+      const float lev = (float)(iNoise(g) * mMix * mLev); const bool loop = iLoop(g);
+      const double t0 = iStart(g) * std::max(0, mp.frames - 1) * mp.hop + (v.t - dt), step = wv.sr / sr; double pos = t0 * wv.sr;
       const float* wl = wv.l.data(); const float* wr = wv.r.empty() ? wl : wv.r.data();
-      const double mDur = std::max(0, mp.frames - 1) * mp.hop, wBeg = clampd(p[HM_MAP_START], 0, 1) * mDur * wv.sr, wEnd = std::max(wBeg + 1, clampd(p[HM_MAP_END], 0, 1) * mDur * wv.sr);   // Map Start .. Map End
+      const double mDur = std::max(0, mp.frames - 1) * mp.hop, wBeg = iStart(g) * mDur * wv.sr, wEnd = std::max(wBeg + 1, iEnd(g) * mDur * wv.sr);   // Map Start .. Map End
       for (int i = 0; i < m; i++, pos += step) {
         double q = pos; if (loop) { if (q > wEnd) q = wBeg + std::fmod(q - wBeg, std::max(1.0, wEnd - wBeg)); if (q < 0) q = 0; } if (q >= std::min((double)wv.n - 1, wEnd) || q < 0) { nzL[i] = nzR[i] = 0; continue; }
         const int a = (int)q, b = a + 1 < wv.n ? a + 1 : 0; const float fr = (float)(q - a);
         nzL[i] = lev * (wl[a] + (wl[b] - wl[a]) * fr); nzR[i] = lev * (wr[a] + (wr[b] - wr[a]) * fr);
       }
       nzOn = true;
-    } else if (mapOn && nm.frames > 0 && p[HM_MAP_NOISE] > 0) {
+    } else if (mapOn && nm.frames > 0 && iNoise(g) > 0) {
       const double tm = (v.t - dt) * clampd(p[HM_MAP_SPEED], 0, 16);
-      double fp = clampd(p[HM_MAP_START], 0, 1) * (nm.frames - 1) + tm / nm.hop;
-      const bool loop = p[HM_MAP_LOOP] > 0.5 && nm.frames > 1;
-      fp = mapPos(fp, nm.frames, loop);
+      double fp = iStart(g) * (nm.frames - 1) + tm / nm.hop;
+      const bool loop = iLoop(g) && nm.frames > 1;
+      fp = mapPos(g, fp, nm.frames, loop);
       const int g0 = (int)fp, g1 = loop ? (g0 + 1) % nm.frames : std::min(g0 + 1, nm.frames - 1); const float gf = p[HM_MAP_INTERP] > 0.5 ? (float)(fp - g0) : 0.f;
-      const float lev = (float)(std::max(0.0, p[HM_MAP_NOISE]) * mMix * mLev), *rL0 = nm.aL.data() + (size_t)g0 * nm.bands, *rL1 = nm.aL.data() + (size_t)g1 * nm.bands;
+      const float lev = (float)(iNoise(g) * mMix * mLev), *rL0 = nm.aL.data() + (size_t)g0 * nm.bands, *rL1 = nm.aL.data() + (size_t)g1 * nm.bands;
       const float *rR0 = nm.stereo ? nm.aR.data() + (size_t)g0 * nm.bands : rL0, *rR1 = nm.stereo ? nm.aR.data() + (size_t)g1 * nm.bands : rL1;
       const bool ms = nm.ms && nm.stereo;               // mid / side map: two independent noises, L = M + S, R = M - S
       constexpr float NS = 1.7320508f / 2147483648.f;     // xorshift32 -> uniform noise of unit variance
@@ -739,7 +754,7 @@ class Harmor : public Instrument {
       if (nzOn) { l += nzL[i]; r += nzR[i]; }
       if (v.fade > 0) {
         e *= (double)v.fade / (sr * 0.003 + 1); v.fade--;
-        if (v.fade == 0) { L[i] += (float)(l * e * pl); R[i] += (float)(r * e * pr); if (v.pPitch >= 0) { int pp = v.pPitch; double pv = v.pVel; v.on = false; start(v, pp, pv, -1); } else v.on = false; return; }
+        if (v.fade == 0) { L[i] += (float)(l * e * pl); R[i] += (float)(r * e * pr); if (v.pPitch >= 0) { int pp = v.pPitch; double pv = v.pVel; v.on = false; const int ki = nImg; nImg = v.pImg; start(v, pp, pv, -1); nImg = ki; } else v.on = false; return; }
       }
       L[i] += (float)(l * e * pl); R[i] += (float)(r * e * pr);
     }

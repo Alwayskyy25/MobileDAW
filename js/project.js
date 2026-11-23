@@ -422,7 +422,7 @@ export function slideLane(c, f) {
   }
   return n;
 }
-export function clipNoteEvents(c, kind, f = [], st6 = false) {   // st6: a 6th value per note = pitch offset in semitones (drum step Pitch lane)
+export function clipNoteEvents(c, kind, f = [], st6 = false) {   // st6: a 6th value per note = pitch offset in semitones (drum step Pitch lane) / the note's image (img, Harmor)
   let n = 0;
   const xp = kind === 'drum' ? 0 : (c.xpose | 0);   // xpose = clip transpose (semitones, playback only)
   for (const g of loopSegs(c)) {
@@ -436,7 +436,7 @@ export function clipNoteEvents(c, kind, f = [], st6 = false) {   // st6: a 6th v
         continue;
       }
       f.push(c.start + at + sw, Math.min(nt.d, e - nt.t), xp ? Math.max(0, Math.min(127, nt.p + xp)) : nt.p, nt.v, nt.pan || 0);
-      if (st6) f.push(kind === 'drum' ? nt.pt || 0 : 0);
+      if (st6) f.push(kind === 'drum' ? nt.pt || 0 : nt.img || 0);   // melodic tracks: the note's image (Harmor: which vocal / map it plays)
       n++;
     }
   }
@@ -1770,7 +1770,7 @@ async function loadAssets({ missing }, gen, onProgress) {
     if (t.inst && t.inst.zones) for (const z of t.inst.zones) if (z) see(z.sample, -1);
     if (t.kind === 'drum' && t.inst && t.inst.pads) for (const q of t.inst.pads) { see(q.sample, -1); if (q.chain && q.chain.inst) see(q.chain.inst.sample, -1); if (q.sample && padWarp(q)) renders++; }
   }
-  const tjobs = state.tracks.filter((t) => t.inst && ((t.inst.type === INST.SOUNDFONT && t.inst.sf && t.inst.sf.path) || (t.inst.type === 37 && t.inst.wt && t.inst.wt.some(Boolean)) || (t.inst.type === 38 && ((t.inst.hm && t.inst.hm.path) || (t.inst.hmT && t.inst.hmT.some(Boolean))))));
+  const tjobs = state.tracks.filter((t) => t.inst && ((t.inst.type === INST.SOUNDFONT && t.inst.sf && t.inst.sf.path) || (t.inst.type === 37 && t.inst.wt && t.inst.wt.some(Boolean)) || (t.inst.type === 38 && ((t.inst.hm && t.inst.hm.path) || (t.inst.hmT && t.inst.hmT.some(Boolean)) || Object.keys(t.inst.hmI || {}).length))));
   const dwps = state.tracks.filter((t) => t.inst && t.inst.type === INST.FLM_DW && t.inst.dwp);
   const total = Math.max(1, uses.size + renders + tjobs.length + dwps.length);
   let done = 0, lastP = 0, what = 'Memuat sample\u2026';
@@ -1824,7 +1824,7 @@ async function loadAssets({ missing }, gen, onProgress) {
       const r = await loadSoundFontFor(i, t.inst.sf.path, t.inst.sf.preset); if (r && r.error) missing.push(t.inst.sf.path);
     } else if (i >= 0 && t.inst.type === 38) {
       say(t.inst.hm ? (t.inst.hm.src === 'image' ? 'Membuat peta gambar Harmor: ' : 'Resintesis Harmor: ') + t.inst.hm.path.split('/').pop() : 'Tabel harmonik Harmor: ' + (t.name || ''));
-      const r = await (await import('./harmor/harmor.js')).restoreHarmorMap(t); if (r && r.error && t.inst.hm) missing.push(t.inst.hm.path);
+      const r = await (await import('./harmor/harmor.js')).restoreHarmorMap(t); if (r && r.error) missing.push(t.inst.hm ? t.inst.hm.path : Object.values(t.inst.hmI || {}).map((x) => x.path).join(', '));
     } else if (i >= 0) {
       say('Memuat wavetable: ' + (t.name || ''));
       for (let o = 0; o < 2 && live(); o++) { const w = t.inst.wt && t.inst.wt[o]; i = state.tracks.indexOf(t); if (!w || i < 0) continue; const r = await loadMoistureTable(i, o, w.path); if (r && r.error) missing.push(w.path); }

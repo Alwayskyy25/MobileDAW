@@ -265,3 +265,17 @@ WSOLA 75 % overlap dengan penyelarasan **sub-sampel** (korelasi silang ternormal
 mengikuti nada, **penjaga transien** (onset tidak diulang/dilebarkan saat stretch, crossfade 2 ms), pitch naik dengan **sinc berjendela
 (cutoff 0.85/rasio) sebelum decimate**, turun dengan Hermite 4 titik, soft-limiter di keluaran, dan tes bit-per-bit. Prinsip yang sama
 dipakai untuk time-stretch NewTone (bersama PSOLA untuk vokal dan phase vocoder untuk bagian tak bernada), di Web Worker.
+
+## Phase 6e: several vocals in one Harmor (one pattern)
+
+A Harmor now holds up to 8 images ("Vokal 1..8"). Image 1 is the existing map (MAP_A / B / N / W, Map Start / End / Loop / Level /
+Shift / Noise). Images 2..8 live at `HM_IMG + 10 (k - 1)` (1100..1169): slots A, B, N, W, then Start, End, Loop, Level (x the map's),
+Shift (+ the map's, semitones), Noise (x the map's). Speed, Mix, Interp, Formant, Freq Dev, the envelope, voices and effects stay global.
+
+- A note picks its vocal with `note.img` (0..7, absent = 0). The project sends it as the note event's 6th value for melodic tracks
+  (the drum sampler uses the same slot for its step pitch); the engine passes it to `noteOnSt`, which only Harmor reads.
+- An image without a map plays image 1. In mono + legato, a note on another vocal starts that vocal from its Start without a glide.
+- `harmorLoadAudio(i, path, { quality, image })` loads audio into any image; the track remembers the others in `t.inst.hmI`
+  (restored on open, included in the ZIP export).
+- UI: IMG page has the Vokal 1..8 selector (a dot = loaded); the piano roll's lane chooser has "Vokal / citra (Harmor, per not)".
+- Test: `tools/harmor-multi-test.mjs` (two vocals in one clip, fallback, save / open).

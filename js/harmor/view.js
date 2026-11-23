@@ -9,7 +9,7 @@ import { h, menu, toast } from '../ui.js';
 import { fmtParam, normOf, valOf, noteName, DEVICES } from '../defs.js';
 import * as P from '../project.js';
 import { eng } from '../engine.js';
-import { HM, HM_WAVES, HM_QUALITY, HM_FILTERS, HM_SLOPES, HM_LFO_SHAPES, HM_LFO_DEST, HM_ENVS, HM_FX, HM_MAXP } from './schema.js';
+import { HM, HM_WAVES, HM_QUALITY, HM_FILTERS, HM_SLOPES, HM_LFO_SHAPES, HM_LFO_DEST, HM_ENVS, HM_FX, HM_MAXP, HM_ISLOT } from './schema.js';
 
 const OR = '#ff9d2e', OR2 = 'rgba(255,157,46,.22)', INK = '#d6d6d6', DIM = '#8a8a8a', GRID = 'rgba(255,255,255,.07)', GRID2 = 'rgba(255,255,255,.14)', BL = '#5fd4f5';
 const C01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -330,15 +330,18 @@ export function harmorView(k) {
 
   // ---------------------------------------------------------------- editor: image synthesis / resynthesis
   const imgTab = () => {
-    const hm = (t() && t().inst.hm) || null, H = () => import('./harmor.js');
+    // vocal / image g (0..7): image 0 = the main map, 1..7 = more vocals in this Harmor; a note's Vokal value (piano roll lane) picks one
+    const vg = Math.max(0, Math.min(7, st.img | 0)), IP = (o, legacy) => (vg ? HM.IMG + HM.IMG_STRIDE * (vg - 1) + o : legacy);
+    const hmAll = (q) => (q ? ((t() && t().inst.hmI) || {})[q] : t() && t().inst.hm) || null;
+    const hm = hmAll(vg), H = () => import('./harmor.js');
     if (st.resQ == null && hm && hm.src === 'audio' && hm.opts && hm.opts.quality != null) st.resQ = hm.opts.quality;   // the quality the map was made at
     const map = disp((g, w, hh) => {
-      const m = mapView(); if (!m) { txt(g, 'Belum ada peta — muat audio atau gambar (kanan).', w / 2, hh / 2, DIM, 11, 'center'); return; }
+      const m = mapView(); if (!m) { txt(g, vg ? 'Vokal ' + (vg + 1) + ' kosong — muat audio (kanan). Not dengan Vokal ' + (vg + 1) + ' memakai vokal 1.' : 'Belum ada peta — muat audio atau gambar (kanan).', w / 2, hh / 2, DIM, 11, 'center'); return; }
       const { frames, bins, data } = m, img = g.createImageData(Math.max(1, Math.round(w)), Math.max(1, Math.round(hh))), W = img.width, Hh = img.height;
       for (let x = 0; x < W; x++) { const f = Math.min(frames - 1, Math.floor(x / W * frames)); for (let y = 0; y < Hh; y++) { const b = Math.min(bins - 1, Math.floor((1 - y / Hh) * bins)), a = data[16 + f * bins + b] || 0, db = a > 0 ? 20 * Math.log10(a) : -120, v = C01((db + 66) / 60), o = (y * W + x) * 4;
         img.data[o] = 30 + 225 * v; img.data[o + 1] = 22 + 135 * v * v; img.data[o + 2] = 18 + 30 * v; img.data[o + 3] = 255; } }
       { const c2 = document.createElement('canvas'); c2.width = W; c2.height = Hh; c2.getContext('2d').putImageData(img, 0, 0); g.imageSmoothingEnabled = false; g.drawImage(c2, 0, 0, w, hh); }   // through a canvas: putImageData ignores the display scale
-      { const xa = C01(k.get(HM.MAP_START)) * w, xb = Math.max(xa, C01(k.get(HM.MAP_END)) * w), lp = k.get(HM.MAP_LOOP) > 0.5;   // the play range: outside it dimmed, Start / End lines
+      { const xa = C01(k.get(IP(HM_ISLOT.START, HM.MAP_START))) * w, xb = Math.max(xa, C01(k.get(IP(HM_ISLOT.END, HM.MAP_END))) * w), lp = k.get(IP(HM_ISLOT.LOOP, HM.MAP_LOOP)) > 0.5;   // the play range: outside it dimmed, Start / End lines
         g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 0, xa, hh); g.fillRect(xb, 0, w - xb, hh);
         if (lp) { g.fillStyle = 'rgba(95,212,245,.55)'; g.fillRect(xa, 0, xb - xa, 2); }   // Loop: a thin bar over the looped range (the map stays readable)
         g.fillStyle = OR; g.fillRect(Math.round(xa), 0, 2, hh); g.fillStyle = lp ? BL : '#e6e6e6'; g.fillRect(Math.round(xb) - 2, 0, 2, hh);
@@ -351,22 +354,25 @@ export function harmorView(k) {
         const x0 = Math.max(0, Math.min(1 - cw, cx - cw / 2)), y0 = Math.max(0, Math.min(1 - ch, cy - ch / 2)); pend = { ...o, x0, x1: x0 + cw, y0, y1: y0 + ch }; clearTimeout(pendT); pendT = setTimeout(() => applyImg(pend), 350); } } : null });
     let pend = null, pendT = 0;
     const applyImg = async (o) => { const r = await (await H()).harmorLoadImage(i(), t().inst.hm.path, o); if (r.error) toast(r.error); map.paint(); };
-    const mapView = () => { const id = Math.round(k.get(HM.MAP_A)); if (!(id >= 0)) return null; const b = eng.sampleBuffers && eng.sampleBuffers(id); if (!b || !b.l || Math.abs(b.l[0] - 4096.5) > 1e-3) return null; return { frames: Math.round(b.l[1]), bins: Math.round(b.l[2]), layout: Math.round(b.l[4]), data: b.l }; };
+    const mapView = () => { const id = Math.round(k.get(IP(HM_ISLOT.A, HM.MAP_A))); if (!(id >= 0)) return null; const b = eng.sampleBuffers && eng.sampleBuffers(id); if (!b || !b.l || Math.abs(b.l[0] - 4096.5) > 1e-3) return null; return { frames: Math.round(b.l[1]), bins: Math.round(b.l[2]), layout: Math.round(b.l[4]), data: b.l }; };
     const imgOpts = () => (hm && hm.src === 'image' ? hm.opts || {} : {});
     const optBtn = (label, key, vals, names) => { const cur = imgOpts()[key] ?? vals[0]; return h('div', { class: 'hm-chips' }, h('span', { class: 'hm-lab' }, label), ...vals.map((v, q) => h('button', { class: 'hm-chip' + (cur === v ? ' on' : ''), onclick: () => { if (!hm || hm.src !== 'image') { toast('Muat gambar dulu.'); return; } applyImg({ ...imgOpts(), [key]: v }).then(showEd); } }, names[q]))); };
     // the map takes the room (left, full height); a narrow side column holds the source, the play controls and the options (small knobs)
     const loadAudio = async () => { const f = await eng.importFiles('audio/*,.wav,.mp3,.flac,.ogg,.aif,.aiff,.m4a'); if (!f.length) return; const q = Math.round(st.resQ ?? 1);
-      const r = await (await H()).harmorLoadAudio(i(), f[0], { quality: q }, (x) => { status.textContent = 'Menganalisis ' + Math.round(x * 100) + ' %'; }); if (r.error) toast(r.error, 5000); show(); };
-    const loadImage = async () => { const f = await eng.importFiles('image/*,.png,.jpg,.jpeg,.webp,.bmp,.gif'); if (!f.length) return; toast('Membuat peta…', 6000); const r = await (await H()).harmorLoadImage(i(), f[0], { seconds: 2 }); toast(r.error || 'Gambar dimuat.'); show(); };
+      const r = await (await H()).harmorLoadAudio(i(), f[0], { quality: q, image: vg }, (x) => { status.textContent = 'Menganalisis ' + Math.round(x * 100) + ' %'; }); if (r.error) toast(r.error, 5000); show(); };
+    const loadImage = async () => { if (vg) { toast('Gambar hanya untuk Vokal 1; vokal lain dari audio.'); return; } const f = await eng.importFiles('image/*,.png,.jpg,.jpeg,.webp,.bmp,.gif'); if (!f.length) return; toast('Membuat peta…', 6000); const r = await (await H()).harmorLoadImage(i(), f[0], { seconds: 2 }); toast(r.error || 'Gambar dimuat.'); show(); };
     const rp = hm && hm.src === 'audio' && hm.report;
     const info = h('div', { class: 'hm-report' }, rp ? (rp.pitched ? `${noteName(Math.round(rp.note))} ${rp.hz.toFixed(1)} Hz • ${rp.partials} partial • ${Math.round(rp.voiced * 100)} % bernada` : `Tanpa nada: ${rp.why}`) : hm && hm.src === 'image' ? 'Peta dari gambar' : 'Vokal / instrumen bernada tunggal paling akurat');
-    const src = h('div', { class: 'hm-imgsrc' },
-      row(h('button', { class: 'hm-btn prim', onclick: loadAudio }, 'Audio…'), h('button', { class: 'hm-btn', onclick: loadImage }, 'Gambar…'), h('button', { class: 'hm-btn', onclick: async () => { (await H()).harmorClearMap(i()); show(); } }, 'Hapus')),
+    // the vocals of this Harmor: 1..8 (a dot = loaded); the selected one is shown and edited here
+    const vocals = h('div', { class: 'hm-chips hm-vocals' }, h('span', { class: 'hm-lab' }, 'Vokal'), ...Array.from({ length: 8 }, (_, q) => { const x = hmAll(q);
+      return h('button', { class: 'hm-chip' + (q === vg ? ' on' : '') + (x ? ' has' : ''), title: x ? x.path.split('/').pop() : 'kosong', onclick: () => { st.img = q; show(); } }, String(q + 1) + (x ? ' •' : '')); }));
+    const src = h('div', { class: 'hm-imgsrc' }, vocals,
+      row(h('button', { class: 'hm-btn prim', onclick: loadAudio }, 'Audio…'), h('button', { class: 'hm-btn', onclick: loadImage }, 'Gambar…'), h('button', { class: 'hm-btn', onclick: async () => { (await H()).harmorClearMap(i(), vg); show(); } }, 'Hapus')),
       h('div', { class: 'hm-chips' }, h('span', { class: 'hm-lab' }, 'Kualitas'), ...HM_QUALITY.map((n, q) => h('button', { class: 'hm-chip' + ((st.resQ ?? 1) === q ? ' on' : ''), onclick: () => { st.resQ = q; show(); } }, n))), info);
     const S = { size: 'sm' };
-    const play = h('div', { class: 'hm-kgrid' }, knob(HM.MAP_START, 'Start', S), knob(HM.MAP_END, 'End', S), knob(HM.MAP_SPEED, 'Speed', S), knob(HM.MAP_SHIFT, 'Shift', S),
-      knob(HM.MAP_MIX, 'Mix', S), knob(HM.MAP_LEVEL, 'Level', S), knob(HM.MAP_NOISE, 'Noise', S), knob(HM.MAP_FDEV, 'Freq Dev', S));
-    const tg = h('div', { class: 'hm-tgrid' }, tog(HM.MAP_LOOP, 'Loop', { after: () => map.paint() }), tog(HM.MAP_INTERP, 'Interp'), tog(HM.MAP_FORMANT, 'Formant'), tog(HM.MAP_PHASE, 'Fase'));
+    const play = h('div', { class: 'hm-kgrid' }, knob(IP(HM_ISLOT.START, HM.MAP_START), 'Start', S), knob(IP(HM_ISLOT.END, HM.MAP_END), 'End', S), knob(HM.MAP_SPEED, 'Speed', S), knob(IP(HM_ISLOT.SHIFT, HM.MAP_SHIFT), vg ? 'Shift +' : 'Shift', S),
+      knob(HM.MAP_MIX, 'Mix', S), knob(IP(HM_ISLOT.LEVEL, HM.MAP_LEVEL), vg ? 'Level ×' : 'Level', S), knob(IP(HM_ISLOT.NOISE, HM.MAP_NOISE), vg ? 'Noise ×' : 'Noise', S), knob(HM.MAP_FDEV, 'Freq Dev', S));
+    const tg = h('div', { class: 'hm-tgrid' }, tog(IP(HM_ISLOT.LOOP, HM.MAP_LOOP), 'Loop', { after: () => map.paint() }), tog(HM.MAP_INTERP, 'Interp'), tog(HM.MAP_FORMANT, 'Formant'), tog(HM.MAP_PHASE, 'Fase'));
     const imgOpt = hm && hm.src === 'image' ? h('div', { class: 'hm-opts' }, optBtn('Peta', 'layout', [0, 1], ['Harm', 'Frek']), optBtn('Gamma', 'gamma', [1, 0.5, 2], ['1', '.5', '2']), optBtn('Rentang', 'rangeDb', [60, 40, 90], ['60', '40', '90']),
       optBtn('Durasi', 'seconds', [2, 1, 4, 8], ['2', '1', '4', '8 s']), optBtn('Stereo', 'stereo', [false, true], ['Mono', 'Warna'])) : null;
     const side = h('div', { class: 'hm-imgside' }, src, play, tg, imgOpt);

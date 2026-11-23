@@ -2,14 +2,15 @@
 // numbers): never renumber or reuse one, only add at free indices. HM_SCHEMA is the version written with presets / projects so a later
 // version can migrate them. Engine: native/engine/harmor.cpp (C++, web = its WebAssembly build); this file, the UI, the editors, the
 // image / audio analysis and the presets are JavaScript.
-export const HM_SCHEMA = 5;   // 5: resynthesis noise map (map N + Noise level); 2: pitch / filters / unison / LFOs / articulators; 3: Prism / Pluck / Blur / spectral phaser / effects rack; 4: partial map (image / resynthesis)
+export const HM_SCHEMA = 6;   // 6: images 1..7 (several vocals in one Harmor: a note's img picks one)
+export const HM_ISLOT = { A: 0, B: 1, N: 2, W: 3, START: 4, END: 5, LOOP: 6, LEVEL: 7, SHIFT: 8, NOISE: 9 };   // 5: resynthesis noise map (map N + Noise level); 2: pitch / filters / unison / LFOs / articulators; 3: Prism / Pluck / Blur / spectral phaser / effects rack; 4: partial map (image / resynthesis)
 export const HM = { VOL: 0, PARTIALS: 1, QUALITY: 2, POLY: 3, PITCH: 4, FINE: 5, GLIDE: 6, MONO: 7, LEGATO: 8, T_WAVE: 10, T_LEVEL: 11, T_PRND: 12, T_TABLE: 13, T: 10,
   MIX: 30, BLEND: 31, STRETCH: 32, SUB: 33, ATT: 40, DEC: 41, SUS: 42, REL: 43, VELS: 44, VIB_RATE: 45, VIB_DEPTH: 46, VIB_DELAY: 47,
   F: 50, F_STRIDE: 10, SELFOSC: 70, VEL_FLT: 71, U_VOICES: 75, U_DETUNE: 76, U_SPREAD: 77, U_PHASE: 78, U_PITCH: 79, U_VOLDIST: 80,
   L: 91, L_STRIDE: 6, ENV: 110, ENV_STRIDE: 60, ENV_PTS: 16,
   PRISM_AMT: 81, PRISM_MODE: 82, PLUCK_AMT: 83, PLUCK_TIME: 84, PLUCK_DAMP: 85, BLUR_ATT: 86, BLUR_REL: 87, BLUR_HARM: 88,
   SPH_DEPTH: 103, SPH_DENS: 104, SPH_SPEED: 105, SPH_SHARP: 106, SPH_OFS: 107, FX_ORDER: 712, FX: 720, FX_STRIDE: 48,
-  MAP_MIX: 1060, MAP_A: 1061, MAP_B: 1062, MAP_N: 1063, MAP_NOISE: 1064, MAP_W: 1065, MAP_END: 1066, MAP_SPEED: 1069, MAP_START: 1070, MAP_LOOP: 1071, MAP_INTERP: 1072, MAP_FORMANT: 1073, MAP_FDEV: 1074, MAP_LEVEL: 1075, MAP_SHIFT: 1076, MAP_PHASE: 1077 };
+  MAP_MIX: 1060, MAP_A: 1061, MAP_B: 1062, MAP_N: 1063, MAP_NOISE: 1064, MAP_W: 1065, MAP_END: 1066, MAP_SPEED: 1069, MAP_START: 1070, MAP_LOOP: 1071, MAP_INTERP: 1072, MAP_FORMANT: 1073, MAP_FDEV: 1074, MAP_LEVEL: 1075, MAP_SHIFT: 1076, MAP_PHASE: 1077, IMG: 1100, IMG_STRIDE: 10, IMGS: 8 };
 // the effects rack: Harmor runs these MobileDAW effects (DEVICES types) inside itself; effect k's parameter j is HM.FX + 48 k + 2 + j
 export const HM_FX = [['Distortion', 3], ['Chorus', 20], ['Phaser', 21], ['Delay', 17], ['Reverb', 7], ['Compressor', 4], ['EQ', 31]];
 // filter slots (HM.F + 10 f + k), LFO slots (HM.L + 6 l + k), articulator slots (HM.ENV + 60 e + k): see native/engine/harmor.h
@@ -99,6 +100,10 @@ export function harmorDef(DEVICES) {
   at(HM.MAP_LOOP, onoff('Map Loop', 1)); at(HM.MAP_INTERP, onoff('Map Interp', 1)); at(HM.MAP_FORMANT, onoff('Formant', 0));
   at(HM.MAP_FDEV, q('Freq Dev', 0, 1, 1, { unit: '%' })); at(HM.MAP_LEVEL, q('Map Level', 0, 4, 1, { unit: 'x' })); at(HM.MAP_SHIFT, q('Map Shift', -48, 48, 0, { unit: 'st' }));
   at(HM.MAP_PHASE, onoff('Map Phase', 1));
+  for (let g = 1; g < 8; g++) { const b0 = 1100 + 10 * (g - 1), nm = 'Img ' + (g + 1) + ' ';   // images 2..8 (image 1 = the map above)
+    for (const [o, n] of [[0, 'A'], [1, 'B'], [2, 'N'], [3, 'W']]) at(b0 + o, q(nm + 'Slot ' + n, -1, 255, -1, { step: 1, hidden: true }));
+    at(b0 + 4, q(nm + 'Start', 0, 1, 0, { unit: '%' })); at(b0 + 5, q(nm + 'End', 0, 1, 1, { unit: '%' })); at(b0 + 6, onoff(nm + 'Loop', 1));
+    at(b0 + 7, q(nm + 'Level', 0, 4, 1, { unit: 'x' })); at(b0 + 8, q(nm + 'Shift', -48, 48, 0, { unit: 'st' })); at(b0 + 9, q(nm + 'Noise', 0, 4, 1, { unit: 'x' })); }
   for (const e of [8, 9]) { const b = HM.ENV + HM.ENV_STRIDE * e; for (const k of [0, 1, 5, 6, 7, 8, 9]) delete P[b + k].hidden; }   // Image Freq / Image Gain articulators now live
   return { name: 'Harmor', view: 'kit', full: true, native: true, floatOnly: true, big: true, schema: HM_SCHEMA, params: P };   // its own plug-in window (js/harmor/view.js)
 }

@@ -2487,3 +2487,7 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .hm-edz .hm-imgside .hm-k > .hm-kl, .hm-edz .hm-imgside .hm-k > .hm-kv { font-size: 9px; }
 .hm-edz .hm-imgside .hm-report { padding: 2px 4px; }
 @media (orientation: portrait) { .hm-body { grid-template-rows: minmax(0, 30fr) minmax(0, 56fr) minmax(0, 14fr); } }
+/* Harmor IMG: the vocals of one Harmor (1..8); a loaded one is outlined, the selected one filled */
+.hm-vocals { flex-wrap: wrap; gap: 3px; }
+.hm-vocals .hm-chip { min-width: 30px; padding: 0 5px; }
+.hm-vocals .hm-chip.has:not(.on) { border-color: var(--hm-or); color: var(--hm-or); }

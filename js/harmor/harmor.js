@@ -7,7 +7,7 @@ import * as P from '../project.js';
 import { HM } from './schema.js';
 
 let worker = null, jobId = 0;
-const jobs = new Map(), slots = new Map();           // track id -> [slot A, slot B]
+const jobs = new Map(), slots = new Map();           // track id + image -> [slot A, slot B, slot N, slot W]
 function work(msg, transfer, onProgress) {
   if (!worker) {
     worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
@@ -19,15 +19,17 @@ function work(msg, transfer, onProgress) {
 const harmorTrack = (i) => { const t = P.state.tracks[i]; return t && t.inst && t.inst.type === 38 ? t : null; };
 
 // the map into the engine: the track's two slots (made once), then the parameters (not an undo step: the map is data, like a sample)
-async function install(i, t, out) {
-  let ids = slots.get(t.id);
-  if (!ids) { const a = P.allocSampleSlot(), b = P.allocSampleSlot(); if (a < 0 || b < 0) throw new Error('Slot sample penuh (256). Simpan proyek lalu buka ulang.'); ids = [a, b, -1, -1]; slots.set(t.id, ids); }
+// image g: 0 = the map parameters (MAP_A ...), 1..7 = HM.IMG + 10 (g - 1) + slot (A, B, N, W): several vocals in one Harmor, a note's img picks one
+export const imgParam = (g, o) => (g ? HM.IMG + HM.IMG_STRIDE * (g - 1) + o : [HM.MAP_A, HM.MAP_B, HM.MAP_N, HM.MAP_W][o]);
+async function install(i, t, out, g = 0) {
+  const sk = g ? t.id + '#' + g : t.id; let ids = slots.get(sk);
+  if (!ids) { const a = P.allocSampleSlot(), b = P.allocSampleSlot(); if (a < 0 || b < 0) throw new Error('Slot sample penuh (256). Simpan proyek lalu buka ulang.'); ids = [a, b, -1, -1]; slots.set(sk, ids); }
   for (const [q, has] of [[2, out.N], [3, out.W]]) if (has && !(ids[q] >= 0)) { ids[q] = P.allocSampleSlot(); if (ids[q] < 0) throw new Error('Slot sample penuh (256). Simpan proyek lalu buka ulang.'); }
   const r1 = await eng.putSampleBuffers(ids[0], out.A.l, out.A.r || out.A.l); if (!r1 || r1.error) throw new Error((r1 && r1.error) || 'Engine tidak bisa memuat peta.');
   if (out.B) { const r2 = await eng.putSampleBuffers(ids[1], out.B.l, out.B.r || out.B.l); if (!r2 || r2.error) throw new Error((r2 && r2.error) || 'Engine tidak bisa memuat peta.'); }
   const j = P.state.tracks.indexOf(t); if (j < 0) return;
   for (const [q, x] of [[2, out.N], [3, out.W]]) if (x) { const r3 = await eng.putSampleBuffers(ids[q], x.l, x.r || x.l); if (!r3 || r3.error) throw new Error((r3 && r3.error) || 'Engine tidak bisa memuat peta.'); }
-  P.setInstParamQuiet(j, HM.MAP_A, ids[0]); P.setInstParamQuiet(j, HM.MAP_B, out.B ? ids[1] : -1); P.setInstParamQuiet(j, HM.MAP_N, out.N ? ids[2] : -1); P.setInstParamQuiet(j, HM.MAP_W, out.W ? ids[3] : -1);
+  P.setInstParamQuiet(j, imgParam(g, 0), ids[0]); P.setInstParamQuiet(j, imgParam(g, 1), out.B ? ids[1] : -1); P.setInstParamQuiet(j, imgParam(g, 2), out.N ? ids[2] : -1); P.setInstParamQuiet(j, imgParam(g, 3), out.W ? ids[3] : -1);
   if (!(t.inst.params[HM.MAP_MIX] > 0)) P.setInstParamQuiet(j, HM.MAP_MIX, 1);
 }
 const cacheKey = (kind, path, extra) => 'hm' + kind + '|' + path + '|' + (eng.fileSize ? eng.fileSize(path) : 0) + '|' + JSON.stringify(extra) + '|v4';   // v3: harmonic + noise resynthesis, residual waveform; v4: pitch search down to 27 Hz (sub bass)
@@ -38,9 +40,11 @@ async function fromCache(key) {
 }
 function toCache(key, out) { P.cachePut(key + '|A', out.A.l, out.A.r || out.A.l); if (out.B) P.cachePut(key + '|B', out.B.l, out.B.r || out.B.l); if (out.N) P.cachePut(key + '|N', out.N.l, out.N.r || out.N.l); if (out.W) P.cachePut(key + '|W', out.W.l, out.W.r || out.W.l); }
 
-// Resynthesis: an audio file of the library (WAV / MP3 / FLAC / OGG ...) -> the map. opts: { quality: 0 Draft, 1 Normal, 2 High }
+// Resynthesis: an audio file of the library (WAV / MP3 / FLAC / OGG ...) -> the map. opts: { quality: 0 Draft, 1 Normal, 2 High,
+// image: 0..7 (0 = the main map; 1..7 = more vocals in the same Harmor, played by the notes whose img is that number) }
 export async function harmorLoadAudio(i, path, opts = {}, onProgress) {
   const t = harmorTrack(i); if (!t) return { error: 'Pilih track Harmor dulu.' };
+  const g = Math.max(0, Math.min(7, opts.image | 0));
   const quality = Math.max(0, Math.min(2, opts.quality ?? 1)), key = cacheKey('res', path, { quality });
   let out = await fromCache(key), report = null;
   if (!out) {
@@ -50,7 +54,8 @@ export async function harmorLoadAudio(i, path, opts = {}, onProgress) {
     const ok = await work({ kind: 'resynth', l, r, sr, quality }, [l.buffer, ...(r ? [r.buffer] : [])], onProgress);
     out = ok; report = ok.report; toCache(key, out);
   }
-  await install(i, t, out);
+  await install(i, t, out, g);
+  if (g) { t.inst.hmI = t.inst.hmI || {}; t.inst.hmI[g] = { src: 'audio', path, opts: { quality }, ...(report ? { report } : {}) }; P.emit('devices'); return { ok: true, report }; }
   // the resynthesis plays at the file's own level: the map is in sine amplitudes, Harmor's output stage is 0.25 x Volume (headroom for
   // chords), so Map Level 4x = the file's level at Volume 100 % (-3 dB at the default 70 %). Only while the level was never set.
   { const j = P.state.tracks.indexOf(t); if (j >= 0 && t.inst.params[HM.MAP_LEVEL] == null) P.setInstParamQuiet(j, HM.MAP_LEVEL, 4); }
@@ -79,17 +84,21 @@ export async function harmorLoadImage(i, path, opts = {}) {
   P.emit('devices');
   return { ok: true };
 }
-export function harmorClearMap(i) {
+export function harmorClearMap(i, g = 0) {
   const t = harmorTrack(i); if (!t) return;
+  if (g) { for (let o = 0; o < 4; o++) P.setInstParamQuiet(i, imgParam(g, o), -1); if (t.inst.hmI) delete t.inst.hmI[g]; P.emit('devices'); return; }
   P.setInstParamQuiet(i, HM.MAP_A, -1); P.setInstParamQuiet(i, HM.MAP_B, -1); P.setInstParamQuiet(i, HM.MAP_N, -1); P.setInstParamQuiet(i, HM.MAP_W, -1); delete t.inst.hm; P.emit('devices');
 }
 // a project opening: the map of a Harmor track is made again (or read from the cache)
 export async function restoreHarmorMap(t) {
   await restoreHarmorTables(t);
-  const i = P.state.tracks.indexOf(t); if (i < 0 || !t.inst || !t.inst.hm) return { ok: true };
-  const h = t.inst.hm;
-  try { return h.src === 'image' ? await harmorLoadImage(i, h.path, h.opts || {}) : await harmorLoadAudio(i, h.path, h.opts || {}); }
-  catch (e) { return { error: (e && e.message) || String(e) }; }
+  const i = P.state.tracks.indexOf(t); if (i < 0 || !t.inst) return { ok: true };
+  try {
+    let r = { ok: true }; const h = t.inst.hm;
+    if (h) r = h.src === 'image' ? await harmorLoadImage(i, h.path, h.opts || {}) : await harmorLoadAudio(i, h.path, h.opts || {});
+    for (const [g, x] of Object.entries(t.inst.hmI || {})) if (x && x.path) { const r2 = await harmorLoadAudio(P.state.tracks.indexOf(t), x.path, { ...(x.opts || {}), image: +g }); if (r2.error) r = r2; }   // the other vocals
+    return r;
+  } catch (e) { return { error: (e && e.message) || String(e) }; }
 }
 
 // ---- drawn harmonic tables (the HARM editor): level and phase (0..1 of a cycle) of partials 1..516 of timbre tt, into a sample-bank slot

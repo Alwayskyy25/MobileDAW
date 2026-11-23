@@ -9,7 +9,7 @@
 
 namespace mdaw {
 
-constexpr int HM_PARAMS = 1100;
+constexpr int HM_PARAMS = 1200;
 constexpr int HM_MAXP = 516;          // partials per voice
 constexpr int HM_POLY = 16;           // voices
 constexpr int HM_UNI = 8;             // unison copies per voice
@@ -48,6 +48,11 @@ constexpr int HM_FX_NP[HM_FX_N] = { 6, 13, 15, 20, 8, 12, 42 };      // their pa
 // describes itself: the first 16 values of the slot's left channel are a header (HM_MAP_MAGIC, frames, bins, hop s, layout,
 // base MIDI note, lowest Hz, highest Hz), the data follows (frame-major). Slot A: left / right amplitude; slot B: deviation / phase.
 constexpr int HM_MAP_MIX = 1060, HM_MAP_A = 1061, HM_MAP_B = 1062, HM_MAP_N = 1063, HM_MAP_NOISE = 1064, HM_MAP_W = 1065, HM_MAP_END = 1066, HM_MAP_SPEED = 1069, HM_MAP_START = 1070, HM_MAP_LOOP = 1071, HM_MAP_INTERP = 1072;
+// more images (several vocals in one Harmor, one pattern): image 0 = the map parameters above; images 1..7 at HM_IMG + 10 (k - 1): slots
+// A / B / N / W, Start, End, Loop, Level (x the map's), Shift (semitones, + the map's). A note picks its image (note field img -> the
+// note event's 6th value -> noteOnSt); an image without a map plays image 0
+constexpr int HM_IMG = 1100, HM_IMG_STRIDE = 10, HM_IMGS = 8;
+enum { HM_I_A = 0, HM_I_B = 1, HM_I_N = 2, HM_I_W = 3, HM_I_START = 4, HM_I_END = 5, HM_I_LOOP = 6, HM_I_LEVEL = 7, HM_I_SHIFT = 8, HM_I_NOISE = 9 };   // Noise: x the map's
 constexpr int HM_MAP_FORMANT = 1073, HM_MAP_FDEV = 1074, HM_MAP_LEVEL = 1075, HM_MAP_SHIFT = 1076, HM_MAP_PHASE = 1077;
 constexpr int HM_MAP_HDR = 16; constexpr double HM_MAP_MAGIC = 4096.5;
 enum { HM_MAP_HARM = 0, HM_MAP_LOGF = 1, HM_MAP_NOISEB = 2, HM_MAP_WAVE = 3 };

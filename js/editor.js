@@ -273,11 +273,14 @@ function ccPaint(c, x, y) {
   ccLast = { t, v: val };
   return true;
 }
+// Harmor: a note's image (img 0..7 = vocal 1..8 of the Harmor: several vocals in one pattern)
+const isHarmor = () => { const t = P.state.tracks[P.state.sel.track]; return !!(t && t.inst && t.inst.type === 38); };
 function laneChooser(x, y) {
   const c = cur().clip, has = (k, n) => (c.cc || []).some((l) => l.k === k && l.n === n && l.pts.length);
   menu([
     { label: 'Velocity', check: cfg.lane === 'vel', fn: () => { cfg.lane = 'vel'; invalidate(); } },
     { label: 'Pan (per not)', check: cfg.lane === 'pan', fn: () => { cfg.lane = 'pan'; invalidate(); } },
+    ...(isHarmor() ? [{ label: 'Vokal / citra (Harmor, per not)', check: cfg.lane === 'img', fn: () => { cfg.lane = 'img'; invalidate(); } }] : []),
     { sep: true },
     ...CC_LIST.map(([k, n, label]) => ({ label: label + (has(k, n) ? ' •' : ''), check: cfg.lane === 'cc' && cfg.cc.k === k && cfg.cc.n === n, fn: () => { cfg.cc = { k, n }; cfg.lane = 'cc'; invalidate(); } })),
     { label: 'Nomor CC lain…', fn: () => ask('Nomor CC (0-127)', cfg.cc.k === 'cc' ? cfg.cc.n : 74, (v) => { if (Number.isFinite(v) && v >= 0 && v <= 127) { cfg.cc = { k: 'cc', n: Math.round(v) }; cfg.lane = 'cc'; invalidate(); } }, 'number') },
@@ -305,15 +308,16 @@ function drawVel(t, c, gb) {
   ctx.fillStyle = C('#5a5a60'); ctx.fillRect(Math.round(KEYS + (W - KEYS) / 2 - 14), gb + 3, 28, 2);                    // grip mark on the split line
   // lane header: lane name with a chooser arrow, the value of the selected note under it
   ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(0, gb + 2, KEYS - 1, VEL - 2); ctx.fillStyle = C('#141415'); ctx.fillRect(KEYS - 1, gb + 2, 1, VEL - 2);
-  const nm = cfg.lane === 'vel' ? 'Vel' : cfg.lane === 'pan' ? 'Pan' : ccName();
+  if (cfg.lane === 'img' && !isHarmor()) cfg.lane = 'vel';
+  const nm = cfg.lane === 'vel' ? 'Vel' : cfg.lane === 'pan' ? 'Pan' : cfg.lane === 'img' ? 'Vokal' : ccName();
   ctx.fillStyle = C('#d0d0d4'); ctx.font = FONT(700, 10); ctx.textBaseline = 'middle'; ctx.fillText(nm, 5, gb + 13, KEYS - 16);
   ctx.fillStyle = C('#8b8b92'); ctx.beginPath(); ctx.moveTo(KEYS - 12, gb + 11); ctx.lineTo(KEYS - 5, gb + 11); ctx.lineTo(KEYS - 8.5, gb + 15); ctx.closePath(); ctx.fill();
   const lead = sel.size ? [...sel][0] : null;
-  if (lead && cfg.lane !== 'cc' && VEL >= 44) { ctx.fillStyle = T('--lv-orink'); ctx.font = FONT(700, 11); ctx.fillText(cfg.lane === 'pan' ? (Math.abs(pan0(lead)) < 0.02 ? 'C' : Math.round(Math.abs(pan0(lead)) * 50) + (pan0(lead) < 0 ? 'L' : 'R')) : String(Math.round(lead.v * 127)), 5, gb + 30, KEYS - 8); }
+  if (lead && cfg.lane !== 'cc' && VEL >= 44) { ctx.fillStyle = T('--lv-orink'); ctx.font = FONT(700, 11); ctx.fillText(cfg.lane === 'pan' ? (Math.abs(pan0(lead)) < 0.02 ? 'C' : Math.round(Math.abs(pan0(lead)) * 50) + (pan0(lead) < 0 ? 'L' : 'R')) : cfg.lane === 'img' ? String((lead.img || 0) + 1) : String(Math.round(lead.v * 127)), 5, gb + 30, KEYS - 8); }
   if (cfg.lane === 'cc') { drawCC(t, c, gb); return; }
   ctx.save(); ctx.beginPath(); ctx.rect(KEYS, gb + 2, W - KEYS, VEL - 2); ctx.clip();
-  const isPan = cfg.lane === 'pan', top = laneTop(), hh = laneH(), cy = top + hh / 2, bottom = top + hh;
-  for (const q of isPan ? [0.5] : [0, 0.25, 0.5, 0.75]) { ctx.fillStyle = q === 0.5 && isPan ? C('#3a3a3f') : C('#2b2b2e'); ctx.fillRect(KEYS, Math.round(top + q * hh), W - KEYS, 1); }
+  const isPan = cfg.lane === 'pan', isImg = cfg.lane === 'img', top = laneTop(), hh = laneH(), cy = top + hh / 2, bottom = top + hh;
+  for (const q of isPan ? [0.5] : isImg ? [0, 1 / 7, 2 / 7, 3 / 7, 4 / 7, 5 / 7, 6 / 7] : [0, 0.25, 0.5, 0.75]) { ctx.fillStyle = q === 0.5 && isPan ? C('#3a3a3f') : C('#2b2b2e'); ctx.fillRect(KEYS, Math.round(top + q * hh), W - KEYS, 1); }
   ctx.fillStyle = C('#3a3a3f'); ctx.fillRect(KEYS, Math.round(bottom), W - KEYS, 1);
   ctx.fillStyle = 'rgba(0,0,0,.22)'; const ce = px(contentEnd(c)); if (ce < W) ctx.fillRect(Math.max(KEYS, ce), gb + 2, W - ce, VEL - 2);
   for (const pass of [0, 1]) {                                   // selected notes drawn last, on top
@@ -321,10 +325,11 @@ function drawVel(t, c, gb) {
       const s = sel.has(n); if ((pass === 1) !== s) continue;
       const x = Math.round(px(n.t)) + 0.5; if (x < KEYS - 4 || x > W + 4) continue;
       const vv = Math.min(1, n.v), col = s ? C('#ffffff') : velCol(t.color, isPan ? 1 : vv, false);   // an imported FLM boost (velocity above 1) sits at the top
-      const y = isPan ? cy + pan0(n) * hh / 2 : top + (1 - vv) * hh, from = isPan ? cy : bottom;
+      const y = isPan ? cy + pan0(n) * hh / 2 : isImg ? top + (1 - (n.img || 0) / 7) * hh : top + (1 - vv) * hh, from = isPan ? cy : bottom;
       ctx.fillStyle = col; ctx.fillRect(x - 0.75, Math.min(from, y), 1.5, Math.max(1, Math.abs(from - y)));          // stem
       ctx.beginPath(); ctx.arc(x, y, s ? 3.6 : 3, 0, 6.2832); ctx.fill();                                              // head
       if (!s) { ctx.strokeStyle = shadeC(t.color, 0.6); ctx.lineWidth = 1; ctx.stroke(); }
+      if (isImg) { ctx.fillStyle = C('#e8e8ec'); ctx.font = FONT(700, 9); ctx.textBaseline = 'bottom'; ctx.fillText(String((n.img || 0) + 1), x + 4, y - 1); }   // the vocal's number
     }
   }
   ctx.restore();
@@ -631,8 +636,8 @@ function laneSet(c, x, y) {
   let d0 = 14;
   for (const n of c.notes) { const d = Math.abs(px(n.t) - x); if (d < d0) d0 = d; }
   if (d0 >= 14) return false;
-  const top = laneTop(), hh = laneH(), val = cfg.lane === 'pan' ? clamp((y - top - hh / 2) / (hh / 2), -1, 1) : clamp(1 - (y - top) / hh, 0.02, 1);
-  for (const n of c.notes) if (Math.abs(px(n.t) - x) <= d0 + 2) { if (cfg.lane === 'pan') n.pan = Math.abs(val) < 0.06 ? 0 : val; else n.v = val; }
+  const top = laneTop(), hh = laneH(), val = cfg.lane === 'pan' ? clamp((y - top - hh / 2) / (hh / 2), -1, 1) : cfg.lane === 'img' ? clamp(Math.round((1 - (y - top) / hh) * 7), 0, 7) : clamp(1 - (y - top) / hh, 0.02, 1);
+  for (const n of c.notes) if (Math.abs(px(n.t) - x) <= d0 + 2) { if (cfg.lane === 'pan') n.pan = Math.abs(val) < 0.06 ? 0 : val; else if (cfg.lane === 'img') { if (val) n.img = val; else delete n.img; } else n.v = val; }
   return true;
 }
 
