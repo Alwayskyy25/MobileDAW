@@ -55,11 +55,11 @@ export async function harmorLoadAudio(i, path, opts = {}, onProgress) {
     out = ok; report = ok.report; toCache(key, out);
   }
   await install(i, t, out, g);
-  if (g) { t.inst.hmI = t.inst.hmI || {}; t.inst.hmI[g] = { src: 'audio', path, opts: { quality }, ...(report ? { report } : {}) }; P.emit('devices'); return { ok: true, report }; }
+  if (g) { t.inst.hmI = t.inst.hmI || {}; const old = t.inst.hmI[g]; t.inst.hmI[g] = { src: 'audio', path, opts: { quality }, ...(report ? { report } : {}), ...(old && old.name && old.path === path ? { name: old.name } : {}) }; P.emit('devices'); return { ok: true, report }; }
   // the resynthesis plays at the file's own level: the map is in sine amplitudes, Harmor's output stage is 0.25 x Volume (headroom for
   // chords), so Map Level 4x = the file's level at Volume 100 % (-3 dB at the default 70 %). Only while the level was never set.
   { const j = P.state.tracks.indexOf(t); if (j >= 0 && t.inst.params[HM.MAP_LEVEL] == null) P.setInstParamQuiet(j, HM.MAP_LEVEL, 4); }
-  t.inst.hm = { src: 'audio', path, opts: { quality }, ...(report ? { report } : t.inst.hm && t.inst.hm.path === path && t.inst.hm.report ? { report: t.inst.hm.report } : {}) };
+  t.inst.hm = { src: 'audio', path, opts: { quality }, ...(t.inst.hm && t.inst.hm.name && t.inst.hm.path === path ? { name: t.inst.hm.name } : {}), ...(report ? { report } : t.inst.hm && t.inst.hm.path === path && t.inst.hm.report ? { report: t.inst.hm.report } : {}) };
   P.emit('devices');
   return { ok: true, report: t.inst.hm.report || null };
 }

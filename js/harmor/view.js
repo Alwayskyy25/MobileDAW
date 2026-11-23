@@ -5,7 +5,7 @@
 // same values the engine uses (js/harmor/schema.js) or from the engine itself (devOut 998: meter + the newest voice's partials).
 // Touch first: drag a knob up / down, double tap = default, long press = automation; editors: drag to draw / move, pinch to zoom, two
 // fingers to pan, tap to add, double tap to delete. MobileDAW's own drawing: no Image-Line or Ableton artwork.
-import { h, menu, toast } from '../ui.js';
+import { h, menu, toast, ask } from '../ui.js';
 import { fmtParam, normOf, valOf, noteName, DEVICES } from '../defs.js';
 import * as P from '../project.js';
 import { eng } from '../engine.js';
@@ -365,9 +365,10 @@ export function harmorView(k) {
     const info = h('div', { class: 'hm-report' }, rp ? (rp.pitched ? `${noteName(Math.round(rp.note))} ${rp.hz.toFixed(1)} Hz • ${rp.partials} partial • ${Math.round(rp.voiced * 100)} % bernada` : `Tanpa nada: ${rp.why}`) : hm && hm.src === 'image' ? 'Peta dari gambar' : 'Vokal / instrumen bernada tunggal paling akurat');
     // the vocals of this Harmor: 1..8 (a dot = loaded); the selected one is shown and edited here
     const vocals = h('div', { class: 'hm-chips hm-vocals' }, h('span', { class: 'hm-lab' }, 'Vokal'), ...Array.from({ length: 8 }, (_, q) => { const x = hmAll(q);
-      return h('button', { class: 'hm-chip' + (q === vg ? ' on' : '') + (x ? ' has' : ''), title: x ? x.path.split('/').pop() : 'kosong', onclick: () => { st.img = q; show(); } }, String(q + 1) + (x ? ' •' : '')); }));
+      return h('button', { class: 'hm-chip' + (q === vg ? ' on' : '') + (x ? ' has' : ''), title: x ? (x.name || x.path.split('/').pop()) : 'kosong', onclick: () => { st.img = q; show(); } }, String(q + 1) + (x ? ' ' + (x.name || '•') : '')); }));
     const src = h('div', { class: 'hm-imgsrc' }, vocals,
-      row(h('button', { class: 'hm-btn prim', onclick: loadAudio }, 'Audio…'), h('button', { class: 'hm-btn', onclick: loadImage }, 'Gambar…'), h('button', { class: 'hm-btn', onclick: async () => { (await H()).harmorClearMap(i(), vg); show(); } }, 'Hapus')),
+      row(h('button', { class: 'hm-btn prim', onclick: loadAudio }, 'Audio…'), h('button', { class: 'hm-btn', onclick: loadImage }, 'Gambar…'), h('button', { class: 'hm-btn', onclick: async () => { (await H()).harmorClearMap(i(), vg); show(); } }, 'Hapus'),
+        h('button', { class: 'hm-btn', title: 'Nama vokal ini (tampil di not piano roll)', onclick: () => { if (!hm) { toast('Muat audio dulu.'); return; } ask('Nama Vokal ' + (vg + 1), hm.name || hm.path.split('/').pop().replace(/\.[^.]+$/, ''), (v) => { const nm = String(v || '').trim().slice(0, 24); if (nm) hm.name = nm; else delete hm.name; P.emit('devices'); show(); }); } }, 'Nama')),
       h('div', { class: 'hm-chips' }, h('span', { class: 'hm-lab' }, 'Kualitas'), ...HM_QUALITY.map((n, q) => h('button', { class: 'hm-chip' + ((st.resQ ?? 1) === q ? ' on' : ''), onclick: () => { st.resQ = q; show(); } }, n))), info);
     const S = { size: 'sm' };
     const play = h('div', { class: 'hm-kgrid' }, knob(IP(HM_ISLOT.START, HM.MAP_START), 'Start', S), knob(IP(HM_ISLOT.END, HM.MAP_END), 'End', S), knob(HM.MAP_SPEED, 'Speed', S), knob(IP(HM_ISLOT.SHIFT, HM.MAP_SHIFT), vg ? 'Shift +' : 'Shift', S),

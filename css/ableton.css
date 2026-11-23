@@ -2491,3 +2491,9 @@ html.reduce-motion .lk-tabpg, html.reduce-motion .flm-pg > *, html.reduce-motion
 .hm-vocals { flex-wrap: wrap; gap: 3px; }
 .hm-vocals .hm-chip { min-width: 30px; padding: 0 5px; }
 .hm-vocals .hm-chip.has:not(.on) { border-color: var(--hm-or); color: var(--hm-or); }
+/* piano roll: the vocals of a Harmor (one colour each; tap = the selected notes play it, new notes use it) */
+.ed-voc { gap: 3px; align-items: center; }
+.ed-vocb { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+.ed-vocdot { width: 10px; height: 10px; border-radius: 2px; background: var(--voc); flex: none; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+.ed-vocb.on { background: var(--voc) !important; color: #141414 !important; }
+.ed-vocb.on .ed-vocdot { box-shadow: 0 0 0 1px #141414; }

@@ -196,17 +196,17 @@ function drawRoll(t, c) {
       ctx.fillRect(x, y + 2, w - 1, v.keyH - 3); ctx.strokeRect(x + 0.5, y + 2.5, w - 2, v.keyH - 4);
     }
   }
-  const nInk = ink(t.color) === '#141414' ? 'rgba(14,14,18,.82)' : 'rgba(255,255,255,.9)';
+  const nInk = ink(t.color) === '#141414' ? 'rgba(14,14,18,.82)' : 'rgba(255,255,255,.9)', mv = multiVoc(t);
   ctx.font = FONT(600, 9); ctx.textBaseline = 'middle';
   for (const n of c.notes) {
     const x = px(n.t), w = Math.max(3, n.d * v.ppt), y = py(n.p) - v.keyH;
     if (x + w < KEYS || x > W || y > gb || y + v.keyH < RULER) continue;
-    const s = sel.has(n);
-    ctx.fillStyle = velCol(t.color, n.v, s); ctx.fillRect(x, y + 1, w - 1, v.keyH - 1);
-    ctx.strokeStyle = s ? C('#ffffff') : shadeC(t.color, 0.6); ctx.lineWidth = s ? 1.5 : 1; ctx.strokeRect(x + 0.5, y + 1.5, w - 2, v.keyH - 2);   // flat note, hairline outline (Live: no bevel)
+    const s = sel.has(n), nc = noteHex(t, n);
+    ctx.fillStyle = velCol(nc, n.v, s); ctx.fillRect(x, y + 1, w - 1, v.keyH - 1);
+    ctx.strokeStyle = s ? C('#ffffff') : shadeC(nc, 0.6); ctx.lineWidth = s ? 1.5 : 1; ctx.strokeRect(x + 0.5, y + 1.5, w - 2, v.keyH - 2);   // flat note, hairline outline (Live: no bevel)
     if (w > 16 && (s || w > 30)) { ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x + w - 5, y + 4, 2, Math.max(2, v.keyH - 7)); }   // right edge: resize grip, kept for touch
     if (n.sl) { ctx.strokeStyle = nInk; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x + 2, y + v.keyH - 1); ctx.lineTo(x + Math.min(w - 3, v.keyH * 1.6), y + 3); ctx.stroke(); }   // slide note: a rising stroke (glide)
-    if (w > 34 && v.keyH >= 13) { ctx.fillStyle = nInk; ctx.fillText((n.sl ? '\u2197 ' : '') + pName(n.p), x + 4 + (n.sl ? 4 : 0), y + v.keyH / 2 + 1, w - 9); }
+    if (w > 34 && v.keyH >= 13) { ctx.fillStyle = mv ? 'rgba(14,14,18,.85)' : nInk; ctx.fillText((n.sl ? '\u2197 ' : '') + (mv ? vocName(t, n.img || 0) + ' \u00b7 ' : '') + pName(n.p), x + 4 + (n.sl ? 4 : 0), y + v.keyH / 2 + 1, w - 9); }
   }
   if (drag && drag.k === 'rect' && drag.pending) { ctx.strokeStyle = 'rgba(170,210,240,.9)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(drag.x0, drag.y0, 14, 0, 7); ctx.stroke(); }   // long press recognised: the rubber band starts here
   if (drag && drag.k === 'rect' && !drag.pending) { ctx.fillStyle = 'rgba(120,182,230,.14)'; ctx.strokeStyle = 'rgba(170,210,240,.9)'; ctx.lineWidth = 1; ctx.fillRect(drag.x, drag.y, drag.w, drag.h); ctx.strokeRect(drag.x + 0.5, drag.y + 0.5, drag.w, drag.h); }
@@ -275,6 +275,18 @@ function ccPaint(c, x, y) {
 }
 // Harmor: a note's image (img 0..7 = vocal 1..8 of the Harmor: several vocals in one pattern)
 const isHarmor = () => { const t = P.state.tracks[P.state.sel.track]; return !!(t && t.inst && t.inst.type === 38); };
+// a Harmor with more than one vocal: each vocal its own note colour and name, so imut / body notes read apart in one pattern
+const VOC = ['#2ec5d9', '#ff9f1c', '#ff5fa8', '#a07cff', '#5bd46c', '#ff6145', '#f0d84a', '#5b9dff'];
+const vocSrc = (t, g) => (g ? (t.inst.hmI || {})[g] : t.inst.hm) || null;
+const vocals = (t) => { if (!t || !t.inst || t.inst.type !== 38) return []; const out = []; for (let g = 0; g < 8; g++) if (vocSrc(t, g)) out.push(g); return out; };
+const multiVoc = (t) => vocals(t).length > 1;
+function vocName(t, g) {                        // file name (without extension), + the vocal's Start when several vocals share one file
+  const x = vocSrc(t, g); if (!x) return 'Vokal ' + (g + 1); if (x.name) return x.name;
+  const base = x.path.split('/').pop().replace(/\.[^.]+$/, ''), same = vocals(t).filter((q) => vocSrc(t, q).path === x.path);
+  if (same.length < 2) return base;
+  const st = t.inst.params[g ? 1100 + 10 * (g - 1) + 4 : 1070] || 0; return base + ' ' + Math.round(st * 100) + '%';
+}
+const noteHex = (t, n) => (multiVoc(t) ? VOC[(n.img || 0) & 7] : t.color);
 function laneChooser(x, y) {
   const c = cur().clip, has = (k, n) => (c.cc || []).some((l) => l.k === k && l.n === n && l.pts.length);
   menu([
@@ -324,7 +336,7 @@ function drawVel(t, c, gb) {
     for (const n of c.notes) {
       const s = sel.has(n); if ((pass === 1) !== s) continue;
       const x = Math.round(px(n.t)) + 0.5; if (x < KEYS - 4 || x > W + 4) continue;
-      const vv = Math.min(1, n.v), col = s ? C('#ffffff') : velCol(t.color, isPan ? 1 : vv, false);   // an imported FLM boost (velocity above 1) sits at the top
+      const vv = Math.min(1, n.v), col = s ? C('#ffffff') : velCol(noteHex(t, n), isPan ? 1 : vv, false);   // an imported FLM boost (velocity above 1) sits at the top
       const y = isPan ? cy + pan0(n) * hh / 2 : isImg ? top + (1 - (n.img || 0) / 7) * hh : top + (1 - vv) * hh, from = isPan ? cy : bottom;
       ctx.fillStyle = col; ctx.fillRect(x - 0.75, Math.min(from, y), 1.5, Math.max(1, Math.abs(from - y)));          // stem
       ctx.beginPath(); ctx.arc(x, y, s ? 3.6 : 3, 0, 6.2832); ctx.fill();                                              // head
@@ -653,7 +665,7 @@ function rollHandlers() {
         sel.clear();
         let p = clamp(t.p, 0, 127); if (cfg.lock) p = toScale(p);
         const at = clamp(floorT(t.t), 0, maxEnd() - cfg.lastLen);
-        checkpoint(); const n = { t: at, d: cfg.lastLen, p, v: prefs.defVel ?? 0.8 }; c.notes.push(n); sel.add(n); notePreview(p); grew(c, at + n.d); changed();
+        checkpoint(); const n = { t: at, d: cfg.lastLen, p, v: prefs.defVel ?? 0.8, ...(isHarmor() && cfg.vok ? { img: cfg.vok } : {}) }; c.notes.push(n); sel.add(n); notePreview(p); grew(c, at + n.d); changed();
       } else if (t.type === 'lanehead') { const r = canvas.getBoundingClientRect(); laneChooser(r.left + x, r.top + y); }
       else if (t.type === 'lane') { checkpoint(); if (laneSet(c, x, y)) changed(); ccLast = null; }
       else if (t.type === 'rsel') { if (tsel) timeMenu(x); }
@@ -1244,6 +1256,13 @@ function toolbar() {
     B('Pilih semua', () => { sel = new Set(c.clip.notes); invalidate(); if (sel.size) noteBar(null, 80, RULER + 60); }), SEP(),
     B('Lane', () => { cfg.vel = !cfg.vel; clampV(cur().clip); invalidate(); toolbar(); }, cfg.vel),
   );
+  // Harmor with several vocals: one coloured button per vocal. Tap = the selected notes play that vocal, and new notes are drawn with it
+  if (multiVoc(t)) { const cv = cfg.vok || 0;
+    tools.append(SEP(), h('div', { class: 'ed-g ed-voc' }, ...vocals(t).map((g) => {
+      const b = h('button', { class: 'b ed-vocb' + (g === cv ? ' on' : ''), title: sel.size ? 'Jadikan ' + sel.size + ' not terpilih vokal ini' : 'Not baru memakai vokal ini', onclick: () => {
+        cfg.vok = g; if (sel.size) { checkpoint(); for (const n of sel) { if (g) n.img = g; else delete n.img; } changed(); toast(sel.size + ' not \u2192 ' + vocName(t, g), 1300); } toolbar(); invalidate(); } }, h('i', { class: 'ed-vocdot' }), vocName(t, g));
+      b.style.setProperty('--voc', VOC[g]); return b; })));
+  }
   // Live 12's velocity tools (refs/live12/010): Randomize and Ramp, on the selected notes (all notes when none is selected)
   if (cfg.vel && cfg.lane === 'vel') tools.append(SEP(), h('div', { class: 'ed-g' },
     B('Randomize', () => velTool('rand')), B('Ramp', () => velTool('ramp'))));
