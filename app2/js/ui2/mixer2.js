@@ -1,14 +1,13 @@
-// MobileDAW 2's mixer: one strip per track, then the returns and the master, each with its name in the track colour, a tall fader with a
-// round thumb, its level meter, a pan ring, Mute / Solo / Rekam, and the track's kind at the bottom (tap = select, the strip lights up).
-// "Lengkap" opens the full mixer (sends, routing, width, phase): nothing of 1.0's mixer is lost, it is one tap away.
-import { h, clamp } from '../ui.js';
+// MobileDAW 2's mixer, its only mixer view: one strip per track, then the master, each with its name in the track colour, a tall fader with
+// a round thumb, its level meter, a pan ring, Mute / Solo / Rekam, and the track's kind at the bottom (tap = select, the strip lights up).
+import { h, clamp, menu, modal, knob } from '../ui.js';
 import * as P from '../project.js';
 import { MASTER, RET0 } from '../engine.js';
 import { checkpoint } from '../history.js';
 import { gestureTiming } from '../gesture.js';
 const { state } = P;
 const VMAX = 1.4, meterFrac = (lv) => clamp((20 * Math.log10(Math.max(lv, 1e-4)) + 60) / 66, 0, 1);
-let root = null, list = null, strips = [], sig = '', onFull = null;
+let root = null, list = null, strips = [], sig = '';
 
 const ICON = {
   midi: '<path d="M4 5h16v14H4zM8 5v14M12 5v14M16 5v14"/><path d="M6.6 5v7.5M10.6 5v7.5M14.6 5v7.5M18.2 5v7.5" stroke-width="2.4"/>',
@@ -53,9 +52,21 @@ function strip(i) {
   solo.onclick = () => { P.toggleSolo(i); paint(s); };
   rec.onclick = () => { P.toggleArm(i); paint(s); };
   kindB.onclick = () => { P.selectTrack(i); };
-  name.onclick = () => { P.selectTrack(i); };
+  name.onclick = () => { P.selectTrack(i); if (isT) routeMenu(i, name.getBoundingClientRect()); };
   const s = { i, el, name, fad, met, db, pan, on, solo, rec, kindB, lv: [0, 0] };
   paint(s); return s;
+}
+// a track's routing (the name's menu): where it goes (Master or an FX track) and its two sends
+const SEND = { n: 'Send', min: 0, max: 1, def: 0, unit: '%' };
+const pct = (p, v) => Math.round(v * 100) + ' %';
+function routeMenu(i, r) {
+  const t = state.tracks[i]; if (!t) return;
+  menu([{ label: 'KELUAR KE', dim: true }, { label: 'Master', check: !(t.out >= 0), fn: () => P.setOut(i, -1) },
+    ...state.returns.map((rt, k) => ({ label: rt.name, check: t.out === k, fn: () => P.setOut(i, k) })),
+    { sep: true }, { label: 'Send A / Send B\u2026', dim: !state.returns.length, fn: () => {
+      const ks = state.returns.slice(0, 2).map((rt, k) => knob({ ...SEND, n: 'Send ' + 'AB'[k] }, () => (t.send || [0, 0])[k] || 0, (v) => P.setSend(i, k, v), pct));
+      modal('Send \u2022 ' + t.name, h('div', { class: 'knobs' }, ...ks), [{ label: 'Tutup', go: true }]);
+    } }], r.left, r.bottom + 4);
 }
 function paint(s) {
   const t = P.tr(s.i); if (!t) return;
@@ -82,11 +93,9 @@ export function frame() {
 }
 export function show(on) { if (root) { root.hidden = !on; if (on) update(); } }
 export const visible = () => !!root && !root.hidden;
-export function initMixer2(host, full) {
-  onFull = full;
-  const fullB = h('button', { class: 'm2-full' }, 'Mixer lengkap (sends, routing, width)…'); fullB.onclick = () => onFull && onFull();
+export function initMixer2(host) {
   list = h('div', { class: 'm2-list' });
-  root = h('section', { id: 'mix2', hidden: true }, list, fullB);
+  root = h('section', { id: 'mix2', hidden: true }, list);
   host.append(root);
   P.onChange((w) => { if (w === 'tracks' || w === 'all') build(); else if (w === 'mix' || w === 'sel') update(); });
   build();

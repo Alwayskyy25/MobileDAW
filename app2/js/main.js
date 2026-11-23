@@ -292,11 +292,9 @@ function readouts() {
 }
 
 // ------------------------------------------------------------------ views + tabs
-let mixFull = false;
 function showView(v) {
   view = v;
-  if (v !== 'mix') mixFull = false;   // MobileDAW 2: the simple mixer (ui2/mixer2.js) unless "Mixer lengkap" was chosen
-  $('#view-arr').hidden = v !== 'arr'; $('#view-mix').hidden = !(v === 'mix' && mixFull); M2.show(v === 'mix' && !mixFull);
+  $('#view-arr').hidden = v !== 'arr'; $('#view-mix').hidden = true; M2.show(v === 'mix');   // MobileDAW 2: one mixer view (ui2/mixer2.js)
   for (const b of document.querySelectorAll('.seg .b')) b.classList.toggle('on', b.dataset.view === v);
   if (v === 'mix') MX.update();
   TL.invalidate();
@@ -517,7 +515,7 @@ function boot() {
   for (const k of ['dev', 'clip', 'keys']) { const el = h('div', { class: k === 'clip' ? 'ed-root' : 'pane', style: 'position:absolute;inset:0' }); dbody.append(el); panes[k] = el; }
   DV.initDevices(panes.dev); KB.initKeys(panes.keys); ED.initEditor(panes.clip);
   MX.initMixer($('#view-mix'));
-  M2.initMixer2($('#main'), () => { mixFull = true; showView('mix'); });
+  M2.initMixer2($('#main'));
   BR.initBrowser($('#browser'));
   initTopbar({ tap: tapTempo });
   TL.initTimeline($('#arr'), {

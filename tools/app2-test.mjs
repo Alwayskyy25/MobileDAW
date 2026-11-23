@@ -61,19 +61,20 @@ ok(await page.evaluate(async () => (await import('./js/project.js')).state.track
   ok(await page.evaluate(async () => { const P = await import('./js/project.js'); return P.state.tracks[1].clips.some((c) => c.start === P.BAR * 4); }), 'Tempel pastes the copied clip at that beat');
   await page.evaluate(async () => { const P = await import('./js/project.js'); const t = P.state.tracks[1]; const c = t.clips.find((x) => x.start === P.BAR * 4); if (c) P.removeClip(1, c.id); P.state.sel.clip = null; P.emit('clips'); }); }
 
-// the column: tap a tile = wide column (name, Mute / Solo / Rekam, pan)
+// the column: tap a tile = wide column (pan ring, Mute / Solo / Rekam, the volume fader)
 await page.evaluate(() => document.querySelector('#tcol2 .tc-row .tc-tile').click()); await page.waitForTimeout(400);
-ok(await page.evaluate(() => document.documentElement.classList.contains('tc-wide') && getComputedStyle(document.querySelector('#tcol2 .tc-row .tc-ctl')).display === 'flex' && !document.querySelector('#tcol2 .tc-vol')), 'a tap on a track tile widens the column (Mute / Solo / Rekam and pan, no volume)');
+ok(await page.evaluate(() => document.documentElement.classList.contains('tc-wide') && getComputedStyle(document.querySelector('#tcol2 .tc-row .tc-ctl')).display === 'flex' && !!document.querySelector('#tcol2 .tc-row .tc-vol') && !!document.querySelector('#tcol2 .tc-row .tc-bs .tc-pan')), 'a tap on a track tile widens the column (volume fader, pan ring, M / S / R)');
 await page.evaluate(() => document.querySelector('#tcol2 .tc-row .tc-m').click()); await page.waitForTimeout(150);
 ok(await page.evaluate(async () => (await import('./js/project.js')).state.tracks[0].mute === true), 'M mutes the track');
 await page.evaluate(() => document.querySelector('#tcol2 .tc-row .tc-rec').click()); await page.waitForTimeout(150);
 ok(await page.evaluate(async () => (await import('./js/project.js')).state.tracks[0].arm === true), 'R arms the track for recording');
 await page.evaluate(async () => { const P = await import('./js/project.js'); P.toggleArm(0); });
-{ const v = await page.evaluate(() => { const r = document.querySelector('#tcol2 .tc-row .tc-pan').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
-  const v0 = await page.evaluate(async () => (await import('./js/project.js')).state.tracks[0].pan);
-  await page.mouse.move(v.x, v.y); await page.mouse.down(); await page.mouse.move(v.x - 40, v.y, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(100);
-  const v1 = await page.evaluate(async () => (await import('./js/project.js')).state.tracks[0].pan);
-  ok(v1 < v0 - 0.05, `dragging the pan left pans the track left (${v0.toFixed(2)} -> ${v1.toFixed(2)})`); }
+for (const [sel, key, what] of [['.tc-vol', 'vol', 'dragging the volume fader left turns the track down'], ['.tc-pan', 'pan', 'dragging the pan ring left pans the track left']]) {
+  const v = await page.evaluate((sel) => { const r = document.querySelector('#tcol2 .tc-row ' + sel).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, sel);
+  const v0 = await page.evaluate(async (key) => (await import('./js/project.js')).state.tracks[0][key], key);
+  await page.mouse.move(v.x, v.y); await page.mouse.down(); await page.mouse.move(v.x - 40, v.y, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(450);
+  const v1 = await page.evaluate(async (key) => (await import('./js/project.js')).state.tracks[0][key], key);
+  ok(v1 < v0 - 0.05, `${what} (${v0.toFixed(2)} -> ${v1.toFixed(2)})`); }
 await page.evaluate(() => document.querySelector('#tcol2 .tc-row .tc-tile').click()); await page.waitForTimeout(300);
 
 // range menu: copy the selection to the playhead
@@ -90,8 +91,8 @@ if (items.includes('Salin ke playhead')) {
 }
 
 // the mixer: the tracks and the Master (no return strips), each with Mute / Solo / Rekam
-{ const m = await page.evaluate(async () => { const M = await import('./js/ui2/mixer2.js'), P = await import('./js/project.js'); M.build(); const n = document.querySelectorAll('#mix2 .m2-strip').length; return { n, want: P.state.tracks.filter((t) => t.kind !== 'auto').length + 1, msr: document.querySelectorAll('#mix2 .m2-strip:not(.bus) .m2-row .m2-b').length }; });
-  ok(m.n === m.want && m.msr === (m.want - 1) * 3, `the mixer shows the tracks + Master without return strips, with M / S / R (${m.n} strips)`); }
+{ const m = await page.evaluate(async () => { const M = await import('./js/ui2/mixer2.js'), P = await import('./js/project.js'); M.build(); const n = document.querySelectorAll('#mix2 .m2-strip').length; return { n, want: P.state.tracks.filter((t) => t.kind !== 'auto').length + 1, msr: document.querySelectorAll('#mix2 .m2-strip:not(.bus) .m2-row .m2-b').length, full: !!document.querySelector('.m2-full') }; });
+  ok(m.n === m.want && m.msr === (m.want - 1) * 3 && !m.full, `the mixer shows the tracks + Master as its only view, without return strips, with M / S / R (${m.n} strips)`); }
 // main menu
 await page.click('#logo2'); await page.waitForTimeout(400);
 ok(await page.evaluate(() => document.querySelector('#mm2').classList.contains('open') && document.querySelectorAll('#mm2 .u2m-t').length === 5), 'the logo button opens the main menu (5 tabs)');

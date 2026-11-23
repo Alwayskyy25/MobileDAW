@@ -687,3 +687,9 @@ html.tc-wide .tc-row .tc-name { height: 28px; }
 .tc-name .tc-b.tc-solo.on { background: var(--tc); color: rgba(0, 0, 0, .82); }
 .tc-name .tc-b.tc-m.on { background: #f2b8b5; color: #601410; }
 .tc-name .tc-b.tc-rec.on { background: #ff5449; color: #fff; }
+/* pan in the wide column: a small ring with a needle (as the mixer's), next to M / S / R */
+.tc-bs .tc-pan.tc-ring { flex: none; width: 26px; height: 26px; border-radius: 50%; box-sizing: border-box; border: 2.5px solid color-mix(in srgb, var(--text) 16%, transparent); margin-right: 2px; --a: 0deg; }
+.tc-bs .tc-pan.tc-ring::before { display: none; }
+.tc-bs .tc-pan.tc-ring i { position: absolute; left: 50%; top: 50%; width: 2.5px; height: 9px; margin: 0 0 0 -1.25px; border-radius: 2px; background: var(--tc); box-shadow: none; transform-origin: 50% 0; transform: rotate(calc(180deg + var(--a))); }
+.tc-ctl .tc-vol { flex: 1; min-width: 60px; }
+.tc-ctl .db { width: 46px; }

@@ -170,7 +170,7 @@ function buildCol() {
   va.prepend(col);
   // a vertical drag anywhere on the column scrolls the tracks with the timeline
   let d = null;
-  rowsEl.addEventListener('pointerdown', (e) => { if (e.target.closest('.tc-pan, .tc-b')) return; d = { y: e.clientY, id: e.pointerId, moved: false }; }, true);
+  rowsEl.addEventListener('pointerdown', (e) => { if (e.target.closest('.tc-pan, .tc-vol, .tc-b')) return; d = { y: e.clientY, id: e.pointerId, moved: false }; }, true);
   rowsEl.addEventListener('pointermove', (e) => {
     if (!d || e.pointerId !== d.id) return; const dy = e.clientY - d.y;
     if (!d.moved && Math.abs(dy) > gestureTiming().slop) { d.moved = true; try { rowsEl.setPointerCapture(e.pointerId); } catch (_) { /* gone */ } }
@@ -191,6 +191,7 @@ function holdTap(b, tap, long) {
   b.addEventListener('pointermove', (e) => { if (e.buttons && (Math.abs(e.movementY) > 2 || Math.abs(e.movementX) > 2)) clearTimeout(t); });
   b.addEventListener('click', (e) => { if (fired) { fired = false; e.preventDefault(); return; } tap(e); });
 }
+const VMAX = 1.4;
 function rowEl(kind, i) {
   const r = h('div', { class: 'tc-row' });
   const tile = h('button', { class: 'tc-tile', 'aria-label': 'Track' });
@@ -198,8 +199,10 @@ function rowEl(kind, i) {
   if (kind === 'trk') {
     // wide column: the name with Mute / Solo / Rekam, and the pan under it (the volume is in the Mixer)
     const name = h('button', { class: 'tc-name' }), mu = h('button', { class: 'tc-b tc-m', 'aria-label': 'Mute' }, 'M'), so = h('button', { class: 'tc-b tc-solo', 'aria-label': 'Solo' }, 'S'), rc = h('button', { class: 'tc-b tc-rec', 'aria-label': 'Rekam' }, h('i'));
-    const pan = h('div', { class: 'tc-pan', 'aria-label': 'Pan' }, h('i')), pv = h('span', { class: 'db' });
-    name.append(h('span', { class: 'nm' }), h('span', { class: 'tc-bs' }, mu, so, rc)); r.append(name, h('div', { class: 'tc-ctl' }, h('span', { class: 'tc-pl' }, 'Pan'), pan, pv));
+    // the volume fader stays the long bar; the pan is its own small ring next to M / S / R (drag sideways, double tap = centre)
+    const pan = h('div', { class: 'tc-pan tc-ring', 'aria-label': 'Pan' }, h('i')), vol = h('div', { class: 'tc-vol', 'aria-label': 'Volume' }, h('i'), h('em')), db = h('span', { class: 'db' });
+    name.append(h('span', { class: 'nm' }), h('span', { class: 'tc-bs' }, pan, mu, so, rc)); r.append(name, h('div', { class: 'tc-ctl' }, vol, db));
+    dragVal(vol, 'x', () => Math.sqrt(clamp(state.tracks[r._i].vol / VMAX, 0, 1)), (u) => P.setVol(r._i, u * u * VMAX), () => P.setVol(r._i, 1));
     mu.onclick = (e) => { e.stopPropagation(); P.toggleMute(r._i); colSig = ''; };
     so.onclick = (e) => { e.stopPropagation(); P.toggleSolo(r._i); colSig = ''; };
     rc.onclick = (e) => { e.stopPropagation(); P.toggleArm(r._i); colSig = ''; };
@@ -223,7 +226,7 @@ function dragVal(e, axis, get, set, reset) {
     d = { p: axis === 'x' ? ev.clientX : ev.clientY, u: get(), moved: false };
   });
   e.addEventListener('pointermove', (ev) => {
-    if (!d) return; const p = axis === 'x' ? ev.clientX : ev.clientY, span = axis === 'x' ? Math.max(40, e.clientWidth) : 120;
+    if (!d) return; const p = axis === 'x' ? ev.clientX : ev.clientY, span = axis === 'x' ? Math.max(100, e.clientWidth) : 120;
     const du = (axis === 'x' ? p - d.p : d.p - p) / span; if (!d.moved && Math.abs(du) * span < 3) return;
     if (!d.moved) { d.moved = true; checkpoint(); }
     set(clamp(d.u + du, 0, 1)); colSig = '';
@@ -254,8 +257,8 @@ function syncCol() {
         r.querySelector('.tc-name .nm').textContent = t.name;
         r.querySelector('.tc-m').classList.toggle('on', !!t.mute); r.querySelector('.tc-solo').classList.toggle('on', !!t.solo);
         const rc = r.querySelector('.tc-rec'); rc.classList.toggle('on', !!t.arm); rc.disabled = !['audio', 'midi', 'drum'].includes(t.kind);
-        const pn = Math.round(clamp(t.pan, -1, 1) * 50); r.querySelector('.tc-ctl .db').textContent = pn === 0 ? 'C' : Math.abs(pn) + (pn < 0 ? 'L' : 'R');
-        r.querySelector('.tc-pan').style.setProperty('--u', ((clamp(t.pan, -1, 1) + 1) / 2).toFixed(4));
+        const u = Math.sqrt(clamp(t.vol / VMAX, 0, 1)); r.querySelector('.tc-vol').style.setProperty('--u', u.toFixed(4)); r.querySelector('.tc-ctl .db').textContent = t.vol > 1e-4 ? (20 * Math.log10(t.vol)).toFixed(1) + ' dB' : '-\u221e';
+        const pn = Math.round(clamp(t.pan, -1, 1) * 50), pe = r.querySelector('.tc-pan'); pe.style.setProperty('--a', (clamp(t.pan, -1, 1) * 135).toFixed(1) + 'deg'); pe.title = 'Pan ' + (pn === 0 ? 'C' : Math.abs(pn) + (pn < 0 ? 'L' : 'R'));
         tile.setAttribute('aria-label', t.name);
       } else {
         const x = TL.v2XRow(i); r._strip = x.strip; r.style.setProperty('--tc', x.color); tile.innerHTML = '<span class="tc-nm"></span>'; tile.lastChild.textContent = x.name; r.classList.toggle('sel', state.sel.track === x.strip); r.classList.add('xrow'); tile.setAttribute('aria-label', x.name);
