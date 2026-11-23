@@ -88,7 +88,7 @@ function buildBar() {
   tools = { snap: pill(IC.magnet, 'Snap', 'Snap ke grid'), loop: pill(IC.loop, 'Loop', 'LOOP'), follow: pill(IC.follow, 'Ikuti', 'Ikuti playhead'), save: btn('ic save', IC.save, '', 'Simpan') };
   el.metro = pill(IC.metro, '', 'Metronom');
   el.bpm = h('button', { class: 'u2b bpm', 'aria-label': 'Tempo' }, h('b', null, '120'), h('span', { class: 'lb' }, 'BPM'));
-  R.append(h('div', { class: 'tg' }, tools.snap, tools.loop, tools.follow, el.metro), el.bpm, tools.save);
+  R.append(h('div', { class: 'tg' }, tools.loop, tools.follow, el.metro), el.bpm, tools.save);   // Snap sits in the corner above the track column (buildCol)
   top.append(L, M, R);
   $('#app').insertBefore(top, $('#body'));
 
@@ -164,7 +164,7 @@ const wide = () => !!prefs.ui2Wide;
 function buildCol() {
   const va = $('#view-arr');
   col = h('div', { id: 'tcol2' });
-  topEl = h('div', { class: 'tc-top' });
+  topEl = h('div', { class: 'tc-top' }, tools.snap);   // the empty corner left of the ruler holds Snap (tap = on / off, long press = grid)
   rowsEl = h('div', { class: 'tc-rows' });
   col.append(topEl, rowsEl);
   va.prepend(col);

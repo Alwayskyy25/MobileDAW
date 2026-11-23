@@ -954,3 +954,50 @@ html.ui2 .dev-scroll > .card.u2c.v3 { box-shadow: inset 0 1px 0 rgba(255, 255, 2
 .u2c.v3 .u2c-dials > .u2d { gap: 1px; padding: 1px 0 !important; justify-content: center; }
 .u2c .u2d .n, .u2c .u2d .v { line-height: 1.1 !important; }
 .u2c.v3.inst .u2s > .u2fx .u2fx-l { display: none; }
+
+/* ===== cards: a clear border; nothing hidden (tabs wrap, choices fit), the rack stops at a card's start ===== */
+html.ui2 .dev-scroll > .card.u2c.v3 { border: 1px solid rgba(255, 255, 255, .12) !important; box-shadow: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 4px 14px rgba(0, 0, 0, .25) !important; }
+.u2c.v3 .u2s { border: 1px solid rgba(255, 255, 255, .10); box-shadow: inset 0 8px 18px rgba(0, 0, 0, .4) !important; }
+.u2c.v3 .u2s > .u2c-h { border-bottom: 1px solid rgba(255, 255, 255, .06); }
+.u2c.v3 .u2c-p { border-left: 0; }
+.u2c.v3 .u2c-tabs { flex-wrap: wrap; overflow: visible; row-gap: 5px; }
+.u2c.v3 .u2c-tabs button { height: 26px; padding: 0 10px; font-size: 11.5px; }
+.u2c.v3 .u2c-dials > .u2seg-f .u2seg button { font-size: 11px; padding: 0 2px; letter-spacing: -.01em; text-overflow: clip; }
+.u2c.v3 .u2c-dials > .u2seg-f { padding: 0 6px; }
+html.ui2 .dev-scroll { scroll-snap-type: x proximity; scroll-padding-left: 12px; }
+html.ui2 .dev-scroll > .card { scroll-snap-align: start; }
+html.ui2 .dev-scroll > .card.addcard { border: 2px dashed rgba(255, 255, 255, .16) !important; }
+@media (max-width: 1000px) { .u2c.v3 .u2s { width: 196px; } }
+
+/* ===== rack: cards one under the other (full width, the rack scrolls up / down), never side by side ===== */
+html.ui2 #dbody .dev-scroll { flex-direction: column !important; flex-wrap: nowrap !important; overflow-x: hidden !important; overflow-y: auto !important;
+  align-items: stretch !important; gap: 10px !important; scroll-snap-type: y proximity; scroll-padding-top: 8px; padding: 8px 12px 12px !important; }
+html.ui2 #dbody .dev-scroll > .card { flex: none !important; width: auto !important; max-width: none !important; min-width: 0 !important; scroll-snap-align: start; }
+html.ui2 #dbody .dev-scroll > .card.u2c.v3 { height: auto !important; min-height: 150px; align-self: stretch !important; }
+.u2c.v3 .u2s { min-height: 138px; align-self: stretch; }
+/* the controls wrap into rows inside the card's width */
+.u2c.v3 .u2c-g { overflow: visible; }
+.u2c.v3 .u2c-g > .u2c-dials { grid-auto-flow: row dense !important; grid-template-rows: none !important; grid-auto-rows: 60px; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)) !important; grid-auto-columns: auto !important; }
+.u2c.v3 .u2c-dials > :is(.u2dd, .u2t) { grid-column: span 2; }
+.u2c.v3 .u2c-dials > .u2t { grid-column: span 1 !important; }
+.u2c.v3 .u2c-dials > .u2seg-f { grid-column: span 3 !important; }
+/* the add card: a slim full-width bar */
+html.ui2 #dbody .dev-scroll > .card.addcard { flex-direction: row !important; height: 56px !important; min-height: 56px; gap: 12px; justify-content: flex-start; padding: 0 16px; align-self: stretch !important; }
+html.ui2 #dbody .dev-scroll > .card.addcard > b { width: 34px; height: 34px; border-radius: 11px; font-size: 22px; }
+html.ui2 #dbody .dev-scroll > .card.addcard > small { margin-left: auto; }
+html.ui2 #dbody .dev-scroll > .card.u2c.src { height: 56px !important; min-height: 0; flex-direction: row; align-items: center; }
+html.ui2 #dbody .dev-scroll > .card.u2c.src .u2c-empty { background: none; padding: 0 12px; margin: 0; }
+
+/* ===== Snap in the corner above the track column, next to the ruler ===== */
+#tcol2 .tc-top { display: flex; align-items: center; justify-content: center; padding: 0 6px; box-sizing: border-box; }
+#tcol2 .tc-top > .u2b { height: 28px; max-width: 100%; padding: 0 10px 0 8px; gap: 5px; border: 0; border-radius: 999px; display: inline-flex; align-items: center;
+  background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); font: 600 12px/1 var(--font); white-space: nowrap; overflow: hidden; }
+#tcol2 .tc-top > .u2b svg { width: 15px; height: 15px; flex: none; }
+#tcol2 .tc-top > .u2b.on { background: var(--accent); color: var(--accent-ink, #1b1b1f); }
+@media (max-width: 1000px) { .u2c.v3 .u2s { width: 250px !important; } }
+.u2c.v3 .u2s { width: 250px; }
+.u2c.v3 .u2s .u2c-tt .u2c-name span { overflow: visible; text-overflow: clip; }
+#tcol2 .tc-top > .u2b { flex-direction: row !important; min-width: 0; width: auto !important; }
+#tcol2 .tc-top > .u2b .lb { display: inline !important; font-size: 12px; }
+html.ui2 #dbody .dev-scroll > .card.u2c.v3 { min-height: 0; }
+.u2c.v3 .u2s { min-height: 118px; }

@@ -122,6 +122,10 @@ ok(mods.fx.every(([k, , flm]) => flm || k === 16) && mods.fx.some(([k]) => k ===
   ok(v1 !== null && v1 !== v0 && (v0 === null || v1 > v0), `dragging a dial up raises the value (${v0} -> ${v1})`);
   await page.evaluate(() => [...document.querySelectorAll('.dev-scroll > .card.u2c:not(.inst) .u2sw-b')].pop().click()); await page.waitForTimeout(100);
   ok(await page.evaluate(async () => { const P = await import('./js/project.js'); return P.tr(0).devices[P.tr(0).devices.length - 1].bypass === true && !!document.querySelector('.dev-scroll > .card.u2c.off'); }), 'the switch in the card header bypasses the effect'); }
+{ const lay = await page.evaluate(() => { const cs = [...document.querySelectorAll('#dbody .dev-scroll > .card.u2c')].map((c) => c.getBoundingClientRect()), sc = document.querySelector('#dbody .dev-scroll').getBoundingClientRect();
+    return { n: cs.length, stacked: cs.every((r, k) => !k || r.top >= cs[k - 1].bottom - 1), inside: cs.every((r) => r.left >= sc.left - 1 && r.right <= sc.right + 1) }; });
+  ok(lay.n >= 2 && lay.stacked && lay.inside, `module cards stack one under the other inside the rack's width (${lay.n} cards)`); }
+ok(await page.evaluate(() => !!document.querySelector('#tcol2 .tc-top .snap, #tcol2 .tc-top [aria-label*="Snap"]') && !document.querySelector('#top2 .tg [aria-label*="Snap"]')), 'Snap sits in the corner above the track column (not in the top bar)');
 // its own settings: 1.0's preferences are untouched, MobileDAW 2 writes mobiledaw2.prefs.v1
 await page.evaluate(async () => { const { prefs, savePrefs } = await import('./js/prefs.js'); prefs.ui2Wide = false; savePrefs(); });
 const ls = await page.evaluate(() => ({ one: JSON.parse(localStorage.getItem('mobiledaw.prefs.v1')), two: JSON.parse(localStorage.getItem('mobiledaw2.prefs.v1')) }));
