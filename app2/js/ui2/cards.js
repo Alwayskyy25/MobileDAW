@@ -265,7 +265,7 @@ function body(key, groups, mk, every, bigTabs, onTab) {
       const hh = Math.floor(Math.min(card.getBoundingClientRect().bottom, sc.getBoundingClientRect().bottom) - 8 - cl.getBoundingClientRect().top); if (!(hh > 40)) return;
       if (cl.style.height !== hh + 'px') cl.style.height = hh + 'px';
       const kn = cl.querySelector('.u2col.kn'), tg = cl.querySelector('.u2col.tg');
-      if (kn) { const n = kn.children.length, r = Math.max(1, Math.min(n >= 6 ? 2 : 1, Math.floor(hh / 64))), c = Math.ceil(n / r);
+      if (kn) { const n = kn.children.length, r = Math.max(1, Math.min(n >= (hh >= 130 ? 4 : 6) ? 2 : 1, Math.floor(hh / 64))), c = Math.ceil(n / r);
         if (kn.style.getPropertyValue('--kr') !== String(r)) kn.style.setProperty('--kr', String(r)); kn.style.flexGrow = String(c); kn.style.minWidth = (c * 64) + 'px'; }
       if (tg) { const n = tg.children.length, r = Math.max(1, Math.min(n, Math.floor((hh + 5) / 33))), c = Math.ceil(n / r);
         if (tg.style.getPropertyValue('--tr') !== String(r)) tg.style.setProperty('--tr', String(r)); tg.style.flexGrow = "0"; tg.style.minWidth = (c * 92 + (c - 1) * 5) + 'px'; }

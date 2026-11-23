@@ -306,7 +306,7 @@ const HALF = 0.5;
 const halfPx = () => Math.round($('#view-arr').getBoundingClientRect().height * HALF);
 // Device tab: FIXED height (57% of the arrangement area, measured from the reference screenshot) so no effect panel is ever cut off.
 // Clip / Keys keep their own height (the one the person dragged to).
-const DEVH = 0.57;
+const DEVH = 0.7;
 let otherH = '';
 const devPx = () => Math.round($('#view-arr').getBoundingClientRect().height * DEVH);
 function applyDevHeight() {

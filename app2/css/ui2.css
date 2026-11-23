@@ -1408,3 +1408,8 @@ html.ui2 .m2-fad em::after { display: none !important; }
 .u2c.v3 .u2s.haskb.kbhide.kbshow > .u2kb { display: flex !important; }
 .u2c.v3 .u2s.haskb.kbhide.kbshow > :is(.u2real, .u2fx, .u2sf) { visibility: hidden; }
 .u2c.v3 .u2s.haskb.kbhide.kbshow > .u2kb-tg { color: var(--ccm, var(--accent)); bottom: auto; top: 62px; }
+/* a narrower instrument panel: it grows in height (the rack is taller), not sideways */
+.u2c.v3.inst .u2cols { min-width: 340px !important; }
+.u2c.v3.inst .u2vs { flex: 0 0 50px !important; min-width: 50px !important; }
+.u2c.v3.inst .u2st { flex: 0 0 76px !important; min-width: 76px !important; }
+.u2c.v3.inst .u2col.kn { grid-auto-columns: minmax(60px, 74px); flex-grow: 0 !important; }
