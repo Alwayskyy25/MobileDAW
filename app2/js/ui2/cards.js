@@ -123,7 +123,40 @@ function hslider(p, label, get, set, onLong) {
   el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
   el.sync = () => { if (!d) paint(); }; paint(); return el;
 }
-function control(p, label, get, set, onLong) {
+// a vertical slider (an instrument's envelope stages and levels): drag up / down, double tap = default, long press = automation
+const ENV_RE = /(^|\s)(attack|atk|att|decay|dec|sustain|sus|release|rel|hold|delay|dly)$/i;
+function vslider(p, label, get, set, onLong) {
+  const tr = h('div', { class: 'tr' }, h('i', { class: 'f' }), h('em')), v = h('span', { class: 'v' });
+  const el = h('div', { class: 'u2vs', role: 'slider', 'aria-label': label, 'aria-orientation': 'vertical', tabindex: 0 }, h('span', { class: 'n', title: p.n }, label), tr, v);
+  const paint = () => { const x = get(), n = toNorm(p, x); el.style.setProperty('--n', n.toFixed(4)); const t = fmtParam(p, x); if (v.textContent !== t) { v.textContent = t; el.setAttribute('aria-valuetext', t); } };
+  let d = null, last = 0;
+  el.addEventListener('pointerdown', (e) => { e.stopPropagation(); el.setPointerCapture(e.pointerId); d = { y: e.clientY, n: toNorm(p, get()), moved: false, fired: false, t: 0 };
+    if (onLong) d.t = setTimeout(() => { if (d && !d.moved) { d.fired = true; onLong(el.getBoundingClientRect()); } }, gestureTiming().longMs); });
+  el.addEventListener('pointermove', (e) => { if (!d || d.fired) return; const dy = d.y - e.clientY; if (!d.moved && Math.abs(dy) < 3) return;
+    if (!d.moved) { d.moved = true; clearTimeout(d.t); el.classList.add('act'); } set(fromNorm(p, clamp(d.n + dy / Math.max(50, tr.clientHeight), 0, 1))); paint(); });
+  const end = () => { if (!d) return; clearTimeout(d.t); el.classList.remove('act'); if (!d.moved && !d.fired) { const now = performance.now(); if (now - last < gestureTiming().dtapMs) { set(p.def); paint(); last = 0; } else last = now; } d = null; };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  el.addEventListener('keydown', (e) => { const k = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key]; if (!k) return; e.preventDefault();
+    set(fromNorm(p, clamp(toNorm(p, get()) + k * (p.step ? p.step / (p.max - p.min) : 0.01), 0, 1))); paint(); });
+  el.sync = () => { if (!d) paint(); }; paint(); return el;
+}
+// a list as a stepper: the name, an arrow up, the value (tap = the whole list), an arrow down
+function stepper(p, label, get, set) {
+  const items = p.items, val = (k) => p.min + k * (p.step || 1), idx = () => clamp(Math.round((get() - p.min) / (p.step || 1)), 0, items.length - 1);
+  const v = h('button', { class: 'sv' });
+  const go = (dk) => (e) => { e.stopPropagation(); set(val(clamp(idx() + dk, 0, items.length - 1))); paint(); };
+  const up = h('button', { class: 'sa up', 'aria-label': label + ' berikutnya', onclick: go(1) }), dn = h('button', { class: 'sa dn', 'aria-label': label + ' sebelumnya', onclick: go(-1) });
+  const el = h('div', { class: 'u2st' }, h('span', { class: 'n', title: p.n }, label), up, v, dn);
+  v.onclick = (e) => { e.stopPropagation(); const r = v.getBoundingClientRect(), k0 = idx();
+    menu(items.map((x, k) => ({ label: String(x), check: k === k0, fn: () => { set(val(k)); paint(); } })), r.left, r.bottom); };
+  const paint = () => { const k = idx(), t = String(items[k] ?? ''); if (v.textContent !== t) v.textContent = t; v.title = t; up.disabled = k >= items.length - 1; dn.disabled = k <= 0; };
+  el.sync = paint; paint(); return el;
+}
+function control(p, label, get, set, onLong, vert) {
+  if (vert) {   // an instrument's panel: lists as steppers, envelope stages and levels as vertical sliders
+    if (isList(p)) return stepper(p, label, get, set);
+    if (!isSwitch(p) && (SLIDER_RE.test(String(p.n).trim()) || ENV_RE.test(String(p.n).trim()))) return vslider(p, label, get, set, onLong);
+  }
   if (!isList(p) && !isSwitch(p) && SLIDER_RE.test(String(p.n).trim())) return hslider(p, label, get, set, onLong);
   if (isList(p)) return choice(p, label, get, set);
   if (isSwitch(p)) return toggle(p, label, get, set);
@@ -211,11 +244,11 @@ function body(key, groups, mk, every, bigTabs, onTab) {
     // order: lists and switches first (full-width rows), then the dials
     const rows = ctl.filter(({ c }) => !c.classList.contains('u2d') && !c.classList.contains('u2sl')).map(({ c }) => c), dials = ctl.filter(({ c }) => c.classList.contains('u2d')).map(({ c }) => c), sliders = ctl.filter(({ c }) => c.classList.contains('u2sl')).map(({ c }) => c);
     // one grid that fills the rack's height row by row and then grows sideways (a field takes two dial cells): nothing is cut off
-    // one kind per line: lists and switches, then the knobs, then the sliders (each kind starts a new row; nothing is slotted in between)
-    for (const c of [...rows, ...dials, ...sliders]) { c.classList.remove('brk'); delete c.dataset.brk; }
-    if (dials.length && rows.length) dials[0].classList.add('brk');
-    if (sliders.length && (rows.length || dials.length)) sliders[0].classList.add('brk');
-    if (env || rows.length || dials.length || sliders.length) parts.push(h('div', { class: 'u2c-dials' }, ...(env ? [env] : []), ...rows, ...dials, ...sliders));
+    if (mk.cols) {   // an instrument: columns across the whole panel, one kind each: switches, lists, knobs (stacked), sliders
+      const of = (c) => ctl.filter((x) => x.c.classList.contains(c)).map((x) => x.c), tg = of('u2t'), st = of('u2st'), kn = of('u2d'), vs = of('u2vs');
+      const rest = ctl.map((x) => x.c).filter((c) => !tg.includes(c) && !st.includes(c) && !kn.includes(c) && !vs.includes(c));
+      parts.push(h('div', { class: 'u2cols' }, tg.length ? h('div', { class: 'u2col tg' }, ...tg) : null, ...st, ...rest, kn.length ? h('div', { class: 'u2col kn' }, ...kn) : null, ...vs));
+    } else if (env || rows.length || dials.length || sliders.length) parts.push(h('div', { class: 'u2c-dials' }, ...(env ? [env] : []), ...rows, ...dials, ...sliders));
     grid.replaceChildren(...parts); fit();
     const dl = grid.firstElementChild; if (dl && shownOnce) { dl.classList.remove('swap'); void dl.offsetWidth; dl.classList.add('swap'); } shownOnce = true;
   };
@@ -224,20 +257,26 @@ function body(key, groups, mk, every, bigTabs, onTab) {
   // Checked again while the rack is on screen (the panel can still be opening, the tabs can wrap), set only when it changes.
   const fitNow = () => {
     const card = grid.closest('.card'), sc = grid.closest('.dev-scroll'), dl = grid.querySelector('.u2c-dials'); if (!card || !sc || !card.offsetParent) return;
+    const cl = grid.querySelector('.u2cols');
+    if (cl) {   // columns: as tall as the rack allows; knobs two to a column when there is room, switches as many to a column as fit
+      const hh = Math.floor(Math.min(card.getBoundingClientRect().bottom, sc.getBoundingClientRect().bottom) - 8 - cl.getBoundingClientRect().top); if (!(hh > 40)) return;
+      if (cl.style.height !== hh + 'px') cl.style.height = hh + 'px';
+      const kn = cl.querySelector('.u2col.kn'), tg = cl.querySelector('.u2col.tg');
+      if (kn) { const n = kn.children.length, r = Math.max(1, Math.min(n > 2 ? 2 : 1, Math.floor(hh / 74))), c = Math.ceil(n / r);
+        if (kn.style.getPropertyValue('--kr') !== String(r)) kn.style.setProperty('--kr', String(r)); kn.style.flexGrow = String(c); kn.style.minWidth = (c * 64) + 'px'; }
+      if (tg) { const n = tg.children.length, r = Math.max(1, Math.min(n, Math.floor(hh / 40))), c = Math.ceil(n / r);
+        if (tg.style.getPropertyValue('--tr') !== String(r)) tg.style.setProperty('--tr', String(r)); tg.style.flexGrow = String(c * 1.5); tg.style.minWidth = (c * 128) + 'px'; }
+      return;
+    }
     const bottom = Math.min(card.getBoundingClientRect().bottom, sc.getBoundingClientRect().bottom) - 8, dl0 = grid.querySelector('.u2c-dials'), hh = bottom - (dl0 || grid).getBoundingClientRect().top;
     if (!(hh > 0)) return;
     const kids = dl ? [...dl.children] : [], span = (e) => (e.classList.contains('u2seg-f') ? 3 : e.classList.contains('u2dd') || e.classList.contains('u2sl') ? 2 : 1);
-    const cells = kids.reduce((a, e) => a + span(e), 0) || 1, rows = Math.max(1, Math.min(Math.floor((hh + 6) / 62), kids.length || 1));
+    const cells = kids.reduce((a, e) => a + span(e), 0) || 1, rows = Math.max(1, Math.min(Math.floor((hh + 4) / 54), kids.length || 1));
     // the fewest columns whose row-by-row packing (wide controls take 2 or 3 cells, 'dense' fills gaps) fits in the rows
-    const fits = (cols) => { let r = 1, c = 0; for (const e of kids) { const w = span(e);   // row by row in order, a new kind starts a new row
-      if (c > 0 && (e.classList.contains('brk') || c + w > cols)) { r++; c = 0; } c += w; } return r <= rows; };
-    // a kind starts a new row while the rack is tall enough; if not, the sliders join the knobs' last row, then the knobs follow the switches
-    const brks = kids.filter((e) => e.classList.contains('brk') || e.dataset.brk);
-    for (const e of brks) { e.dataset.brk = '1'; e.classList.add('brk'); }
-    const best = () => { let c = Math.max(Math.ceil(cells / rows), ...kids.map(span), 1); while (c < cells && !fits(c)) c++; return fits(c) ? c : 0; };
-    let cols = best();
-    for (let i = brks.length - 1; !cols && i >= 0; i--) { brks[i].classList.remove('brk'); cols = best(); }
-    if (!cols) cols = cells;   // read left to right, top to bottom
+    const fits = (cols) => { const g = []; let used = 0; for (const e of kids) { const w = span(e); let placed = false;
+      for (let r = 0; r < 64 && !placed; r++) { g[r] = g[r] || new Array(cols).fill(0); for (let c = 0; c + w <= cols; c++) { if (g[r].slice(c, c + w).every((x) => !x)) { for (let q = c; q < c + w; q++) g[r][q] = 1; used = Math.max(used, r + 1); placed = true; break; } } }
+    } return used <= rows; };
+    let cols = Math.max(Math.ceil(cells / rows), ...kids.map(span), 1); while (cols < cells && !fits(cols)) cols++;   // read left to right, top to bottom
     const v = String(rows); if (grid.style.getPropertyValue('--rows') !== v) grid.style.setProperty('--rows', v);
     if (grid.style.getPropertyValue('--cols') !== String(cols)) grid.style.setProperty('--cols', String(cols));
   };
@@ -385,8 +424,8 @@ export function instCard(i, t, api) {
   const groups = instGroups(def, t.inst.type);
   const get = (k) => t.inst.params[k] ?? def.params[k].def;
   const mk = (k, pf) => { const p = def.params[k];
-    return control(p, tidy(p.n, pf), () => get(k), (v) => P.setInstParam(i, k, v), (rect) => offerAutomation(rect, { kind: 5, strip: P.stripOf(i), param: k, def: p }, `${t.name} \u2022 ${p.n}`)); };
-  mk.get = get; mk.def = (k) => def.params[k];
+    return control(p, tidy(p.n, pf), () => get(k), (v) => P.setInstParam(i, k, v), (rect) => offerAutomation(rect, { kind: 5, strip: P.stripOf(i), param: k, def: p }, `${t.name} \u2022 ${p.n}`), true); };
+  mk.get = get; mk.def = (k) => def.params[k]; mk.cols = true;
   // the instrument's own display (FL Studio Mobile's synths: the page of the card's tab; 3x Osc: its oscillators)
   const real = midi && def.view === 'kit' && t.inst.type !== 6 ? realScreen(() => instKitView(i, t, api.every), api.every) : null;
   const tmap = TABMAP[t.inst.type];
