@@ -11,7 +11,8 @@ import { prefs, savePrefs } from '../prefs.js';
 import * as P from '../project.js';
 import * as TL from '../timeline.js';
 import { checkpoint, canUndo, canRedo, undoOp, redoOp } from '../history.js';
-import * as Tempo from '../tempo.js';
+import * as PN from './panels.js';
+import { fpsNow } from '../fps.js';
 import * as QS from '../quicksave.js';
 import * as PM from '../projects.js';
 import * as BR from '../browser.js';
@@ -42,6 +43,7 @@ const IC = {
   follow: S('<path d="M4 12h11"/><path d="M11 7.5 15.5 12 11 16.5"/><path d="M19 5v14"/>'),
   save: S('<path d="M5 4.5h11l3.5 3.5v11.5h-14.5z"/><path d="M8 4.5v5h7v-5"/><rect x="8" y="13.5" width="8" height="6" rx="1"/>'),
   arrange: S('<rect x="3.5" y="5" width="9" height="4.5" rx="1.4"/><rect x="8.5" y="11.5" width="12" height="4.5" rx="1.4"/><path d="M3.5 19.5h17"/>'),
+  menu: S('<path d="M4 7h16M4 12h16M4 17h16"/>'),
   plus: S('<path d="M12 5v14M5 12h14"/>'),
   close: S('<path d="M6 6l12 12M18 6 6 18"/>'),
   dup: S('<rect x="3.5" y="6" width="8" height="12" rx="1.6"/><rect x="12.5" y="6" width="8" height="12" rx="1.6" stroke-dasharray="2.2 1.8"/><path d="M16.5 10v4M14.5 12h4"/>'),
@@ -71,7 +73,7 @@ let bar, el = {};
 function buildBar() {
   const top = h('header', { id: 'top2' });
   const L = h('div', { class: 't2-l' }), M = h('div', { class: 't2-c' }), R = h('div', { class: 't2-r' });
-  logo = h('button', { id: 'logo2', 'aria-label': 'Menu utama' }, h('img', { src: 'icons/icon-192.png', alt: '' }));
+  logo = btn('ic', IC.menu, '', 'Menu utama'); logo.id = 'logo2';
   title = h('button', { id: 'title2', 'aria-label': 'Nama lagu' }, h('b', null, ''), h('span', null, 'Lagu'));
   el.undo = btn('ic', IC.undo, '', 'Urungkan'); el.redo = btn('ic', IC.redo, '', 'Ulangi');
   L.append(logo, title, h('i', { class: 'sep' }), el.undo, el.redo);
@@ -91,7 +93,7 @@ function buildBar() {
   el.add = btn('tab add', IC.plus, 'Track', 'Tambah track');
   el.arr = btn('tab', IC.arrange, 'Aransemen', 'ARANSEMEN'); el.mix = btn('tab', IC.mixer, 'Mixer', 'MIXER'); el.rack = btn('tab', IC.rack, 'Rack', 'RACK');
   el.snd = btn('tab', IC.sounds, 'Suara', 'SUARA'); el.keys = btn('tab', IC.keys, 'Keys', 'Keyboard');
-  el.cpu = h('div', { class: 'u2cpu', 'aria-label': 'Beban CPU audio' }, h('b', null, '0 %'), h('span', null, ''));
+  el.cpu = h('button', { class: 'u2cpu', 'aria-label': 'Performa' }, h('b', null, 'CPU 0 %'), h('span', null, '60 FPS'));
   for (const [b, k] of [[el.rack, 'fx'], [el.mix, 'solo']]) b.append(h('i', { class: 'bdg', 'data-k': k }));   // badges: effects on the track / a solo is on
   BL.append(el.add); BM.append(el.arr, el.mix, el.rack, el.snd, el.keys); BR2.append(el.cpu);
   bar.append(BL, BM, BR2);
@@ -115,11 +117,12 @@ function buildBar() {
   el.rack.onclick = () => togglePanel('dev');
   el.keys.onclick = () => togglePanel('keys');
   el.snd.onclick = () => { closeMenu(); BR.toggleBrowser(); };
+  el.cpu.onclick = () => PN.openPerfPanel();
   { // BPM: tap = the Tempo window (tap tempo, time signature), a vertical drag = change the tempo
     const b = el.bpm; let d = null;
     b.addEventListener('pointerdown', (e) => { b.setPointerCapture(e.pointerId); d = { y: e.clientY, b: state.bpm, moved: false }; });
     b.addEventListener('pointermove', (e) => { if (!d) return; const dy = d.y - e.clientY; if (!d.moved && Math.abs(dy) > 10) { d.moved = true; d.y = e.clientY; } if (d.moved) P.setBpm(clamp(Math.round(d.b + (d.y - e.clientY) * 0.25), 20, 999)); });
-    b.addEventListener('pointerup', () => { if (d && !d.moved) Tempo.openTempo(); d = null; });
+    b.addEventListener('pointerup', () => { if (d && !d.moved) PN.openTempoPanel(); d = null; });
     b.addEventListener('pointercancel', () => { d = null; });
   }
 }
@@ -131,6 +134,8 @@ function togglePanel(t) {
 let last = '';
 export function readouts() {
   if (!on) return;
+  PN.sample();
+  { const f = Math.round(fpsNow() || 0) + ' FPS'; if (el.cpu.lastChild.textContent !== f) el.cpu.lastChild.textContent = f; }
   const tab = api.getTab(), shut = api.isShut(), v = api.getView();
   const t = state.tracks[state.sel.track], nfx = t && t.devices ? t.devices.length : 0, solo = state.tracks.some((q) => q.solo);
   { const p = Math.max(0, state.pos), bi = P.barAt(p), bt = P.beatLenAt(p), off = p - P.barStart(bi), pos = `${bi + 1}.${Math.floor(off / bt) + 1}.${Math.floor((off % bt) / Math.max(60, bt / 4)) + 1}`;
@@ -146,8 +151,7 @@ export function readouts() {
   el.arr.classList.toggle('on', v === 'arr' && shut && !BR.isOpen()); el.mix.classList.toggle('on', v === 'mix'); el.rack.classList.toggle('on', v === 'arr' && tab === 'dev' && !shut); el.keys.classList.toggle('on', v === 'arr' && tab === 'keys' && !shut);
   el.snd.classList.toggle('on', BR.isOpen());
   { const a = el.rack.querySelector('.bdg'), b = el.mix.querySelector('.bdg'); a.textContent = nfx ? String(nfx) : ''; a.hidden = !nfx; b.textContent = 'S'; b.hidden = !solo; }
-  const c = Math.round(clamp(state.cpu * 100, 0, 999)); el.cpu.firstChild.textContent = c + ' %'; el.cpu.classList.toggle('hot', c > 80); el.cpu.classList.toggle('warm', c > 55 && c <= 80);
-  const m = performance.memory; el.cpu.lastChild.textContent = m ? Math.round(m.usedJSHeapSize / 1048576) + ' MB' : 'CPU';
+  const c = Math.round(clamp(state.cpu * 100, 0, 999)); el.cpu.firstChild.textContent = 'CPU ' + c + ' %'; el.cpu.classList.toggle('hot', c > 80); el.cpu.classList.toggle('warm', c > 55 && c <= 80);
 }
 
 // ------------------------------------------------------------------ track column (left of the timeline)
@@ -329,7 +333,7 @@ function buildMenu() {
   const x = btn('u2m-x', IC.close, '', 'Tutup');
   const tabs = h('nav', { class: 'u2m-tabs' }, ...TABS.map(([k, n]) => { const b = h('button', { class: 'u2m-t', 'data-k': k }, n); b.onclick = () => { mmTab = k; renderMenu(); }; return b; }));
   mmBody = h('div', { class: 'u2m-body' });
-  pan.append(h('header', { class: 'u2m-hd' }, h('img', { src: 'icons/icon-192.png', alt: '' }), h('div', null, h('b', null, 'MobileDAW 2'), h('span', null, 'versi 2.0')), x), tabs, mmBody);
+  pan.append(h('header', { class: 'u2m-hd' }, h('div', null, h('b', null, 'MobileDAW 2'), h('span', null, 'versi 2.0')), x), tabs, mmBody);
   mm.append(scrim, pan); $('#app').append(mm);
   scrim.onclick = closeMenu; x.onclick = closeMenu;
   QS.onSaveState((d) => { logo.classList.toggle('unsaved', d); tools.save.classList.toggle('unsaved', d); title.lastChild.textContent = d ? 'Belum disimpan' : 'Tersimpan'; });
@@ -354,7 +358,7 @@ function renderMenu() {
   } else if (mmTab === 'proyek') {
     B.append(h('div', { class: 'u2m-grid' }, big('Simpan', done(() => QS.quickSave())), big('Simpan sebagai…', done(() => QS.saveAs())), big('Render cepat', done(() => api.exportWav()))));
     const end = state.tracks.reduce((m, t) => t.clips.reduce((a, c) => Math.max(a, c.start + c.len), m), 0);
-    const bpmV = h('button', { class: 'u2m-fld' }, state.bpm.toFixed(1) + ' BPM'); bpmV.onclick = done(() => Tempo.openTempo());
+    const bpmV = h('button', { class: 'u2m-fld' }, state.bpm.toFixed(1) + ' BPM'); bpmV.onclick = done(() => PN.openTempoPanel());
     const step = (d) => () => { P.setBpm(clamp(Math.round(state.bpm) + d, 20, 999)); bpmV.textContent = state.bpm.toFixed(1) + ' BPM'; };
     const nm = h('button', { class: 'u2m-fld' }, state.projectName || 'Tanpa nama'); nm.onclick = () => ask('Nama lagu', state.projectName, (v) => { if (v && v.trim()) { state.projectName = v.trim(); renderMenu(); } });
     B.append(h('h3', null, 'Info lagu'),
@@ -404,4 +408,4 @@ export function initUi2(a) {
   readouts();
 }
 export function frame() { if (!on) return; syncCol(); placeBub(); placeIns(); }
-export function back() { if (closeMenu()) return true; if (bub) { hideBub(); return true; } if (ins) { hideIns(); return true; } return false; }
+export function back() { if (PN.close()) return true; if (closeMenu()) return true; if (bub) { hideBub(); return true; } if (ins) { hideIns(); return true; } return false; }

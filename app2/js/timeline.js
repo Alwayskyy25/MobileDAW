@@ -264,9 +264,9 @@ function drawClip(t, c, y, hh) {
   // Live (replica of the arrangement clip, same in every theme: clip colours are not themed): title strip and body in the clip colour, the name and the
   // content (waveform / notes / envelope) in near-black on a light colour or near-white on a dark one, a thin dark edge; a selected clip turns lighter,
   // a deactivated clip is grey. Folded / short rows show only the colour + content (no strip).
-  const body = c.muted ? '#9a9a9f' : t.color;                              // owner: the clip keeps exactly its track's colour (the header's) also when selected; the light edge shows the selection
+  const body = c.muted ? (V2 ? '#3a3a3e' : '#9a9a9f') : V2 ? shade(t.color, 0.62) : t.color;   // MobileDAW 2: a deep tone of the track colour, the content bright on it                              // owner: the clip keeps exactly its track's colour (the header's) also when selected; the light edge shows the selection
   ctx.fillStyle = body; ctx.fillRect(x, y0, w, h0);
-  const strip = V2 && !c.muted ? shade(col, 0.28) : col;   // MobileDAW 2: a deeper title strip, the name in light text
+  const strip = V2 ? (c.muted ? '#55555b' : t.color) : col;   // MobileDAW 2: the title strip in the full track colour
   if (tall) { ctx.fillStyle = strip; ctx.fillRect(x, y0, w, hd); ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.fillRect(x, y0 + hd, w, 1); }   // the name strip: same colour, a faint line under it
   // Live 12 (refs/live12-official/02): no outline around a clip; the arrangement grid runs through its body as faint darker lines (beats, bars)
   { const gx = gridT(), bp = BAR * view.ppt; if (gx * view.ppt >= 6) { ctx.fillStyle = 'rgba(0,0,0,.08)'; for (let tk = Math.ceil(cs / gx) * gx; tk < cs + cl; tk += gx) { const lx = Math.round(tx(tk)); if (lx > xs && lx < xe) ctx.fillRect(lx, y0 + hd, 1, h0 - hd); } }
@@ -286,7 +286,7 @@ function drawClip(t, c, y, hh) {
     ctx.fillStyle = INK; for (const p of pts) { const px = x + p.t * view.ppt; if (px >= xs - 3 && px <= xe + 3) ctx.fillRect(px - 2, yy(p.v) - 2, 4, 4); }   // breakpoints, as in Live's automation
   } else if (t.kind === 'audio' && (c.dsample || c.sample) && ((c.dsample || c.sample).pyr || (c.dsample || c.sample).peaks) && bh > 8) {
     const es = c.dsample || c.sample, lk = live.get(c.id) || 1, o = c.offset || 0;
-    ctx.fillStyle = c.muted ? INK : shade(t.color, 0.72);   // Live 12 (refs/live12-official 02, 03): the waveform in a deep tone of the clip colour, not black
+    ctx.fillStyle = V2 ? (c.muted ? 'rgba(200,200,205,.45)' : tint(t.color, 0.15)) : c.muted ? INK : shade(t.color, 0.72);   // Live 12 (refs/live12-official 02, 03): the waveform in a deep tone of the clip colour, not black
     for (const g of P.loopSegs(c)) {                            // a clip longer than its audio repeats it: every repeat is drawn from the start of the content
       const sx = x + g.o * view.ppt, sw = g.len * view.ppt;
       if (sx > xe || sx + sw < xs) continue;
@@ -306,7 +306,7 @@ function drawClip(t, c, y, hh) {
     }
   } else if (c.notes && bh > 6) {
     const [lo, hi] = noteBox(c), span = hi - lo + 1, nh = Math.max(2, Math.min(bh / span * 0.8, 7));   // Live: solid note bars, about 4/5 of a pitch row
-    ctx.fillStyle = c.muted ? INK : shade(t.color, 0.85);   // Live 12: notes nearly black (the clip colour's darkest tone), in every theme
+    ctx.fillStyle = V2 ? (c.muted ? 'rgba(200,200,205,.45)' : tint(t.color, 0.1)) : c.muted ? INK : shade(t.color, 0.85);   // Live 12: notes nearly black (the clip colour's darkest tone), in every theme
     for (const g of P.loopSegs(c)) {                            // looped MIDI: the notes are drawn again in every repeat (no empty bars)
       const gx = x + g.o * view.ppt;
       if (gx > xe || gx + g.len * view.ppt < xs) continue;
