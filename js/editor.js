@@ -27,7 +27,7 @@ const SCALES = { Chromatic: null, Major: [0, 2, 4, 5, 7, 9, 11], Minor: [0, 2, 3
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const BLACK = new Set([1, 3, 6, 8, 10]);
 
-const cfg = { snap: 6, snapOn: true, fold: false, key: 0, scale: 'Chromatic', lastScale: 'Major', lock: false, vel: true, velH: 0, lane: 'vel', cc: { k: 'bend', n: 0 }, ccErase: false, mode: 'auto', lastLen: [60, 120, 240, 480, 960, 1920, 3840].includes(+prefs.defLen) ? +prefs.defLen : STEP, follow: true };   // velH: lane height dragged by the user (0 = automatic)
+const cfg = { vokFocus: -1, snap: 6, snapOn: true, fold: false, key: 0, scale: 'Chromatic', lastScale: 'Major', lock: false, vel: true, velH: 0, lane: 'vel', cc: { k: 'bend', n: 0 }, ccErase: false, mode: 'auto', lastLen: [60, 120, 240, 480, 960, 1920, 3840].includes(+prefs.defLen) ? +prefs.defLen : STEP, follow: true };   // velH: lane height dragged by the user (0 = automatic)
 const v = { x0: 0, ppt: 0.12, top: 84, keyH: 16 };
 const sv = { x0: 0, stepW: 30, y0: 0, rowH: 38 };
 let side = null, padSel = -1, padTrack = -1;   // drum pad panel (right of the step grid) and the pad it shows
@@ -201,12 +201,24 @@ function drawRoll(t, c) {
   for (const n of c.notes) {
     const x = px(n.t), w = Math.max(3, n.d * v.ppt), y = py(n.p) - v.keyH;
     if (x + w < KEYS || x > W || y > gb || y + v.keyH < RULER) continue;
-    const s = sel.has(n), nc = noteHex(t, n);
+    const s = sel.has(n), nc = noteHex(t, n), dim = mv && cfg.vokFocus >= 0 && (n.img || 0) !== cfg.vokFocus && !s;
+    ctx.globalAlpha = dim ? 0.18 : 1;
     ctx.fillStyle = velCol(nc, n.v, s); ctx.fillRect(x, y + 1, w - 1, v.keyH - 1);
     ctx.strokeStyle = s ? C('#ffffff') : shadeC(nc, 0.6); ctx.lineWidth = s ? 1.5 : 1; ctx.strokeRect(x + 0.5, y + 1.5, w - 2, v.keyH - 2);   // flat note, hairline outline (Live: no bevel)
     if (w > 16 && (s || w > 30)) { ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x + w - 5, y + 4, 2, Math.max(2, v.keyH - 7)); }   // right edge: resize grip, kept for touch
     if (n.sl) { ctx.strokeStyle = nInk; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x + 2, y + v.keyH - 1); ctx.lineTo(x + Math.min(w - 3, v.keyH * 1.6), y + 3); ctx.stroke(); }   // slide note: a rising stroke (glide)
     if (w > 34 && v.keyH >= 13) { ctx.fillStyle = mv ? 'rgba(14,14,18,.85)' : nInk; ctx.fillText((n.sl ? '\u2197 ' : '') + (mv ? vocName(t, n.img || 0) + ' \u00b7 ' : '') + pName(n.p), x + 4 + (n.sl ? 4 : 0), y + v.keyH / 2 + 1, w - 9); }
+    else if (mv && w > 13 && v.keyH >= 9) { ctx.fillStyle = 'rgba(14,14,18,.85)'; ctx.font = FONT(700, 8); ctx.fillText(vocShort(t, n.img || 0), x + 2, y + v.keyH / 2 + 1, w - 3); ctx.font = FONT(600, 9); }   // narrow note: the vocal's short name (im, b1 ...)
+    ctx.globalAlpha = 1;
+  }
+  if (mv) {                                                        // the vocal band under the ruler: which vocal sounds when, named where it changes
+    const BH = 13, ns = [...c.notes].sort((a, b) => a.t - b.t); ctx.fillStyle = 'rgba(30,30,34,.92)'; ctx.fillRect(KEYS, RULER, W - KEYS, BH);
+    let lastG = -1, lastX = -1e9; ctx.font = FONT(700, 9); ctx.textBaseline = 'middle';
+    for (const n of ns) { const g = n.img || 0, x = px(n.t), w = Math.max(2, n.d * v.ppt); if (x + w < KEYS || x > W) { lastG = g; continue; }
+      ctx.globalAlpha = cfg.vokFocus >= 0 && g !== cfg.vokFocus ? 0.25 : 1; ctx.fillStyle = VOC[g & 7]; ctx.fillRect(x, RULER + 2, w, BH - 4);
+      if (g !== lastG && x - lastX > 40) { ctx.fillStyle = '#f4f4f6'; ctx.fillText(vocName(t, g), Math.max(KEYS + 2, x) + 2, RULER + BH / 2 + 0.5, 90); lastX = x; }
+      lastG = g; }
+    ctx.globalAlpha = 1;
   }
   if (drag && drag.k === 'rect' && drag.pending) { ctx.strokeStyle = 'rgba(170,210,240,.9)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(drag.x0, drag.y0, 14, 0, 7); ctx.stroke(); }   // long press recognised: the rubber band starts here
   if (drag && drag.k === 'rect' && !drag.pending) { ctx.fillStyle = 'rgba(120,182,230,.14)'; ctx.strokeStyle = 'rgba(170,210,240,.9)'; ctx.lineWidth = 1; ctx.fillRect(drag.x, drag.y, drag.w, drag.h); ctx.strokeRect(drag.x + 0.5, drag.y + 0.5, drag.w, drag.h); }
@@ -276,16 +288,7 @@ function ccPaint(c, x, y) {
 // Harmor: a note's image (img 0..7 = vocal 1..8 of the Harmor: several vocals in one pattern)
 const isHarmor = () => { const t = P.state.tracks[P.state.sel.track]; return !!(t && t.inst && t.inst.type === 38); };
 // a Harmor with more than one vocal: each vocal its own note colour and name, so imut / body notes read apart in one pattern
-const VOC = ['#2ec5d9', '#ff9f1c', '#ff5fa8', '#a07cff', '#5bd46c', '#ff6145', '#f0d84a', '#5b9dff'];
-const vocSrc = (t, g) => (g ? (t.inst.hmI || {})[g] : t.inst.hm) || null;
-const vocals = (t) => { if (!t || !t.inst || t.inst.type !== 38) return []; const out = []; for (let g = 0; g < 8; g++) if (vocSrc(t, g)) out.push(g); return out; };
-const multiVoc = (t) => vocals(t).length > 1;
-function vocName(t, g) {                        // file name (without extension), + the vocal's Start when several vocals share one file
-  const x = vocSrc(t, g); if (!x) return 'Vokal ' + (g + 1); if (x.name) return x.name;
-  const base = x.path.split('/').pop().replace(/\.[^.]+$/, ''), same = vocals(t).filter((q) => vocSrc(t, q).path === x.path);
-  if (same.length < 2) return base;
-  const st = t.inst.params[g ? 1100 + 10 * (g - 1) + 4 : 1070] || 0; return base + ' ' + Math.round(st * 100) + '%';
-}
+const VOC = P.VOC_COLORS, vocals = P.vocList, vocName = P.vocName, vocShort = P.vocShort, multiVoc = (t) => vocals(t).length > 1;
 const noteHex = (t, n) => (multiVoc(t) ? VOC[(n.img || 0) & 7] : t.color);
 function laneChooser(x, y) {
   const c = cur().clip, has = (k, n) => (c.cc || []).some((l) => l.k === k && l.n === n && l.pts.length);
@@ -336,12 +339,14 @@ function drawVel(t, c, gb) {
     for (const n of c.notes) {
       const s = sel.has(n); if ((pass === 1) !== s) continue;
       const x = Math.round(px(n.t)) + 0.5; if (x < KEYS - 4 || x > W + 4) continue;
+      ctx.globalAlpha = multiVoc(t) && cfg.vokFocus >= 0 && (n.img || 0) !== cfg.vokFocus && !s ? 0.18 : 1;
       const vv = Math.min(1, n.v), col = s ? C('#ffffff') : velCol(noteHex(t, n), isPan ? 1 : vv, false);   // an imported FLM boost (velocity above 1) sits at the top
       const y = isPan ? cy + pan0(n) * hh / 2 : isImg ? top + (1 - (n.img || 0) / 7) * hh : top + (1 - vv) * hh, from = isPan ? cy : bottom;
       ctx.fillStyle = col; ctx.fillRect(x - 0.75, Math.min(from, y), 1.5, Math.max(1, Math.abs(from - y)));          // stem
       ctx.beginPath(); ctx.arc(x, y, s ? 3.6 : 3, 0, 6.2832); ctx.fill();                                              // head
       if (!s) { ctx.strokeStyle = shadeC(t.color, 0.6); ctx.lineWidth = 1; ctx.stroke(); }
       if (isImg) { ctx.fillStyle = C('#e8e8ec'); ctx.font = FONT(700, 9); ctx.textBaseline = 'bottom'; ctx.fillText(String((n.img || 0) + 1), x + 4, y - 1); }   // the vocal's number
+      ctx.globalAlpha = 1;
     }
   }
   ctx.restore();
@@ -1260,8 +1265,11 @@ function toolbar() {
   if (multiVoc(t)) { const cv = cfg.vok || 0;
     tools.append(SEP(), h('div', { class: 'ed-g ed-voc' }, ...vocals(t).map((g) => {
       const b = h('button', { class: 'b ed-vocb' + (g === cv ? ' on' : ''), title: sel.size ? 'Jadikan ' + sel.size + ' not terpilih vokal ini' : 'Not baru memakai vokal ini', onclick: () => {
-        cfg.vok = g; if (sel.size) { checkpoint(); for (const n of sel) { if (g) n.img = g; else delete n.img; } changed(); toast(sel.size + ' not \u2192 ' + vocName(t, g), 1300); } toolbar(); invalidate(); } }, h('i', { class: 'ed-vocdot' }), vocName(t, g));
-      b.style.setProperty('--voc', VOC[g]); return b; })));
+        cfg.vok = g; if (sel.size) { checkpoint(); for (const n of sel) { if (g) n.img = g; else delete n.img; } changed(); toast(sel.size + ' not \u2192 ' + vocName(t, g), 1300); }
+        else { cfg.vokFocus = cfg.vokFocus === g ? -1 : g; toast(cfg.vokFocus >= 0 ? 'Fokus: ' + vocName(t, g) + ' (vokal lain diredupkan) \u2022 not baru = ' + vocName(t, g) : 'Semua vokal tampil', 1600); }
+        toolbar(); invalidate(); } }, h('i', { class: 'ed-vocdot' }), vocName(t, g), h('span', { class: 'ed-vocn' }, String(c.clip.notes.filter((n) => (n.img || 0) === g).length)));
+      b.style.setProperty('--voc', VOC[g]); if (cfg.vokFocus === g) b.classList.add('focus'); return b; }),
+      B('Semua', () => { cfg.vokFocus = -1; toolbar(); invalidate(); }, !(cfg.vokFocus >= 0))));
   }
   // Live 12's velocity tools (refs/live12/010): Randomize and Ramp, on the selected notes (all notes when none is selected)
   if (cfg.vel && cfg.lane === 'vel') tools.append(SEP(), h('div', { class: 'ed-g' },

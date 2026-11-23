@@ -422,6 +422,20 @@ export function slideLane(c, f) {
   }
   return n;
 }
+// Harmor vocals (several in one Harmor): a colour and a name per vocal, shared by the piano roll and the arrangement's clip preview
+export const VOC_COLORS = ['#2ec5d9', '#ff9f1c', '#ff5fa8', '#a07cff', '#5bd46c', '#ff6145', '#f0d84a', '#5b9dff'];
+export const vocSrc = (t, g) => (t && t.inst && t.inst.type === 38 ? (g ? (t.inst.hmI || {})[g] : t.inst.hm) || null : null);
+export const vocList = (t) => { const out = []; for (let g = 0; g < 8; g++) if (vocSrc(t, g)) out.push(g); return out; };
+export function vocName(t, g) {                        // its own name, else the file name (+ its Start when several vocals share one file)
+  const x = vocSrc(t, g); if (!x) return 'Vokal ' + (g + 1); if (x.name) return x.name;
+  const base = x.path.split('/').pop().replace(/\.[^.]+$/, ''), same = vocList(t).filter((q) => vocSrc(t, q).path === x.path);
+  if (same.length < 2) return base;
+  const st = t.inst.params[g ? 1100 + 10 * (g - 1) + 4 : 1070] || 0; return base + ' ' + Math.round(st * 100) + '%';
+}
+export function vocShort(t, g) {                       // 'body 1' -> 'b1', 'imut' -> 'im'
+  const w = vocName(t, g).split(/[\s_\-]+/).filter(Boolean); if (!w.length) return String(g + 1);
+  const last = w[w.length - 1]; return /^\d+%?$/.test(last) && w.length > 1 ? w[0][0] + last.replace('%', '') : w[0].slice(0, 2);
+}
 export function clipNoteEvents(c, kind, f = [], st6 = false) {   // st6: a 6th value per note = pitch offset in semitones (drum step Pitch lane) / the note's image (img, Harmor)
   let n = 0;
   const xp = kind === 'drum' ? 0 : (c.xpose | 0);   // xpose = clip transpose (semitones, playback only)
