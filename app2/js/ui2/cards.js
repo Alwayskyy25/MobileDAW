@@ -124,7 +124,9 @@ function hslider(p, label, get, set, onLong) {
   el.sync = () => { if (!d) paint(); }; paint(); return el;
 }
 // a vertical slider (an instrument's envelope stages and levels): drag up / down, double tap = default, long press = automation
-const ENV_RE = /(^|\s)(attack|atk|att|decay|dec|sustain|sus|release|rel|hold|delay|dly)$/i;
+const ENV_RE = /(^|\s)(attack|atk|att|decay|dec|sustain|sus|release|rel|hold|delay|dly|predelay|pre ?delay)$/i;
+// faders for the close-set controls (amounts, depths, tracking, detune / spread / phase, mixes); knobs for the main tone controls
+const FADER_RE = /(^|\s)(amount|amt|depth|kbd|kbd ?trk|key ?(trk|track)|vel|vel ?(trk|track|sens)|velocity|detune|dtn\.? spread|spread|phase|phase rand|slide|glide|sub osc|noise|unison pan|mix|dry|wet|er|width)$/i;
 function vslider(p, label, get, set, onLong) {
   const tr = h('div', { class: 'tr' }, h('i', { class: 'f' }), h('em')), v = h('span', { class: 'v' });
   const el = h('div', { class: 'u2vs', role: 'slider', 'aria-label': label, 'aria-orientation': 'vertical', tabindex: 0 }, h('span', { class: 'n', title: p.n }, label), tr, v);
@@ -155,7 +157,8 @@ function stepper(p, label, get, set) {
 function control(p, label, get, set, onLong, vert) {
   if (vert) {   // an instrument's panel: lists as steppers, envelope stages and levels as vertical sliders
     if (isList(p)) return stepper(p, label, get, set);
-    if (!isSwitch(p) && (SLIDER_RE.test(String(p.n).trim()) || ENV_RE.test(String(p.n).trim()))) return vslider(p, label, get, set, onLong);
+    if (!isSwitch(p) && (ENV_RE.test(String(p.n).trim()) || FADER_RE.test(String(p.n).trim()))) return vslider(p, label, get, set, onLong);
+    if (!isSwitch(p)) return dial(p, label, get, set, onLong);   // gain, level, pan, cutoff, pitch, rate...: a knob
   }
   if (!isList(p) && !isSwitch(p) && SLIDER_RE.test(String(p.n).trim())) return hslider(p, label, get, set, onLong);
   if (isList(p)) return choice(p, label, get, set);
@@ -262,7 +265,7 @@ function body(key, groups, mk, every, bigTabs, onTab) {
       const hh = Math.floor(Math.min(card.getBoundingClientRect().bottom, sc.getBoundingClientRect().bottom) - 8 - cl.getBoundingClientRect().top); if (!(hh > 40)) return;
       if (cl.style.height !== hh + 'px') cl.style.height = hh + 'px';
       const kn = cl.querySelector('.u2col.kn'), tg = cl.querySelector('.u2col.tg');
-      if (kn) { const n = kn.children.length, r = Math.max(1, Math.min(n > 2 ? 2 : 1, Math.floor(hh / 74))), c = Math.ceil(n / r);
+      if (kn) { const n = kn.children.length, r = Math.max(1, Math.min(n >= 6 ? 2 : 1, Math.floor(hh / 64))), c = Math.ceil(n / r);
         if (kn.style.getPropertyValue('--kr') !== String(r)) kn.style.setProperty('--kr', String(r)); kn.style.flexGrow = String(c); kn.style.minWidth = (c * 64) + 'px'; }
       if (tg) { const n = tg.children.length, r = Math.max(1, Math.min(n, Math.floor(hh / 40))), c = Math.ceil(n / r);
         if (tg.style.getPropertyValue('--tr') !== String(r)) tg.style.setProperty('--tr', String(r)); tg.style.flexGrow = String(c * 1.5); tg.style.minWidth = (c * 128) + 'px'; }
