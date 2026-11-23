@@ -191,7 +191,8 @@ class Moist2 : public Instrument {
   void setTempo(double b) override { bpm = b > 0 ? b : 120; }
   void setMod(double v) override { wheel = v; }
   bool hasSetBend() override { return true; }
-  void setBend(double st) override { bendSt = st; }
+  void setBend(double st) override { bendSt = st; slideSt = 0; }
+  void setBendSl(double st, double sl) override { bendSt = st; slideSt = std::isfinite(sl) ? sl : 0; }   // slide notes: exact semitones, not scaled by Bend Up / Down
   void setParam(int i, double v) override {
     if (i < 0 || i >= M2_PARAMS) return;
     if (i == M2_SMP_A || i == M2_SMP_B) { p[i] = v; loadCustom(i == M2_SMP_A ? 0 : 1, (int)v); return; }
@@ -239,7 +240,7 @@ class Moist2 : public Instrument {
   }
 
  private:
-  double sr, bpm = 120, wheel = 0, bendSt = 0, lastFreq = 0; Bank* bank;
+  double sr, bpm = 120, wheel = 0, bendSt = 0, slideSt = 0, lastFreq = 0; Bank* bank;
   double p[M2_PARAMS];
   Voice voices[POLY]; unsigned char held[128] = {}; unsigned heldOrder[128] = {}; unsigned clock = 0;
   Table custom[2]; const Table* tblA = nullptr; const Table* tblB = nullptr;
@@ -287,7 +288,7 @@ class Moist2 : public Instrument {
 
   void renderBlock(float* L, float* R, int n) {
     std::fill(bufL.begin(), bufL.begin() + n, 0.0f); std::fill(bufR.begin(), bufR.begin() + n, 0.0f);
-    const double dt = 1.0 / sr, bendR = bendSt >= 0 ? bendSt * (std::round(p[166] * 48 - 24)) / 2.0 : -bendSt * (std::round(p[167] * 48 - 24)) / 2.0;   // the engine's ±2 st wheel scaled to Bend Up / Down
+    const double dt = 1.0 / sr, bendR0 = bendSt >= 0 ? bendSt * (std::round(p[166] * 48 - 24)) / 2.0 : -bendSt * (std::round(p[167] * 48 - 24)) / 2.0, bendR = bendR0 + slideSt;   // the engine's ±2 st wheel scaled to Bend Up / Down
     const int nA = std::max(1, (int)std::lround(p[6] * 16)), nB = std::max(1, (int)std::lround(p[19] * 16));
     const int wmA = idxOf(p[168], WARPS), wmB = idxOf(p[169], WARPS), subSh = idxOf(p[170], 6); const double subOct = std::round(p[171] * 8 - 4);
     const FType ft = ftype(p[44]); const bool filtOn = p[216] > 0.5, toF[4] = { p[40] > 0.5, p[41] > 0.5, p[42] > 0.5, p[43] > 0.5 };

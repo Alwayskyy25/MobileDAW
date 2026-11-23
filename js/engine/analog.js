@@ -36,7 +36,8 @@ const mkVoice = () => ({ on: false, held: false, pitch: 0, vel: 0, age: 0, f: 0,
 export class Analog {
   constructor(sr) { this.sr = sr; this.counter = 0; this.rng = { seed: 4242 }; this.bend = 0; this.bpm = 120; this.p = new Array(92).fill(0); this.v = Array.from({ length: 32 }, mkVoice); this.lph = [0, 0]; this.lsh = [0, 0]; this.vph = 0; this.held = []; }
   setTempo(b) { this.bpm = b; }
-  setBend(st) { this.bend = st; }
+  setBend(st) { this.bend = st; this.slide = 0; }
+  setBendSl(st, sl) { this.bend = st; this.slide = Number.isFinite(sl) ? sl : 0; }   // slide notes: exact semitones, not scaled by PB Range
   setParam(i, x) { this.p[i] = x; }
   active() { for (const v of this.v) if (v.on) return true; return false; }
   start(v, p, vel, legato) {
@@ -76,7 +77,7 @@ export class Analog {
         if (v.cnt-- <= 0) {
           v.cnt = CT - 1;
           v.gf = glide ? v.f + (v.gf - v.f) * glide : v.f;
-          const bendSt = this.bend / 2 * p[88] + vib + v.uni * p[82];
+          const bendSt = this.bend / 2 * p[88] + (this.slide || 0) + vib + v.uni * p[82];
           for (let o = 0; o < 2; o++) {
             const b = o * 12, st = p[b + 4] * 12 + p[b + 5] + p[b + 6] + bendSt + lv[o] * p[b + 10] * 12 + (p[b + 9] ? v.fe[o].v * p[b + 9] * 12 : 0);
             v.d[o] = clamp((p[b + 11] > 0.5 ? v.gf : 261.63) * Math.pow(2, st / 12) / sr, 0, 0.45); v.pw[o] = 0.5 - p[b + 7] * 0.45;

@@ -58,7 +58,7 @@ void Analog::render(float* L, float* R, int from, int to) {
       if (x.cnt-- <= 0) {
         x.cnt = CT - 1;
         x.gf = glide != 0 ? x.f + (x.gf - x.f) * glide : x.f;
-        double bendSt = bend / 2 * p[88] + vib + x.uni * p[82];
+        double bendSt = bend / 2 * p[88] + slide + vib + x.uni * p[82];
         for (int o = 0; o < 2; o++) {
           int b = o * 12; double st = p[b + 4] * 12 + p[b + 5] + p[b + 6] + bendSt + lv[o] * p[b + 10] * 12 + (p[b + 9] != 0 ? x.fe[o].v * p[b + 9] * 12 : 0);
           x.d[o] = clamp((p[b + 11] > 0.5 ? x.gf : 261.63) * std::pow(2, st / 12) / sr, 0, 0.45); x.pw[o] = 0.5 - p[b + 7] * 0.45;

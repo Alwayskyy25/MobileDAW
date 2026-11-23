@@ -18,7 +18,9 @@ class Operator : public Instrument {
   double sr, bpm = 120, bend = 0, p[96] = {}; uint32_t counter = 0, seed = 991; OpVoice v[16]; int wav[4] = {}; bool on[4] = { true, false, false, false };
   void setTempo(double b) override { bpm = b; }
   bool hasSetBend() override { return true; }
-  void setBend(double st) override { bend = st; }
+  void setBend(double st) override { bend = st; slide = 0; }
+  void setBendSl(double st, double sl) override { bend = st; slide = std::isfinite(sl) ? sl : 0; }   // slide notes: exact semitones, not scaled by PB Range
+  double slide = 0;
   void setParam(int i, double x) override { if (i >= 0 && i < 96) p[i] = x; }
   bool active() override { for (auto& x : v) if (x.on) return true; return false; }
   void noteOn(int pt, double vel) override;

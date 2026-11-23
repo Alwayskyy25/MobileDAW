@@ -35,7 +35,8 @@ const dbl = (db) => (db <= -60 ? 0 : Math.pow(10, db / 20));
 export class Operator {
   constructor(sr) { this.sr = sr; this.counter = 0; this.rng = { seed: 991 }; this.bend = 0; this.p = new Array(96).fill(0); this.v = Array.from({ length: 16 }, mkVoice); this.bpm = 120; this.wav = [0, 0, 0, 0]; this.on = [true, false, false, false]; }
   setTempo(b) { this.bpm = b; }
-  setBend(st) { this.bend = st; }
+  setBend(st) { this.bend = st; this.slide = 0; }
+  setBendSl(st, sl) { this.bend = st; this.slide = Number.isFinite(sl) ? sl : 0; }   // slide notes: exact semitones, not scaled by PB Range
   setParam(i, x) { this.p[i] = x; }
   active() { for (const v of this.v) if (v.on) return true; return false; }
   noteOn(p, vel) {
@@ -58,7 +59,7 @@ export class Operator {
       for (let i = from; i < to; i++) {
         if (v.cnt-- <= 0) {
           v.cnt = CT - 1; let alive = false;
-          const f0 = v.f * Math.pow(2, this.bend / 2 * p[82] / 12);
+          const f0 = v.f * Math.pow(2, (this.bend / 2 * p[82] + (this.slide || 0)) / 12);
           for (let o = 0; o < 4; o++) {
             const b = o * 16, e = v.e[o].step(p[b + 10] * 0.001 * time, p[b + 11] * 0.001 * time, dbl(p[b + 12]), p[b + 13] * 0.001 * time, dbl(p[b + 14]), dbl(p[b + 15]), Math.round(p[64 + o]), dtc);
             if (v.e[o].st !== 0 && alg.c.includes(o) && on[o]) alive = true;

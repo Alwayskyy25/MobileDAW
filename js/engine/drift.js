@@ -44,7 +44,8 @@ export class Drift {
     this.v = Array.from({ length: 32 }, mkVoice); this.held = []; this.last = 0; this.md = new Float64Array(13);
   }
   setTempo(b) { this.bpm = b; }
-  setBend(st) { this.bend = st; }
+  setBend(st) { this.bend = st; this.slide = 0; }
+  setBendSl(st, sl) { this.bend = st; this.slide = Number.isFinite(sl) ? sl : 0; }   // slide notes: exact semitones, not scaled by PB Range
   setParam(i, x) { this.p[i] = x; }
   active() { for (const v of this.v) if (v.on) return true; return false; }
   maxVoices() { const m = Math.round(this.p[50]); return m === 1 ? 1 : m === 3 ? 4 : VOICES[clamp(Math.round(this.p[51]), 0, 7)]; }
@@ -111,7 +112,7 @@ export class Drift {
           for (let s = 0; s < 3; s++) { const dst = Math.round(p[60 + s * 3]); if (dst > 0) md[dst] += this.src(v, Math.round(p[59 + s * 3]), e1, e2, lf) * p[61 + s * 3]; }
           v.dT -= dtc; if (v.dT <= 0) { v.dT = 0.15 + rnd(this.rng) * 0.3; v.dG = (rnd(this.rng) * 2 - 1); } v.drift += ((v.dG || 0) - v.drift) * 0.02;
           v.glideF = glide ? v.f + (v.glideF - v.f) * glide : v.f;
-          const pm = this.src(v, Math.round(p[8]), e1, e2, lf) * p[9] * 12 + this.src(v, Math.round(p[10]), e1, e2, lf) * p[11] * 12 + md[6] * 12 + this.bend / 2 * p[58] + v.det + v.drift * p[52] * 0.3;
+          const pm = this.src(v, Math.round(p[8]), e1, e2, lf) * p[9] * 12 + this.src(v, Math.round(p[10]), e1, e2, lf) * p[11] * 12 + md[6] * 12 + this.bend / 2 * p[58] + (this.slide || 0) + v.det + v.drift * p[52] * 0.3;
           const f = v.glideF * Math.pow(2, pm / 12);
           d1 = clamp(f * Math.pow(2, Math.round(p[1])) / sr, 0, 0.45); d2 = clamp(f * Math.pow(2, Math.round(p[6]) + (p[7] + md[5] * 12) / 12) / sr, 0, 0.45);
           sh = clamp(p[2] + this.src(v, Math.round(p[3]), e1, e2, lf) * p[4] + md[4], 0, 1);

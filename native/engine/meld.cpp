@@ -91,7 +91,7 @@ void Meld::render(float* L, float* R, int from, int to) {
           double p1 = E.l1; E.l1 += r1 * dtc; if (std::floor(E.l1) != std::floor(p1)) { bool w5 = jsRound(q(O_L1W)) == 5; double a = E.s1 * 0.5 * (w5 ? 1 : 0); E.s1 = a + (rnd01(seed) * 2 - 1) * (w5 ? 0.5 : 1); }
           double p2 = E.l2; E.l2 += r2 * dtc; if (std::floor(E.l2) != std::floor(p2)) E.s2 = rnd01(seed) * 2 - 1;
           src[2] = lfo(q(O_L1W), E.l1 + q(O_L1P) / 360, q(O_L1SH), q(O_L1F), E.s1) * q(O_FX1) * fade; src[3] = lfo(q(O_L2W), E.l2 + q(O_L2P) / 360, 0, 0, E.s2); E.lv1 = src[2]; E.lv2 = src[3];
-          double st = q(O_OCT) * 12 + q(O_SEMI) + q(O_FINE) / 100 + bend / 2 * p[MG + 7] + x.det;
+          double st = q(O_OCT) * 12 + q(O_SEMI) + q(O_FINE) / 100 + bend / 2 * p[MG + 7] + slide + x.det;
           E.d = clamp(x.f * std::pow(2, st / 12) / sr, 0, 0.45);
           E.shape = clamp(q(O_SHAPE) + m(0), 0, 1); E.tone = clamp(q(O_TONE) + m(1), 0, 1);
           double fc = clamp(q(O_FREQ) * std::pow(2, m(2) * 6), 20, sr * 0.45), qq = clamp(q(O_Q) + m(3), 0, 1); E.morph = clamp(q(O_MORPH) + m(4), 0, 1);

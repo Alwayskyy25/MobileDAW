@@ -51,4 +51,19 @@ ok(b2 > 0.03 && b1 < a1 * 0.1, `after the slide it sounds an octave up (440 Hz $
   ok(rms(sp.L2, 62400, 86400) < 0.05 * rms(sp.R2, 62400, 86400), 'after a pan slide to +1 the sound is on the right');
   ok(Math.abs(rms(sv.L2, 4800, 19200) - rms(ref.L2, 4800, 19200)) < 1e-6, 'before the slide nothing changes');
 }
+// ---- Live instruments read the wheel in units scaled by their own PB Range (bend / 2 x PB Range): a slide note must still glide by exact
+// semitones (setBendSl keeps the two apart). A note at 57 sliding -3 semitones must end at 48 + ... = 54 (185.0 Hz), whatever the PB Range.
+{
+  const { INSTRUMENTS } = await import(path.join(root, 'js/defs.js'));
+  const f0At = (x, a, b) => { const z = []; for (let k = a; k < b - 1; k++) if (x[k] < 0 && x[k + 1] >= 0) z.push(k + x[k] / (x[k] - x[k + 1])); if (z.length < 3) return 0; const d = []; for (let k = 1; k < z.length; k++) d.push(z[k] - z[k - 1]); d.sort((p, q) => p - q); return SR / d[d.length >> 1]; };
+  for (const [type, name, prm] of [[14, 'Operator', [[22, -60], [38, -60], [54, -60], [83, 1]]], [13, 'Drift', []], [15, 'Analog', []], [16, 'Poli', [[7, 0], [8, 0], [6, 0], [58, 0], [9, 0], [33, 0], [32, 0]]], [17, 'Meld', []]]) {
+    const e3 = new Engine(SR); e3.masterLimit(false); e3.tempo(120); e3.trackInst(0, type); INSTRUMENTS[type].params.forEach((q, k) => { if (q && typeof q.def === 'number') e3.instParam(0, k, q.def); }); for (const [k, v] of prm) e3.instParam(0, k, v); e3.trackVol(0, 1);
+    e3.trackNotes(0, [0, PPQ * 4, 57, 0.8, 0], 1); e3.trackCC(0, [PPQ, 4, 0, PPQ * 2, 4, -3], 2); e3.play();
+    const L3 = new Float32Array(N), R3 = new Float32Array(N); for (let k = 0; k < N; k += 128) e3.render(L3.subarray(k, k + 128), R3.subarray(k, k + 128), 128);
+    // low-pass the render (one-pole x4) so the zero crossings are the fundamental's
+    const lp = Float32Array.from(L3); for (let pass = 0; pass < 4; pass++) { let y = 0; for (let k = 0; k < lp.length; k++) { y += (lp[k] - y) * 0.03; lp[k] = y; } }
+    const fa = f0At(lp, 9600, 22000), fb = f0At(lp, 72000, 90000), st = 12 * Math.log2(fb / fa);
+    ok(Math.abs(st + 3) < 0.15, `${name}: a slide note -3 semitones glides exactly -3 (${st.toFixed(2)} st, ${fa.toFixed(1)} -> ${fb.toFixed(1)} Hz)`);
+  }
+}
 console.log(bad ? `\n${bad} FAILED` : '\nSLIDE NOTES OK'); process.exit(bad ? 1 : 0);

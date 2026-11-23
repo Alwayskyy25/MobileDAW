@@ -41,7 +41,8 @@ export class Poli {
     const N = 2048; this.cl = new Float32Array(N); this.cr = new Float32Array(N); this.cw = 0; this.cph = 0; this.CM = N - 1;
   }
   setTempo(b) { this.bpm = b; }
-  setBend(st) { this.bend = st; }
+  setBend(st) { this.bend = st; this.slide = 0; }
+  setBendSl(st, sl) { this.bend = st; this.slide = Number.isFinite(sl) ? sl : 0; }   // slide notes: exact semitones, not scaled by PB Range
   setParam(i, x) { this.p[i] = x; }
   active() { for (const v of this.v) if (v.on) return true; return false; }
   mode() { return Math.round(this.p[65]); }        // 0 Poly, 1 Mono, 2 Unison
@@ -83,7 +84,7 @@ export class Poli {
           const src = (t) => { const fade = p[16] > 0 ? Math.min(1, v.t / p[16]) : 1, lf = this.lfoV(v) * fade; return cell(G[t + ',0']) * lf + cell(G[t + ',1']) * fe + cell(G[t + ',2']) * ae + cell(M[t + ',0']) * v.vel + cell(M[t + ',1']) * (v.pitch - 60) / 60; };
           v.lph += lfoHz * Math.pow(2, src(6) * 4) * dtc; if (v.lph >= 1) { v.lph -= Math.floor(v.lph); v.lsh = rnd(this.rng) * 2 - 1; }
           v.gf = glide ? v.f + (v.gf - v.f) * glide : v.f;
-          const bendOn = bendAll || v.held, f = v.gf * Math.pow(2, (src(3) * 12 + (bendOn ? this.bend / 2 * p[61] : 0) + v.det) / 12);
+          const bendOn = bendAll || v.held, f = v.gf * Math.pow(2, (src(3) * 12 + (bendOn ? this.bend / 2 * p[61] : 0) + (this.slide || 0) + v.det) / 12);
           v.dS = clamp(f / sr, 0, 0.45); v.pw = clamp(0.5 - p[1] * 0.45 - src(4) * 0.4, 0.05, 0.95); v.ring = clamp((f + p[10]) * Math.pow(2, src(5) * 2) / sr, 0, 0.45);   // RM Freq modulation: +-2 octaves
           const lpf = clamp(p[19] * Math.pow(2, src(0) * 6), 20, sr * 0.45), hpf = clamp(p[18] * Math.pow(2, src(1) * 6), 10, sr * 0.45);
           v.g = Math.tan(Math.PI * lpf / sr); v.k = 2 - 1.95 * p[20]; v.i1 = 1 / (1 + v.g * (v.g + v.k)); v.i2 = 1 / (1 + v.g * (v.g + v.k + 0.3));

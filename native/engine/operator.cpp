@@ -43,7 +43,7 @@ void Operator::render(float* L, float* R, int from, int to) {
     for (int i = from; i < to; i++) {
       if (x.cnt-- <= 0) {
         x.cnt = CT - 1; bool alive = false;
-        double f0 = x.f * std::pow(2, bend / 2 * p[82] / 12);
+        double f0 = x.f * std::pow(2, (bend / 2 * p[82] + slide) / 12);
         for (int o = 0; o < 4; o++) {
           int b = o * 16; double e = x.e[o].step(p[b + 10] * 0.001 * time, p[b + 11] * 0.001 * time, dblO(p[b + 12]), p[b + 13] * 0.001 * time, dblO(p[b + 14]), dblO(p[b + 15]), (int)jsRound(p[64 + o]), dtc);
           if (x.e[o].st != 0 && isC(o) && on[o]) alive = true;

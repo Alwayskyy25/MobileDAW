@@ -39,7 +39,8 @@ const mkVoice = () => ({ on: false, held: false, pitch: 0, vel: 0, age: 0, f: 0,
 export class Meld {
   constructor(sr) { this.sr = sr; this.counter = 0; this.rng = { seed: 909 }; this.bend = 0; this.bpm = 120; this.p = new Array(MELD_B + MELD_N).fill(0); this.v = Array.from({ length: 16 }, mkVoice); this.held = []; this.g1 = [0, 0]; this.g2 = [0, 0]; }
   setTempo(b) { this.bpm = b; }
-  setBend(st) { this.bend = st; }
+  setBend(st) { this.bend = st; this.slide = 0; }
+  setBendSl(st, sl) { this.bend = st; this.slide = Number.isFinite(sl) ? sl : 0; }   // slide notes: exact semitones, not scaled by PB Range
   setParam(i, x) { this.p[i] = x; }
   active() { for (const v of this.v) if (v.on) return true; return false; }
   start(v, p, vel) {
@@ -83,7 +84,7 @@ export class Meld {
             const p1 = E.l1; E.l1 += r1 * dtc; if (Math.floor(E.l1) !== Math.floor(p1)) E.s1 = E.s1 * 0.5 * (Math.round(q(MO.l1w)) === 5) + (rnd(this.rng) * 2 - 1) * (Math.round(q(MO.l1w)) === 5 ? 0.5 : 1);
             const p2 = E.l2; E.l2 += r2 * dtc; if (Math.floor(E.l2) !== Math.floor(p2)) E.s2 = rnd(this.rng) * 2 - 1;
             src[2] = this.lfo(q(MO.l1w), E.l1 + q(MO.l1p) / 360, q(MO.l1sh), q(MO.l1f), E.s1) * q(MO.fx1) * fade; src[3] = this.lfo(q(MO.l2w), E.l2 + q(MO.l2p) / 360, 0, 0, E.s2); E.lv1 = src[2]; E.lv2 = src[3];
-            const st = q(MO.oct) * 12 + q(MO.semi) + q(MO.fine) / 100 + this.bend / 2 * p[G + 7] + v.det;
+            const st = q(MO.oct) * 12 + q(MO.semi) + q(MO.fine) / 100 + this.bend / 2 * p[G + 7] + (this.slide || 0) + v.det;
             E.d = clamp(v.f * Math.pow(2, st / 12) / sr, 0, 0.45);
             E.shape = clamp(q(MO.shape) + m(0), 0, 1); E.tone = clamp(q(MO.tone) + m(1), 0, 1);
             const fc = clamp(q(MO.freq) * Math.pow(2, m(2) * 6), 20, sr * 0.45), qq = clamp(q(MO.q) + m(3), 0, 1); E.morph = clamp(q(MO.morph) + m(4), 0, 1);

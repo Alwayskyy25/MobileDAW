@@ -24,7 +24,9 @@ class Poli : public Instrument {
   float cl[2048] = {}; double cw = 0, cph = 0; int gi[7][3], mi[7][2];
   void setTempo(double b) override { bpm = b; }
   bool hasSetBend() override { return true; }
-  void setBend(double st) override { bend = st; }
+  void setBend(double st) override { bend = st; slide = 0; }
+  void setBendSl(double st, double sl) override { bend = st; slide = std::isfinite(sl) ? sl : 0; }   // slide notes: exact semitones, not scaled by PB Range
+  double slide = 0;
   void setParam(int i, double x) override { if (i >= 0 && i < 71) p[i] = x; }
   bool active() override { for (auto& x : v) if (x.on) return true; return false; }
   int mode() { return (int)jsRound(p[65]); }

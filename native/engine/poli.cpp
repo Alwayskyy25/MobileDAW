@@ -64,7 +64,7 @@ void Poli::render(float* L, float* R, int from, int to) {
         auto src = [&](int t) { double fade = p[16] > 0 ? jsMin(1, x.t / p[16]) : 1, lf = lfoV(x) * fade; return cell(gi[t][0]) * lf + cell(gi[t][1]) * fe + cell(gi[t][2]) * ae + cell(mi[t][0]) * x.vel + cell(mi[t][1]) * (x.pitch - 60) / 60; };
         x.lph += lfoHz * std::pow(2, src(6) * 4) * dtc; if (x.lph >= 1) { x.lph -= std::floor(x.lph); x.lsh = rnd01(seed) * 2 - 1; }
         x.gf = glide != 0 ? x.f + (x.gf - x.f) * glide : x.f;
-        bool bendOn = bendAll || x.held; double f = x.gf * std::pow(2, (src(3) * 12 + (bendOn ? bend / 2 * p[61] : 0) + x.det) / 12);
+        bool bendOn = bendAll || x.held; double f = x.gf * std::pow(2, (src(3) * 12 + (bendOn ? bend / 2 * p[61] : 0) + slide + x.det) / 12);
         x.dS = clamp(f / sr, 0, 0.45); x.pw = clamp(0.5 - p[1] * 0.45 - src(4) * 0.4, 0.05, 0.95); x.ring = clamp((f + p[10]) * std::pow(2, src(5) * 2) / sr, 0, 0.45);
         double lpf = clamp(p[19] * std::pow(2, src(0) * 6), 20, sr * 0.45), hpf = clamp(p[18] * std::pow(2, src(1) * 6), 10, sr * 0.45);
         x.g = std::tan(PI * lpf / sr); x.k = 2 - 1.95 * p[20]; x.i1 = 1 / (1 + x.g * (x.g + x.k)); x.i2 = 1 / (1 + x.g * (x.g + x.k + 0.3));

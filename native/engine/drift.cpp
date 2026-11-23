@@ -77,7 +77,7 @@ void Drift::render(float* L, float* R, int from, int to) {
         for (int s = 0; s < 3; s++) { int dst = rnd_i(p[60 + s * 3]); if (dst > 0) md[dst] += src(x, rnd_i(p[59 + s * 3]), e1, e2, lf) * p[61 + s * 3]; }
         x.dT -= dtc; if (x.dT <= 0) { x.dT = 0.15 + rnd01(seed) * 0.3; x.dG = (rnd01(seed) * 2 - 1); } x.drift += (x.dG - x.drift) * 0.02;
         x.glideF = glide != 0 ? x.f + (x.glideF - x.f) * glide : x.f;
-        double pm = src(x, rnd_i(p[8]), e1, e2, lf) * p[9] * 12 + src(x, rnd_i(p[10]), e1, e2, lf) * p[11] * 12 + md[6] * 12 + bend / 2 * p[58] + x.det + x.drift * p[52] * 0.3;
+        double pm = src(x, rnd_i(p[8]), e1, e2, lf) * p[9] * 12 + src(x, rnd_i(p[10]), e1, e2, lf) * p[11] * 12 + md[6] * 12 + bend / 2 * p[58] + slide + x.det + x.drift * p[52] * 0.3;
         double f = x.glideF * std::pow(2, pm / 12);
         d1 = clamp(f * std::pow(2, jsRound(p[1])) / sr, 0, 0.45); d2 = clamp(f * std::pow(2, jsRound(p[6]) + (p[7] + md[5] * 12) / 12) / sr, 0, 0.45);
         sh = clamp(p[2] + src(x, rnd_i(p[3]), e1, e2, lf) * p[4] + md[4], 0, 1);

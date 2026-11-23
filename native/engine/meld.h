@@ -24,7 +24,9 @@ class Meld : public Instrument {
   double sr, bpm = 120, bend = 0, p[159] = {}, g1[2] = {}, g2[2] = {}; uint32_t counter = 0, seed = 909; MeldVoice* v; int held[128]; int nheld = 0;
   void setTempo(double b) override { bpm = b; }
   bool hasSetBend() override { return true; }
-  void setBend(double st) override { bend = st; }
+  void setBend(double st) override { bend = st; slide = 0; }
+  void setBendSl(double st, double sl) override { bend = st; slide = std::isfinite(sl) ? sl : 0; }   // slide notes: exact semitones, not scaled by PB Range
+  double slide = 0;
   void setParam(int i, double x) override { if (i >= 0 && i < 159) p[i] = x; }
   bool active() override { for (int k = 0; k < 16; k++) if (v[k].on) return true; return false; }
   void start(MeldVoice& x, int pt, double vel);
