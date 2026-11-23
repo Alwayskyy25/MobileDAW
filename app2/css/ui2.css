@@ -703,3 +703,34 @@ html.tc-wide .tc-ctl { height: 28px; }
 .tc-ctl .tc-vol em { left: var(--x); width: 4px; height: 26px; margin: -13px 0 0 -2px; border-radius: 2px; background: var(--tc); box-shadow: none; }
 .tc-ctl .tc-vol:active em { width: 3px; margin-left: -1.5px; }
 .tc-ctl .db { font-size: 11px; color: var(--text); opacity: .8; }
+
+/* ===== floating toolbars (Material You): the bottom navigation and the top tools share one design =====
+   an elevated pill container (44 px), items as 36 px pills with an icon and a label, the selected / switched-on item filled in the
+   accent colour; the icon-only items (metronome) are 36 px circles. The transport pill and BPM use the same container. */
+html.ui2 #bar2 .b2-c, html.ui2 #top2 .tg, html.ui2 #top2 .tpill, html.ui2 #top2 .bpm {
+  height: 44px !important; box-sizing: border-box; padding: 4px !important; gap: 2px !important; border-radius: 999px !important;
+  background: var(--panel2) !important; border: 1px solid color-mix(in srgb, var(--text) 8%, transparent) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .28), 0 1px 3px rgba(0, 0, 0, .2) !important; align-items: center; }
+html.ui2 #bar2 .b2-c .tab, html.ui2 #top2 .tg > button {
+  height: 34px !important; min-width: 0; padding: 0 14px 0 12px !important; gap: 7px !important; border: 0 !important; border-radius: 999px !important;
+  background: transparent !important; color: color-mix(in srgb, var(--text) 82%, transparent) !important; box-shadow: none !important;
+  display: inline-flex !important; flex-direction: row !important; align-items: center; justify-content: center;
+  font: 600 13px/1 var(--font) !important; letter-spacing: 0; transition: background calc(.18s * var(--anim, 1)), color calc(.18s * var(--anim, 1)); }
+html.ui2 #bar2 .b2-c .tab svg, html.ui2 #top2 .tg > button svg { width: 18px !important; height: 18px !important; color: var(--dim); flex: none; }
+html.ui2 #bar2 .b2-c .tab:active, html.ui2 #top2 .tg > button:active { background: color-mix(in srgb, var(--text) 10%, transparent) !important; }
+html.ui2 #bar2 .b2-c .tab.on, html.ui2 #top2 .tg > button.on { background: var(--accent) !important; color: var(--accent-ink, #1b1b1f) !important; }
+html.ui2 #bar2 .b2-c .tab.on svg, html.ui2 #top2 .tg > button.on svg { color: var(--accent-ink, #1b1b1f) !important; }
+/* icon-only items: a circle */
+html.ui2 #top2 .tg > button:not(:has(.lb)):not(:has(span)) { width: 34px; padding: 0 !important; }
+/* badges sit on the icon */
+html.ui2 #bar2 .b2-c .tab { position: relative; }
+html.ui2 #bar2 .b2-c .tab .bdg { position: static; margin-left: 2px; }
+/* + Track and the performance chip: same height as the toolbars */
+html.ui2 #bar2 .add { height: 44px !important; box-shadow: 0 4px 14px rgba(0, 0, 0, .28) !important; }
+html.ui2 #top2 .tpill button { height: 34px !important; }
+html.ui2 #top2 .bpm { width: auto !important; min-width: 0 !important; padding: 0 16px !important; gap: 5px !important; display: inline-flex !important; flex-direction: row !important; align-items: baseline !important; justify-content: center; }
+html.ui2 #top2 .bpm b { font: 700 15px/1 var(--font) !important; }
+html.ui2 #top2 .bpm .lb { font: 600 10.5px/1 var(--font) !important; color: var(--dim); letter-spacing: .04em; }
+html.ui2 #top2 .bpm { padding-top: 0 !important; line-height: 34px; }
+html.ui2 #top2 .bpm { align-items: center !important; line-height: 1 !important; padding-top: 4px !important; padding-bottom: 4px !important; }
+html.ui2 #top2 .bpm > * { display: block; margin: 0 !important; position: static !important; transform: none !important; }
