@@ -693,3 +693,13 @@ html.tc-wide .tc-row .tc-name { height: 28px; }
 .tc-bs .tc-pan.tc-ring i { position: absolute; left: 50%; top: 50%; width: 2.5px; height: 9px; margin: 0 0 0 -1.25px; border-radius: 2px; background: var(--tc); box-shadow: none; transform-origin: 50% 0; transform: rotate(calc(180deg + var(--a))); }
 .tc-ctl .tc-vol { flex: 1; min-width: 60px; }
 .tc-ctl .db { width: 46px; }
+
+/* volume fader in the track column: a Material You slider - a thick rounded track, the active part in the track colour,
+   a tall thin handle with a small gap on each side (no thin line with a dot) */
+html.tc-wide .tc-ctl { height: 28px; }
+.tc-ctl .tc-vol { height: 28px; --x: calc(6px + (100% - 12px) * var(--u)); }
+.tc-ctl .tc-vol::before { left: calc(var(--x) + 6px); right: 0; height: 12px; margin-top: -6px; border-radius: 2px 6px 6px 2px; background: color-mix(in srgb, var(--tc) 22%, color-mix(in srgb, var(--text) 8%, transparent)); }
+.tc-ctl .tc-vol i { left: 0; width: max(0px, calc(var(--x) - 6px)); height: 12px; margin-top: -6px; border-radius: 6px 2px 2px 6px; background: var(--tc); }
+.tc-ctl .tc-vol em { left: var(--x); width: 4px; height: 26px; margin: -13px 0 0 -2px; border-radius: 2px; background: var(--tc); box-shadow: none; }
+.tc-ctl .tc-vol:active em { width: 3px; margin-left: -1.5px; }
+.tc-ctl .db { font-size: 11px; color: var(--text); opacity: .8; }
