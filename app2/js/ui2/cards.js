@@ -196,17 +196,26 @@ function body(key, groups, mk, every, bigTabs) {
     const dl = grid.firstElementChild; if (dl && shownOnce) { dl.classList.remove('swap'); void dl.offsetWidth; dl.classList.add('swap'); } shownOnce = true;
   };
   // rows: as many as the rack is tall (the card is only as tall as its controls, so measure against the rack, not the card)
-  const fit = () => requestAnimationFrame(() => {
-    const sc = grid.closest('.dev-scroll'), dl = grid.querySelector('.u2c-dials'); if (!sc) return;
-    const hh = sc.clientHeight - (grid.getBoundingClientRect().top - sc.getBoundingClientRect().top) - 18;
-    if (hh > 0) grid.style.setProperty('--rows', String(Math.max(1, Math.min(Math.floor((hh + 6) / 66), dl ? dl.children.length : 1))));
-  });
-  if (typeof ResizeObserver !== 'undefined') { let last = 0; new ResizeObserver(() => { const sc = grid.closest('.dev-scroll'), hgt = sc ? sc.clientHeight : 0; if (hgt !== last) { last = hgt; fit(); } }).observe(grid); requestAnimationFrame(() => { const sc = grid.closest('.dev-scroll'); if (sc) new ResizeObserver(fit).observe(sc); }); }
+  // rows: as many 58 px rows (+4 px gaps) as fit between the grid's top and the card's bottom; never more than the controls need.
+  // Checked again while the rack is on screen (the panel can still be opening, the tabs can wrap), set only when it changes.
+  const fitNow = () => {
+    const card = grid.closest('.card'), sc = grid.closest('.dev-scroll'), dl = grid.querySelector('.u2c-dials'); if (!card || !sc || !card.offsetParent) return;
+    const bottom = Math.min(card.getBoundingClientRect().bottom, sc.getBoundingClientRect().bottom) - 8, hh = bottom - grid.getBoundingClientRect().top;
+    if (!(hh > 0)) return;
+    const kids = dl ? [...dl.children] : [], span = (e) => (e.classList.contains('u2seg-f') ? 3 : e.classList.contains('u2dd') ? 2 : 1);
+    const cells = kids.reduce((a, e) => a + span(e), 0) || 1, rows = Math.max(1, Math.min(Math.floor((hh + 4) / 62), kids.length || 1));
+    const cols = Math.max(Math.ceil(cells / rows), ...kids.map(span), 1);   // read left to right, top to bottom (Attack, Decay, Sustain, Release in order)
+    const v = String(rows); if (grid.style.getPropertyValue('--rows') !== v) grid.style.setProperty('--rows', v);
+    if (grid.style.getPropertyValue('--cols') !== String(cols)) grid.style.setProperty('--cols', String(cols));
+  };
+  const fit = () => requestAnimationFrame(fitNow);
+  if (typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(() => fit()); ro.observe(grid); ro.observe(tabs); requestAnimationFrame(() => { const sc = grid.closest('.dev-scroll'); if (sc) ro.observe(sc); }); }
+  setTimeout(fit, 120); setTimeout(fit, 450);
   if (groups.length > 1 || bigTabs) groups.forEach((g, gi) => tabs.append(h('button', { role: 'tab', onclick: (e) => { e.stopPropagation(); show(gi); } }, g[0])));
   if (tabs.children.length) box.append(tabs);
   box.append(grid);
   show(Math.min(tabMem.get(key) || 0, Math.max(0, groups.length - 1)));
-  every(120, () => { for (const c of live) if (c.sync) c.sync(); });
+  every(120, () => { for (const c of live) if (c.sync) c.sync(); fitNow(); });
   return box;
 }
 
@@ -223,7 +232,7 @@ function powerSwitch(on, flip, label) {
 const SV = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
 const CAT = {
   echo: ['Echo & Reverb', '#7cc8ff', SV('<path d="M4 12h2M8 8v8M12 5v14M16 8v8M20 11v2"/>')],
-  level: ['Level & Dinamika', '#9be37a', SV('<path d="M5 19V9M10 19V5M15 19v-8M20 19v-5"/>')],
+  level: ['Dinamika', '#9be37a', SV('<path d="M5 19V9M10 19V5M15 19v-8M20 19v-5"/>')],
   eq: ['EQ & Filter', '#ffc65c', SV('<path d="M3 16c3 0 4-8 7-8s3 6 6 6 3-4 5-4"/>')],
   mod: ['Modulasi', '#c9b3ff', SV('<path d="M3 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0"/>')],
   pitch: ['Pitch & Stereo', '#ff9ccb', SV('<path d="M8 4v16M8 4l-3 3M8 4l3 3M16 20V4M16 20l-3-3M16 20l3-3"/>')],

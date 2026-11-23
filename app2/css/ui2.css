@@ -1001,3 +1001,37 @@ html.ui2 #dbody .dev-scroll > .card.u2c.src .u2c-empty { background: none; paddi
 #tcol2 .tc-top > .u2b .lb { display: inline !important; font-size: 12px; }
 html.ui2 #dbody .dev-scroll > .card.u2c.v3 { min-height: 0; }
 .u2c.v3 .u2s { min-height: 118px; }
+
+/* ===== rack back to side by side; each card styled like the floating bottom bar; dense controls that never overlap or clip ===== */
+html.ui2 #dbody .dev-scroll { flex-direction: row !important; overflow-x: auto !important; overflow-y: hidden !important; align-items: stretch !important;
+  gap: 10px !important; padding: 8px 12px 10px !important; scroll-snap-type: x proximity; scroll-padding-left: 12px; }
+html.ui2 #dbody .dev-scroll > .card { width: auto !important; flex: 0 0 auto !important; scroll-snap-align: start; }
+html.ui2 #dbody .dev-scroll > .card.u2c.v3 { height: 100% !important; min-height: 0 !important; align-self: stretch !important;
+  background: var(--panel2) !important; border: 1px solid color-mix(in srgb, var(--text) 8%, transparent) !important; border-radius: 22px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .28), 0 1px 3px rgba(0, 0, 0, .2) !important; padding: 5px !important; gap: 7px; }
+.u2c.v3 .u2s { width: 214px !important; min-height: 0 !important; height: auto; border-radius: 17px; }
+/* controls: columns of 56 px, rows of 58 px, as many rows as the rack holds (ui2/cards.js fit) */
+.u2c.v3 .u2c-g { overflow: hidden; }
+.u2c.v3 .u2c-g > .u2c-dials { grid-auto-flow: column dense !important; grid-template-rows: repeat(var(--rows, 1), 58px) !important; grid-auto-rows: 58px;
+  grid-template-columns: none !important; grid-auto-columns: 56px !important; gap: 4px 3px !important; }
+.u2c.v3 .u2c-dials > .u2d svg { width: 31px !important; height: 31px !important; }
+.u2c.v3 .u2c-dials > .u2d .n { max-width: 54px; font-size: 9.5px !important; }
+.u2c.v3 .u2c-dials > .u2d .v { max-width: 56px; font-size: 10.5px !important; }
+.u2c.v3 .u2c-dials > :is(.u2dd) { grid-column: span 2 !important; padding: 0 9px; }
+.u2c.v3 .u2c-dials > .u2t { grid-column: span 1 !important; }
+.u2c.v3 .u2c-dials > .u2seg-f { grid-column: span 3 !important; }
+.u2c.v3 .u2c-dials > .u2dd > b { font-size: 12px; }
+.u2c.v3 .u2c-tabs { max-width: 420px; }
+.u2c.v3 .u2c-tabs button { height: 25px; padding: 0 9px; font-size: 11px; }
+html.ui2 #dbody .dev-scroll > .card.addcard { flex-direction: column !important; height: auto !important; min-height: 0; width: 150px !important; justify-content: center; padding: 10px; border-radius: 22px !important; }
+html.ui2 #dbody .dev-scroll > .card.addcard > small { margin-left: 0; }
+html.ui2 #dbody .dev-scroll > .card.u2c.src { height: auto !important; width: 220px !important; flex-direction: column; }
+/* the panel is at least as wide as its tabs (up to 420 px), so the tab rows never depend on the number of control columns */
+.u2c.v3 .u2c-tabs { width: max-content !important; min-width: 0 !important; max-width: 420px !important; }
+.u2c.v3 .u2c-p { min-width: min-content; }
+.u2c.v3 .u2c-g > .u2c-dials { grid-auto-columns: minmax(56px, 1fr) !important; }
+.u2c.v3 .u2c-g > .u2c-dials { grid-auto-columns: minmax(60px, 1fr) !important; }
+.u2c.v3 .u2c-dials > .u2d .n { max-width: 60px !important; }
+.u2c.v3 .u2c-dials > .u2seg-f .u2seg button { font-size: 10.5px !important; }
+/* fill row by row in a fixed number of columns (from the controls and the rows that fit) */
+.u2c.v3 .u2c-g > .u2c-dials { grid-auto-flow: row dense !important; grid-template-columns: repeat(var(--cols, 4), minmax(60px, 1fr)) !important; grid-template-rows: none !important; grid-auto-rows: 58px !important; }
