@@ -490,8 +490,12 @@ const PUon = () => state.punch.on && state.punch.end > state.punch.start;
 function drawRuler(g) {
   ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(0, 0, CW, LT);                                 // beat-time ruler
   ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(0, LT, CW, RULER - LT);                       // scrub area: locators, loop brace (Live 12: the ruler's colour)
-  ctx.fillStyle = C('#08080a'); ctx.fillRect(0, LT - 1, CW, 1); ctx.fillRect(0, RULER - 2, CW, 2);
+  if (!V2) { ctx.fillStyle = C('#08080a'); ctx.fillRect(0, LT - 1, CW, 1); ctx.fillRect(0, RULER - 2, CW, 2); }
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, CW, RULER); ctx.clip();
+  if (V2) {   // MobileDAW 2: one band, no strips; every bar line runs from the top of the ruler on into the grid
+    const lt = currentTone() === 'light', INK = lt ? '0,0,0' : '255,255,255', bp = BAR * view.ppt; let kk = 1; while (bp * kk < 34) kk *= 2;
+    for (let b = Math.max(0, P.barAt(view.x0)); tx(P.barStart(b)) < CW; b++) { const x = Math.round(tx(P.barStart(b))); if (x >= 0) { ctx.fillStyle = `rgba(${INK},${b % kk ? 0.07 : 0.16})`; ctx.fillRect(x, b % kk ? LT : 0, 1, b % kk ? RULER - LT : RULER); } }
+  }
   if (sel) { ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(tx(sel.a), 0, tx(sel.b) - tx(sel.a), LT - 1); }
   // loop brace along the bottom of the beat ruler: grey when the loop is off, lit when it is on (Live's Arrangement Loop)
   const LP = state.loop;
@@ -499,7 +503,7 @@ function drawRuler(g) {
     const a = Math.round(tx(LP.start)), b = Math.round(tx(LP.end));
     if (b > 0 && a < CW) {
       const brace = () => { ctx.fillRect(a, RULER - 7, b - a, 5); ctx.fillRect(a, RULER - 12, 3, 10); ctx.fillRect(b - 3, RULER - 12, 3, 10); };
-      ctx.fillStyle = C('#4c4c52'); brace();
+      if (!V2) { ctx.fillStyle = C('#4c4c52'); brace(); }   // MobileDAW 2: no grey brace while the loop is off (Loop in the top bar shows it)
       if (loopA > 0.01) { ctx.globalAlpha = loopA; ctx.fillStyle = T('--accent'); brace(); ctx.globalAlpha = 1; }   // on / off fades (Live's lit brace)
       if (drag && (drag.k === 'loop' || drag.k === 'loopL' || drag.k === 'loopR')) { ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(a, RULER - 7, b - a, 1); }
     }

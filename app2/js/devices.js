@@ -18,6 +18,7 @@ import { prefs } from './prefs.js';
 import * as DP from './drumpad.js';
 import { reorderGrip } from './reorder.js';
 import { lvTabs } from './liveui.js';
+import * as C2 from './ui2/cards.js';
 const { state } = P;
 const VIEWS = { ...FXVIEW, 16: minimetersView };   // MiniMeters has its own view module
 
@@ -654,6 +655,32 @@ function fitKit() {
     const over = lk.offsetHeight * (parseFloat(lk.style.zoom) || 1) - avail; if (over > 1) lk.style.zoom = Math.max(0.6, (parseFloat(lk.style.zoom) || 1) * avail / (avail + over)).toFixed(3);   // never taller than the rack
   }
 }
+
+// MobileDAW 2: the Material You cards (ui2/cards.js); the classic card stays the full editor in a floating window
+function instPresetMenu(i, t, r) {
+  const presets = P.presetsFor(t.inst.type);
+  const items = [{ label: 'Simpan preset ke folder\u2026', fn: () => ask('Nama preset', '', (n) => { const x = PRS.saveInstrumentPreset(i, n); toast(x.error || 'Preset tersimpan di Presets/Instruments.'); }) }];
+  const mine = PRS.userInstrumentPresets(t.inst.type);
+  if (mine.length) { items.push({ sep: true }, { label: 'PRESET SAYA', dim: true }); for (const m of mine) items.push({ label: m.name, fn: () => { const x = PRS.applyPresetFile(m.path, i); if (x.error) toast(x.error, 4000); } }); }
+  let cat = null;
+  for (const pr of presets) {
+    if (pr.cat && pr.cat !== cat) { cat = pr.cat; items.push({ sep: true }); items.push({ label: cat.toUpperCase(), dim: true }); }
+    items.push({ label: pr.name, fn: () => P.applyPreset(i, pr) });
+  }
+  menu(items, Math.max(8, r.left - 60), r.bottom);
+}
+function m3Inst(i, t) {
+  const def = INSTRUMENTS[t.inst.type];
+  if (def.view === 'irack') return instCard(i, t);
+  const extra = [...(def.zones ? [{ label: 'Zona sample\u2026', fn: (r) => zonesMenu(i, r || { left: 80, bottom: 120 }) }] : []), ...(t.inst.type === 38 ? harmorMenu(i, t).map((x) => ({ ...x, fn: () => x.fn() })) : [])];
+  return C2.instCard(i, t, { every, extra, openWindow: () => openInstWindow(t.id),
+    pickInst: (r) => menu(INST_LIST.map((k) => ({ label: INSTRUMENTS[k].name, check: t.inst.type === k, fn: () => P.setInstrument(i, k) })), r.left, r.bottom + 4),
+    presetMenu: (r) => instPresetMenu(i, t, r) });
+}
+function m3Fx(i, d, di, n) {
+  if (d.missing) return fxCard(i, d, di, n);
+  return C2.fxCard(i, d, di, n, { every, stripName, fxPick, openWindow: () => openDeviceWindow(d.id) });
+}
 let fitRO = null, fitLate = 0, tabMO = null;
 export function render() {
   if (!root) return;
@@ -677,9 +704,9 @@ export function render() {
     scroll.append(h('div', { class: 'hint' }, 'Ini track otomasi untuk ', h('b', {}, P.autoLabel(t)), '. Ketuk-ganda klipnya untuk mengedit titik.'));
     root.replaceChildren(scroll); return;
   }
-  if (i < MASTER && t.inst) put(instCard(i, t), 'i' + t.id);
-  else if (i < MASTER) put(h('div', { class: 'card dev-src' }, h('h4', {}, h('i', { class: 'pdot' }), h('span', {}, 'Audio')), h('div', { class: 'dev-src-b' }, h('b', {}, 'Klip audio'), 'diputar lalu lewat rantai efek di kanan')), 'src');
-  t.devices.forEach((d, di) => put(fxCard(i, d, di, t.devices.length), d.id));
+  if (i < MASTER && t.inst) put(m3Inst(i, t), 'i' + t.id);
+  else if (i < MASTER) put(C2.audioCard(), 'src');
+  t.devices.forEach((d, di) => put(m3Fx(i, d, di, t.devices.length), d.id));
   const full = t.devices.length >= 16;
   const add = h('button', { class: 'card addcard dev-drop b', 'aria-label': 'Tambah efek', onclick: (e) => {
     const r = e.currentTarget.getBoundingClientRect(), n = t.devices.length;

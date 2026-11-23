@@ -98,6 +98,23 @@ ok(!(await page.evaluate(() => document.querySelector('#mm2').classList.contains
 const mods = await page.evaluate(async () => { const D = await import('./js/defs.js'); return { inst: D.INST_LIST.map((k) => D.INSTRUMENTS[k].name), fx: D.FX_GROUPS.flatMap((g) => g[2]).map((k) => [k, D.DEVICES[k].name, D.DEVICES[k].flm != null]) }; });
 ok(mods.inst.length === 10 && ['DirectWave', 'GMS', 'MiniSynth', 'SuperSaw', '3x Osc', 'Slicer', 'Transistor Bass', 'Harmor', 'Moisture'].every((n) => mods.inst.includes(n)), 'instruments: FL Studio Mobile\'s + Harmor + Moisture (' + mods.inst.join(', ') + ')');
 ok(mods.fx.every(([k, , flm]) => flm || k === 16) && mods.fx.some(([k]) => k === 16), `effects: only FL Studio Mobile's (${mods.fx.length - 1}) + MiniMeters`);
+// module cards (ui2/cards.js): every offered instrument and effect renders as a Material You card; a dial drag changes the value, the switch bypasses
+{ await page.evaluate(async () => { const P = await import('./js/project.js'); P.selectTrack(0); [...document.querySelectorAll('#bar2 button')].find((b) => /Rack/.test(b.textContent)).click(); });
+  await page.waitForTimeout(300);
+  const r = await page.evaluate(async () => {
+    const P = await import('./js/project.js'), D = await import('./js/defs.js'), DV = await import('./js/devices.js'), bad = [];
+    for (const k of D.INST_LIST) { P.setInstrument(0, k); DV.render(); if (!document.querySelector('.dev-scroll > .card.u2c.inst .u2c-h')) bad.push('inst ' + k); }
+    P.setInstrument(0, 32);
+    for (const k of D.FX_GROUPS.flatMap((g) => g[2]).filter((x) => D.DEVICES[x])) { P.addDevice(0, k); DV.render(); const n = P.tr(0).devices.length; if (document.querySelectorAll('.dev-scroll > .card.u2c:not(.inst)').length !== n) bad.push('fx ' + k); P.removeDevice(0, n - 1); }
+    P.addDevice(0, 132); DV.render(); return { bad, active: document.querySelector('#devices, .dev-scroll') && document.querySelector('.dev-scroll').getBoundingClientRect().height };
+  });
+  ok(!r.bad.length, 'every instrument and effect has a Material You card' + (r.bad.length ? ': missing ' + r.bad.join(', ') : ''));
+  const dl = await page.evaluate(() => { const c = [...document.querySelectorAll('.dev-scroll > .card.u2c:not(.inst)')].pop(); c.scrollIntoView(); const d = c.querySelector('.u2d'); const b = d.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + 22 }; });
+  const pv = async () => page.evaluate(async () => { const P = await import('./js/project.js'); const d = P.tr(0).devices[P.tr(0).devices.length - 1]; return d.params[1] ?? null; });
+  const v0 = await pv(); await page.mouse.move(dl.x, dl.y); await page.mouse.down(); await page.mouse.move(dl.x, dl.y - 40, { steps: 6 }); await page.mouse.up(); const v1 = await pv();
+  ok(v1 !== null && v1 !== v0 && (v0 === null || v1 > v0), `dragging a dial up raises the value (${v0} -> ${v1})`);
+  await page.evaluate(() => [...document.querySelectorAll('.dev-scroll > .card.u2c:not(.inst) .u2sw-b')].pop().click()); await page.waitForTimeout(100);
+  ok(await page.evaluate(async () => { const P = await import('./js/project.js'); return P.tr(0).devices[P.tr(0).devices.length - 1].bypass === true && !!document.querySelector('.dev-scroll > .card.u2c.off'); }), 'the switch in the card header bypasses the effect'); }
 // its own settings: 1.0's preferences are untouched, MobileDAW 2 writes mobiledaw2.prefs.v1
 await page.evaluate(async () => { const { prefs, savePrefs } = await import('./js/prefs.js'); prefs.ui2Wide = false; savePrefs(); });
 const ls = await page.evaluate(() => ({ one: JSON.parse(localStorage.getItem('mobiledaw.prefs.v1')), two: JSON.parse(localStorage.getItem('mobiledaw2.prefs.v1')) }));

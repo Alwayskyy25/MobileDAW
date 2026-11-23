@@ -443,3 +443,107 @@ html.ui2 #bar2 .add { height: 44px; padding: 0 18px; }
 html.ui2 #bar2 .b2-l, html.ui2 #bar2 .b2-r { align-items: center; }
 /* the track rows never show above the column's top area (the coloured block in the corner) */
 #tcol2 .tc-rows { overflow: hidden; }
+
+/* ===== MobileDAW 2 module cards (js/ui2/cards.js): Material You, one look for every effect and instrument ===== */
+html.ui2 #app .dev-scroll > .card.u2c, html.ui2 .dev-scroll > .card.u2c { display: flex; flex-direction: column; flex: 0 0 auto; width: 340px; min-width: 300px; max-width: 360px; height: 100%; min-height: 0 !important; padding: 0 0 10px !important; border-radius: var(--m3-l) !important; background: var(--raise) !important; overflow: hidden; }
+.u2c.off .u2c-b, .u2c.off .u2c-cta { opacity: .45; }
+.u2c-h { display: flex; align-items: center; gap: 8px; height: 56px; flex: none; padding: 0 8px 0 14px; }
+.u2c-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 10px; margin-left: -4px; border: 0; border-radius: 999px; background: transparent; color: var(--text); font: 600 16px/1 var(--font); text-align: left; }
+.u2c-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.u2c-name:active { background: color-mix(in srgb, var(--text) 10%, transparent); }
+.u2c .car { flex: none; width: 0; height: 0; border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; border-top: 5px solid var(--dim); }
+.u2c-ic { flex: none; width: 32px; height: 32px; border-radius: 12px; background: var(--m3-tonal); position: relative; }
+.u2c-ic::after { content: ''; position: absolute; inset: 9px; border-radius: 3px; background: linear-gradient(90deg, var(--accent) 0 2px, transparent 2px 5px, var(--accent) 5px 7px, transparent 7px 10px, var(--accent) 10px 12px, transparent 12px); }
+.u2c-ic.au::after { background: linear-gradient(90deg, var(--accent) 0 2px, transparent 2px 4px, var(--accent) 4px 6px, transparent 6px 8px, var(--accent) 8px 10px, transparent 10px 12px, var(--accent) 12px); clip-path: polygon(0 35%, 17% 35%, 17% 0, 50% 0, 50% 100%, 67% 100%, 67% 20%, 100% 20%, 100% 80%, 0 80%); }
+.u2chip { flex: none; height: 32px; padding: 0 14px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--text) 22%, transparent); background: transparent; color: var(--text); font: 500 13px/1 var(--font); }
+.u2c-more { flex: none; width: 40px; height: 40px; border: 0; border-radius: 999px; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+.u2c-more i { width: 4px; height: 4px; border-radius: 50%; background: var(--dim); }
+.u2c-more:active { background: color-mix(in srgb, var(--text) 10%, transparent); }
+/* switch (M3: 52 x 32 track, a thumb that grows when on) */
+.u2sw { position: relative; flex: none; display: block; width: 46px; height: 28px; border-radius: 999px; box-sizing: border-box; border: 2px solid color-mix(in srgb, var(--text) 45%, transparent); background: var(--panel2); transition: background .18s, border-color .18s; }
+.u2sw::after { content: ''; position: absolute; left: 5px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; background: color-mix(in srgb, var(--text) 55%, transparent); transition: left .18s cubic-bezier(.2, 0, 0, 1), width .18s, height .18s, margin .18s, background .18s; }
+:is(.on, [aria-checked=true]) > .u2sw { background: var(--accent); border-color: var(--accent); }
+:is(.on, [aria-checked=true]) > .u2sw::after { left: 20px; width: 20px; height: 20px; margin-top: -10px; background: var(--accent-ink, #1b1b1f); }
+.u2sw-b { flex: none; padding: 0; border: 0; background: transparent; height: 40px; display: flex; align-items: center; }
+/* tabs: a row of chips (scrolls sideways when there are many) */
+.u2c-b { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.u2c-tabs { flex: none; display: flex; gap: 6px; padding: 0 12px 8px; overflow-x: auto; scrollbar-width: none; }
+.u2c-tabs::-webkit-scrollbar { display: none; }
+.u2c-tabs button { flex: none; height: 32px; padding: 0 14px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--text) 20%, transparent); background: transparent; color: var(--dim); font: 500 13px/1 var(--font); white-space: nowrap; transition: background .15s, color .15s; }
+.u2c-tabs button.on { background: var(--m3-tonal); border-color: transparent; color: var(--text); }
+.u2c-g { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 12px 4px; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; }
+.u2c-dials { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px 4px; }
+/* dial */
+.u2d { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 0 4px; border-radius: 16px; touch-action: none; user-select: none; -webkit-user-select: none; cursor: ns-resize; }
+.u2d svg { width: 48px; height: 48px; overflow: visible; }
+.u2d .disc { fill: var(--panel2); }
+.u2d .trk { fill: none; stroke: color-mix(in srgb, var(--text) 14%, transparent); stroke-width: 4.5; stroke-linecap: round; }
+.u2d .val { fill: none; stroke: var(--accent); stroke-width: 4.5; stroke-linecap: round; }
+.u2d .dot { fill: var(--accent); }
+.u2d .v { font: 600 12px/1.2 var(--font); color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
+.u2d .n { font: 500 11px/1.2 var(--font); color: var(--dim); white-space: nowrap; max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
+.u2d.act, .u2d:focus-visible { background: color-mix(in srgb, var(--accent) 12%, transparent); outline: none; }
+/* on / off row */
+.u2t { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 0 6px 0 14px; border: 0; border-radius: 14px; background: var(--panel2); color: var(--text); font: 500 14px/1.2 var(--font); text-align: left; }
+/* segmented buttons */
+.u2seg-f { display: flex; flex-direction: column; gap: 6px; }
+.u2seg-f > .n, .u2dd > .n { font: 500 12px/1 var(--font); color: var(--dim); }
+.u2seg { display: flex; height: 36px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--text) 22%, transparent); overflow: hidden; }
+.u2seg button { flex: 1; min-width: 0; border: 0; border-left: 1px solid color-mix(in srgb, var(--text) 22%, transparent); background: transparent; color: var(--text); font: 500 12.5px/1 var(--font); padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.u2seg button:first-child { border-left: 0; }
+.u2seg button.on { background: var(--m3-tonal); font-weight: 600; }
+/* drop-down field */
+.u2dd { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; align-items: center; gap: 4px 8px; min-height: 52px; padding: 8px 16px; border: 0; border-radius: 14px; background: var(--panel2); color: var(--text); text-align: left; }
+.u2dd > .n { grid-column: 1; grid-row: 1; }
+.u2dd > b { grid-column: 1; grid-row: 2; font: 600 14px/1.2 var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.u2dd > .car { grid-column: 2; grid-row: 1 / 3; }
+/* envelope drawing */
+.u2env { flex: none; width: 100%; height: 64px; border-radius: 16px; background: var(--panel2); }
+.u2env .l { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.u2env .f { fill: color-mix(in srgb, var(--accent) 18%, transparent); stroke: none; }
+/* buttons, actions, notes */
+.u2c-acts { flex: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 0 12px 10px; }
+.u2btn { height: 40px; padding: 0 18px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--text) 22%, transparent); background: transparent; color: var(--accent); font: 600 13.5px/1 var(--font); }
+.u2btn.tonal { background: var(--m3-tonal); border-color: transparent; color: var(--text); }
+.u2btn.fill { background: var(--accent); border-color: transparent; color: var(--accent-ink, #1b1b1f); }
+.u2c-cta { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 0 12px 10px; padding: 14px 16px; border-radius: 16px; background: var(--panel2); }
+.u2c-cta p { margin: 0; font: 400 13px/1.4 var(--font); color: var(--dim); }
+.u2c-empty { margin: 0 12px; padding: 16px; border-radius: 16px; background: var(--panel2); font: 400 13px/1.4 var(--font); color: var(--dim); }
+.u2c-warn { flex: none; margin: 0 12px 10px; padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, #ffb4ab 18%, transparent); color: var(--text); font: 500 12.5px/1.3 var(--font); }
+/* the add card next to the chain */
+html.ui2 .dev-scroll > .card.addcard { flex: 0 0 auto; width: 160px; height: 100%; border-radius: var(--m3-l) !important; background: transparent !important; box-shadow: none !important; border: 2px dashed color-mix(in srgb, var(--text) 18%, transparent) !important; color: var(--dim); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px; text-align: center; }
+html.ui2 .dev-scroll > .card.addcard > b { width: 56px; height: 56px; border-radius: 18px; background: var(--m3-tonal); color: var(--text); display: grid; place-items: center; font: 400 30px/1 var(--font); }
+html.ui2 .dev-scroll > .card.addcard > span { font: 600 13px/1.3 var(--font); color: var(--text); }
+html.ui2 .dev-scroll > .card.addcard > small { font: 400 11.5px/1.3 var(--font); }
+html.ui2 .dev-scroll { gap: 10px; padding: 10px 12px; align-items: stretch; }
+/* compact for the short rack: a 48 px header, controls in two columns */
+.u2c-h { height: 50px; }
+.u2c-tabs { padding-bottom: 6px; }
+.u2c-tabs button { height: 30px; padding: 0 12px; }
+.u2c-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(146px, 1fr)); gap: 6px; }
+.u2t { min-height: 40px; font-size: 13px; padding-left: 12px; }
+.u2t .u2sw { transform: scale(.86); transform-origin: right center; }
+.u2dd { min-height: 46px; padding: 6px 12px; }
+.u2seg-f { grid-column: 1 / -1; }
+.u2d svg { width: 44px; height: 44px; }
+.u2d { padding: 4px 0 2px; }
+.u2env { height: 52px; }
+.u2c-acts { padding-bottom: 8px; }
+.u2c-acts .u2btn { height: 36px; }
+.u2c-dials { grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: center; }
+.u2c-dials > :is(.u2dd, .u2t) { grid-column: span 2; }
+.u2c-dials > .u2seg-f { grid-column: 1 / -1; }
+/* the bottom panel is one surface: its title strip (grip, track name, maximise) and the rack share the app background */
+html.ui2 #detail, html.ui2 #view-arr:not(.shut) #detail { background: var(--bg) !important; border-radius: 0; margin-top: 0; }
+html.ui2 #dtabs, html.ui2 #dbody, html.ui2 #dbody .dev-scroll { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+html.ui2 #dtabs { padding: 4px 12px 0; }
+
+/* module cards never cut a control off: the controls fill as many rows as the rack is tall and the card grows sideways */
+html.ui2 #app .dev-scroll > .card.u2c, html.ui2 .dev-scroll > .card.u2c { width: max-content; min-width: 300px; max-width: none; }
+.u2c-tabs { width: 0; min-width: 100%; box-sizing: border-box; }
+.u2c-g { overflow: hidden; display: block; padding: 0 12px; }
+.u2c-g > .u2c-dials { display: grid; grid-auto-flow: column dense; grid-template-rows: repeat(var(--rows, 1), 78px); grid-template-columns: none; grid-auto-columns: 78px; gap: 6px; align-items: center; height: auto; }
+.u2c-dials > :is(.u2dd, .u2t) { grid-column: span 2; }
+.u2c-dials > .u2seg-f, .u2c-dials > .u2env { grid-column: span 3; }
+.u2c-dials > .u2env { height: 70px; align-self: center; }
+.u2c-dials > .u2d { padding: 2px 0; }
