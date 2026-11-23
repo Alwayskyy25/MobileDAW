@@ -1,6 +1,6 @@
 /* MobileDAW 2 (js/ui2/shell.js): the frame around the arrangement. Warm, quiet surfaces from the theme (Studio by default), the accent for
    what is on, round transport, text tabs, pill tools. Every value comes from the theme tokens, so the other themes work too. */
-html.ui2 { --b2-h: 56px; --tc-w: 66px; --tc-ww: 300px; --u2-r: 10px; --u2-pill: 999px; }
+html.ui2 { --b2-h: 56px; --tc-w: 66px; --tc-ww: 320px; --u2-r: 10px; --u2-pill: 999px; }
 html.ui2.tc-wide { --tc-cur: var(--tc-ww); }
 html.ui2:not(.tc-wide) { --tc-cur: var(--tc-w); }
 html.ui2 #top { display: none; }
@@ -41,22 +41,22 @@ html.tc-wide .tc-row:not(.xrow):not(.fold) .tc-ctl { display: flex; }
 html.tc-wide .tc-row { flex-wrap: wrap; align-content: center; row-gap: 4px; padding-right: 10px; }
 html.tc-wide .tc-row .tc-tile { position: absolute; left: 0; top: 0; bottom: 0; }
 html.tc-wide .tc-row.sel { background: color-mix(in srgb, var(--tc) 6%, var(--panel)); }
-.tc-name { width: calc(100% - var(--tc-w) - 10px); margin-left: calc(var(--tc-w) + 10px); height: 18px; align-items: baseline; justify-content: space-between; gap: 8px; border: 0; background: none; padding: 0; cursor: pointer; }
-.tc-name .nm { min-width: 0; color: var(--tc); font: var(--fw-sb, 600) 12.5px/18px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tc-name .db { flex: none; color: var(--dim); font: var(--fw-m, 500) 10.5px/18px var(--font); font-variant-numeric: tabular-nums; }
+.tc-name { width: calc(100% - var(--tc-w) - 10px); margin-left: calc(var(--tc-w) + 10px); height: 22px; align-items: center; justify-content: space-between; gap: 6px; border: 0; background: none; padding: 0; cursor: pointer; }
+.tc-name .nm { flex: 1; min-width: 0; text-align: left; color: var(--tc); font: var(--fw-sb, 600) 12.5px/18px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-ctl .db { flex: none; width: 46px; text-align: right; color: var(--dim); font: var(--fw-m, 500) 10.5px/22px var(--font); font-variant-numeric: tabular-nums; }
 .tc-ctl { width: calc(100% - var(--tc-w) - 10px); margin-left: calc(var(--tc-w) + 10px); align-items: center; gap: 6px; height: 22px; }
 /* on / off: a small switch in the track colour; solo: a word that lights up */
-.tc-ctl .tc-on { flex: none; width: 26px; min-width: 26px; height: 16px; padding: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 14%, transparent); position: relative; }
-.tc-ctl .tc-on svg { display: none; }
-.tc-ctl .tc-on::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--dim); transition: left calc(.15s * var(--anim, 1)); }
-.tc-ctl .tc-on.on { background: color-mix(in srgb, var(--tc) 40%, transparent); }
-.tc-ctl .tc-on.on::after { left: 12px; background: var(--tc); }
-.tc-ctl .tc-solo { flex: none; flex-direction: row; gap: 0; min-width: 0; width: auto; height: 20px; padding: 0 7px; border-radius: 6px; background: none; color: var(--dim); font: var(--fw-m, 500) 11.5px/1 var(--font); white-space: nowrap; }
-.tc-ctl .tc-solo::after { content: "olo"; }
-.tc-ctl .tc-solo.on { background: var(--tc); color: rgba(0, 0, 0, .8); }
+.tc-name .tc-on { flex: none; width: 26px; min-width: 26px; height: 16px; padding: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 14%, transparent); position: relative; }
+.tc-name .tc-on svg { display: none; }
+.tc-name .tc-on::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--dim); transition: left calc(.15s * var(--anim, 1)); }
+.tc-name .tc-on.on { background: color-mix(in srgb, var(--tc) 40%, transparent); }
+.tc-name .tc-on.on::after { left: 12px; background: var(--tc); }
+.tc-name .tc-solo { flex: none; flex-direction: row; gap: 0; min-width: 0; width: auto; height: 20px; padding: 0 7px; border-radius: 6px; background: none; color: var(--dim); font: var(--fw-m, 500) 11.5px/1 var(--font); white-space: nowrap; }
+.tc-name .tc-solo::after { content: "olo"; }
+.tc-name .tc-solo.on { background: var(--tc); color: rgba(0, 0, 0, .8); }
 /* pan and volume: a line with a round thumb in the track colour (volume filled from the left, pan from the centre) */
 .tc-pan, .tc-vol { position: relative; height: 22px; touch-action: none; cursor: ew-resize; --u: .5; }
-.tc-pan { flex: none; width: 36px; }
+.tc-pan { flex: none; width: 40px; }
 .tc-vol { flex: 1; min-width: 70px; }
 .tc-pan::before, .tc-vol::before { content: ""; position: absolute; left: 6px; right: 6px; top: 50%; height: 4px; margin-top: -2px; border-radius: 2px; background: color-mix(in srgb, var(--text) 13%, transparent); }
 .tc-vol i { position: absolute; left: 6px; top: 50%; height: 4px; margin-top: -2px; width: calc((100% - 12px) * var(--u)); border-radius: 2px; background: var(--tc); }
@@ -261,3 +261,14 @@ html.ui2 #app .ed-tools .b.on, html.ui2 #app .ed-tools .ed-g .b.on { background:
 html.ui2 #app .ed-tools .b.on::before { display: none; }
 html.ui2 #app .ed-tools .ed-sep { background: none; width: 4px; }
 html.ui2 #dtabs { background: var(--panel); border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent); }
+
+/* ---- the editor in MobileDAW 2: only the grid, the keys and the ruler; three small buttons at the top right */
+html.ui2 #view-arr.edfull #dtabs, html.ui2 #view-arr.edfull .ed-tools { display: none !important; }
+#edf2 { position: absolute; top: 4px; right: max(10px, var(--sar)); z-index: 7; display: flex; gap: 6px; }
+#edf2[hidden] { display: none; }
+#edf2 .ef { flex-direction: row; gap: 5px; height: 30px; min-width: 34px; padding: 0 10px; border-radius: 999px; background: color-mix(in srgb, var(--panel) 92%, transparent); color: var(--text);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .35), 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent); font: var(--fw-m, 500) 12px/1 var(--font); }
+#edf2 .ef svg { width: 16px; height: 16px; }
+#edf2 .ef.on { background: var(--accent); color: var(--accent-ink); }
+#edf2 .ef.shut { background: var(--accent); color: var(--accent-ink); }
+#edf2 .ef[hidden] { display: none; }

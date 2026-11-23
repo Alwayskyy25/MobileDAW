@@ -44,6 +44,8 @@ const IC = {
   save: S('<path d="M5 4.5h11l3.5 3.5v11.5h-14.5z"/><path d="M8 4.5v5h7v-5"/><rect x="8" y="13.5" width="8" height="6" rx="1"/>'),
   arrange: S('<rect x="3.5" y="5" width="9" height="4.5" rx="1.4"/><rect x="8.5" y="11.5" width="12" height="4.5" rx="1.4"/><path d="M3.5 19.5h17"/>'),
   menu: S('<path d="M4 7h16M4 12h16M4 17h16"/>'),
+  lane: S('<path d="M5 19V9M10 19V5M15 19v-7M20 19v-4"/>'),
+  down: S('<path d="M6 9l6 6 6-6"/>'),
   plus: S('<path d="M12 5v14M5 12h14"/>'),
   close: S('<path d="M6 6l12 12M18 6 6 18"/>'),
   dup: S('<rect x="3.5" y="6" width="8" height="12" rx="1.6"/><rect x="12.5" y="6" width="8" height="12" rx="1.6" stroke-dasharray="2.2 1.8"/><path d="M16.5 10v4M14.5 12h4"/>'),
@@ -195,8 +197,8 @@ function rowEl(kind, i) {
   if (kind === 'trk') {
     const name = h('button', { class: 'tc-name' }), pw = btn('tc-on', IC.power, '', 'Nyala / mati'), so = h('button', { class: 'u2b tc-solo' }, 'S');
     const pan = h('div', { class: 'tc-pan', 'aria-label': 'Pan' }, h('i')), vol = h('div', { class: 'tc-vol', 'aria-label': 'Volume' }, h('i'), h('em'));
-    name.append(h('span', { class: 'nm' }), h('span', { class: 'db' }));
-    r.append(name, h('div', { class: 'tc-ctl' }, pw, so, pan, vol));
+    name.append(h('span', { class: 'nm' }), h('span', { class: 'db' }));   // the dB readout moves to the fader line below
+    const db = name.querySelector('.db'); name.append(pw, so); r.append(name, h('div', { class: 'tc-ctl' }, pan, vol, db));
     pw.onclick = () => { P.toggleMute(r._i); colSig = ''; };
     so.onclick = () => { P.toggleSolo(r._i); colSig = ''; };
     holdTap(name, () => P.selectTrack(r._i), () => { const b = name.getBoundingClientRect(); TL.v2HeadMenu(r._i, b.left + 20, b.bottom); });
@@ -249,7 +251,7 @@ function syncCol() {
         r.classList.toggle('sel', state.sel.track === i); r.classList.toggle('muted', !!t.mute); r.classList.toggle('auto', t.kind === 'auto'); r.classList.toggle('fold', !!t.fold);
         r.querySelector('.tc-name .nm').textContent = t.name;
         r.querySelector('.tc-on').classList.toggle('on', !t.mute); r.querySelector('.tc-solo').classList.toggle('on', !!t.solo);
-        const u = Math.sqrt(clamp(t.vol / VMAX, 0, 1)), v = r.querySelector('.tc-vol'); v.style.setProperty('--u', u.toFixed(4)); r.querySelector('.tc-name .db').textContent = t.vol > 1e-4 ? (20 * Math.log10(t.vol)).toFixed(1) + ' dB' : '-∞';
+        const u = Math.sqrt(clamp(t.vol / VMAX, 0, 1)), v = r.querySelector('.tc-vol'); v.style.setProperty('--u', u.toFixed(4)); r.querySelector('.tc-ctl .db').textContent = t.vol > 1e-4 ? (20 * Math.log10(t.vol)).toFixed(1) + ' dB' : '-∞';
         r.querySelector('.tc-pan').style.setProperty('--u', ((clamp(t.pan, -1, 1) + 1) / 2).toFixed(4));
         tile.setAttribute('aria-label', t.name);
       } else {
@@ -403,11 +405,29 @@ export function initUi2(a) {
   api = a; on = true;
   document.documentElement.classList.add('ui2');
   TL.setV2(true);
-  buildBar(); buildCol(); buildBubbles(); buildMenu();
+  buildBar(); buildCol(); buildBubbles(); buildMenu(); buildEdFab();
   api.setShut(true);                        // 2.0 starts with the whole screen for the arrangement; Rack / Keyboard open the panel
   P.onChange((w) => { if (w === 'all' || w === 'tracks' || w === 'mix' || w === 'sel') colSig = ''; if (w === 'all') { hideBub(); hideIns(); } });
   addEventListener('themechange', () => { colSig = ''; });
   readouts();
 }
-export function frame() { if (!on) return; syncCol(); placeBub(); placeIns(); }
+// ------------------------------------------------------------------ the clip editor, full screen and simple: Vel / Pan lane, every tool in one menu, close
+let edf = null;
+function buildEdFab() {
+  const lane = btn('ef', IC.lane, 'Vel', 'Lane velocity'), more = btn('ef', IC.more, '', 'Alat editor'), shut = btn('ef shut', IC.down, '', 'Tutup editor');
+  edf = h('div', { id: 'edf2' }, lane, more, shut);
+  $('#view-arr').append(edf);
+  const tool = (txt) => [...document.querySelectorAll('.ed-tools .b')].find((b) => b.textContent.trim() === txt);
+  lane.onclick = () => { const b = tool('Lane'); if (b) b.click(); };
+  shut.onclick = () => { const b = $('#btn-edclose'); if (b) b.click(); };
+  more.onclick = () => {   // every toolbar command of the editor (the toolbar row itself is hidden in MobileDAW 2)
+    const r = more.getBoundingClientRect(), items = [...document.querySelectorAll('.ed-tools .b')].filter((b) => b.offsetParent !== null || true).map((b) => ({ label: b.textContent.trim(), check: b.classList.contains('on'), fn: () => b.click() })).filter((x) => x.label && x.label !== 'Lane');
+    menu(items.length ? items : [{ label: 'Tidak ada alat untuk klip ini', dim: true }], r.right - 220, r.bottom + 4);
+  };
+}
+function syncEdFab() {
+  const full = $('#view-arr').classList.contains('edfull'); edf.hidden = !full; if (!full) return;
+  const b = [...document.querySelectorAll('.ed-tools .b')].find((q) => q.textContent.trim() === 'Lane'); edf.firstChild.hidden = !b; if (b) edf.firstChild.classList.toggle('on', b.classList.contains('on'));
+}
+export function frame() { if (!on) return; syncCol(); placeBub(); placeIns(); syncEdFab(); }
 export function back() { if (PN.close()) return true; if (closeMenu()) return true; if (bub) { hideBub(); return true; } if (ins) { hideIns(); return true; } return false; }
