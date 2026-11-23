@@ -648,6 +648,7 @@ function render() {
   const chips = h('div', { class: 'chips' }, ...cl.map(([k, l]) => h('button', { class: 'chip' + (cat === k ? ' on' : ''), onclick: () => { cat = k; render(); } }, l)));
   pvBar = null;
   { const pl = bhead.querySelector('.places'); if (pl) side.insertBefore(h('div', { class: 'bs-places' }, h('div', { class: 'bs-h' }, 'Places'), pl), side.querySelector('.bs-sp')); }   // Live: the folders (Places) live in the sidebar under the Library
+  aside.dataset.tab = tab;   // MobileDAW 2: the rows' leading icon follows the tab (ui2.css)
   aside.replaceChildren(side, h('div', { class: 'bmain' }, sbar, chips, bhead, list));
   { const on = aside.querySelector('.places .pl.on'); if (on) { const pn = on.parentNode; pn.scrollLeft = on.offsetLeft - (pn.clientWidth - on.offsetWidth) / 2; } }   // keep the active place centred in the strip
   applyFilter(list, cnt);

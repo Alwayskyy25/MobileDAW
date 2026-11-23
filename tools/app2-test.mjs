@@ -140,6 +140,13 @@ ok(mods.fx.every(([k, , flm]) => flm || k === 16) && mods.fx.some(([k]) => k ===
     let painted = 0; if (ins) { const d = ins.getContext('2d').getImageData(0, 0, ins.width, ins.height).data, set = new Set(); for (let k = 0; k < d.length; k += 32) set.add(d[k] + ',' + d[k + 1] + ',' + d[k + 2]); painted = set.size; }
     return { fx: !!fx, ins: !!ins, painted }; });
   ok(rd.fx && rd.ins && rd.painted > 8, `effect and synth cards show the module's own display (synth display colours: ${rd.painted})`); }
+// the instrument card's keyboard plays the instrument (a note goes to the engine while the key is held)
+{ const k = await page.evaluate(async () => { const P = await import('./js/project.js'), E = await import('./js/engine.js'); P.setInstrument(0, 32); await new Promise((r) => setTimeout(r, 400));
+    const key = document.querySelector('.dev-scroll > .card.u2c.inst .u2kb .wk'); if (!key) return 'no keyboard';
+    const seen = []; const orig = P.noteEvent; const b = key.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height - 4 }; });
+  if (typeof k === 'string') ok(false, k); else { await page.mouse.move(k.x, k.y); await page.mouse.down(); await page.waitForTimeout(120);
+    const lit = await page.evaluate(() => !!document.querySelector('.u2kb .wk.on')); await page.mouse.up(); await page.waitForTimeout(80);
+    ok(lit && !(await page.evaluate(() => !!document.querySelector('.u2kb .wk.on'))), 'the instrument card has a keyboard: a key lights while held and lets go'); } }
 ok(await page.evaluate(() => !!document.querySelector('#tcol2 .tc-top .snap, #tcol2 .tc-top [aria-label*="Snap"]') && !document.querySelector('#top2 .tg [aria-label*="Snap"]')), 'Snap sits in the corner above the track column (not in the top bar)');
 // its own settings: 1.0's preferences are untouched, MobileDAW 2 writes mobiledaw2.prefs.v1
 await page.evaluate(async () => { const { prefs, savePrefs } = await import('./js/prefs.js'); prefs.ui2Wide = false; savePrefs(); });

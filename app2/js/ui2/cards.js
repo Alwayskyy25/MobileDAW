@@ -274,10 +274,43 @@ function header(icon, nameEl, sub, ...right) {
 
 // v3 card: a module like a piece of hardware - a screen on the left (the graphic, with the module's name, switch and menu on it, and the
 // instrument's actions under it), the tabs and the controls on the right
-function cardV3(cls, cc, head, hero, foot, panelKids) {
-  const screen = h('div', { class: 'u2s' }, hero || h('div', { class: 'u2fx blank' }), head, foot && foot.length ? h('div', { class: 'u2s-foot' }, ...foot) : null);
+function cardV3(cls, cc, head, hero, foot, panelKids, kb) {
+  // an instrument's buttons (Preset, SoundFont, Sample...) sit under its name in the title bar, its keyboard at the screen's foot
+  if (kb && foot && foot.length) { const tt = head.querySelector('.u2c-tt'), sm = tt && tt.querySelector('small'); if (sm) sm.replaceWith(h('div', { class: 'u2c-chips' }, ...foot)); foot = null; }
+  const screen = h('div', { class: 'u2s' + (kb ? ' haskb' : '') }, hero || h('div', { class: 'u2fx blank' }), head, kb || null, foot && foot.length ? h('div', { class: 'u2s-foot' }, ...foot) : null);
   const card = h('div', { class: 'card u2c v3 ' + cls }, screen, h('div', { class: 'u2c-p' }, ...panelKids.filter(Boolean)));
   card.style.setProperty('--cc', cc); return card;
+}
+
+// a two-octave keyboard on an instrument's screen: tap a key to hear the instrument (the octave arrows move it)
+const kbOct = new Map();
+function miniKeys(i, key) {
+  let base = kbOct.get(key) ?? 48;
+  const keys = h('div', { class: 'u2kb-keys' }), lab = h('span', { class: 'u2kb-o' });
+  const build = () => {
+    const ws = [], bs = []; let wi = 0;
+    for (let n = 0; n < 24; n++) { const pc = n % 12, black = [1, 3, 6, 8, 10].includes(pc), p = base + n;
+      const k = h('i', { class: black ? 'bk' : 'wk', style: black ? `left:calc(${wi} * 100% / 14 - 100% / 40)` : '' });
+      k.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); try { k.setPointerCapture(e.pointerId); } catch (_) { /* gone */ } k.classList.add('on'); P.noteEvent(i, p, 0.8, true); });
+      const off = () => { if (!k.classList.contains('on')) return; k.classList.remove('on'); P.noteEvent(i, p, 0, false); };
+      k.addEventListener('pointerup', off); k.addEventListener('pointercancel', off); k.addEventListener('pointerleave', off);
+      if (black) bs.push(k); else { ws.push(k); wi++; } }
+    keys.replaceChildren(...ws, ...bs); lab.textContent = 'C' + (Math.floor(base / 12) - 1);
+  };
+  const step = (d) => (e) => { e.stopPropagation(); base = clamp(base + d * 12, 24, 84); kbOct.set(key, base); build(); };
+  build();
+  return h('div', { class: 'u2kb' }, h('button', { class: 'u2kb-a', 'aria-label': 'Oktaf turun', onclick: step(-1) }, '\u2039'), keys, h('button', { class: 'u2kb-a', 'aria-label': 'Oktaf naik', onclick: step(1) }, '\u203a'), lab);
+}
+// SoundFont has no display of its own: its real state, as text (the file, the program, the envelope multipliers over the file's own)
+function sfScreen(t, def, every) {
+  const el = h('div', { class: 'u2sf' });
+  const paint = () => {
+    const sf = t.inst.sf, pr = sf && sf.presets ? sf.presets[sf.preset || 0] : null, nm = (q) => (typeof q === 'string' ? q : q && (q.name || q.n)) || '\u2014';
+    const v = (k) => fmtParam(def.params[k], t.inst.params[k] ?? def.params[k].def);
+    const rows = [['File', sf ? String(sf.path || '').split('/').pop() : 'Belum dimuat'], ['Program', sf ? nm(pr) : '\u2014'], ['ADSR', v(2) + ' ' + v(3) + ' ' + v(4) + ' ' + v(5)]];
+    el.replaceChildren(...rows.map(([a, b]) => h('div', { class: 'r' }, h('span', {}, a), h('b', {}, b))));
+  };
+  paint(); every(300, paint); return el;
 }
 
 // ---- effect card
@@ -350,8 +383,8 @@ export function instCard(i, t, api) {
   const tmap = TABMAP[t.inst.type];
   if (groups.length) kids.push(body('i' + t.id, groups, mk, api.every, false, real && real.setTab ? (gi) => real.setTab(tmap ? (tmap[gi] ?? 0) : 0) : null));
   else kids.push(h('div', { class: 'u2c-empty' }, 'Diatur lewat editornya.'));
-  const hero = real || fxDisplay({ def, d: null, family: 'inst', strip: i, every: api.every, get });
-  return cardV3('inst', t.color || 'var(--accent)', head, hero, foot, kids);
+  const hero = real || (t.inst.type === 6 ? sfScreen(t, def, api.every) : fxDisplay({ def, d: null, family: 'inst', strip: i, every: api.every, get }));
+  return cardV3('inst', t.color || 'var(--accent)', head, hero, foot, kids, midi ? miniKeys(i, t.id) : null);
 }
 
 // ---- drum kit: a grid of pads (tap = choose + hear it), the chosen pad's Gain / Pan / Pitch / Decay (+ Start / End for a sample),
