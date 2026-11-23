@@ -124,10 +124,13 @@ function buildBar() {
   el.cpu.onclick = () => PN.openPerfPanel();
   { // BPM: tap = the Tempo window (tap tempo, time signature), a vertical drag = change the tempo
     const b = el.bpm; let d = null;
-    b.addEventListener('pointerdown', (e) => { b.setPointerCapture(e.pointerId); d = { y: e.clientY, b: state.bpm, moved: false }; });
-    b.addEventListener('pointermove', (e) => { if (!d) return; const dy = d.y - e.clientY; if (!d.moved && Math.abs(dy) > 10) { d.moved = true; d.y = e.clientY; } if (d.moved) P.setBpm(clamp(Math.round(d.b + (d.y - e.clientY) * 0.25), 20, 999)); });
-    b.addEventListener('pointerup', () => { if (d && !d.moved) PN.openTempoPanel(); d = null; });
+    // the tap opens the window from 'click' (reliable for touch too); a drag that changed the tempo swallows that click
+    let dragged = false;
+    b.addEventListener('pointerdown', (e) => { try { b.setPointerCapture(e.pointerId); } catch (_) { /* gone */ } d = { y: e.clientY, b: state.bpm, moved: false }; dragged = false; });
+    b.addEventListener('pointermove', (e) => { if (!d) return; const dy = d.y - e.clientY; if (!d.moved && Math.abs(dy) > 10) { d.moved = true; dragged = true; d.y = e.clientY; } if (d.moved) P.setBpm(clamp(Math.round(d.b + (d.y - e.clientY) * 0.25), 20, 999)); });
+    b.addEventListener('pointerup', () => { d = null; });
     b.addEventListener('pointercancel', () => { d = null; });
+    b.addEventListener('click', () => { if (dragged) { dragged = false; return; } PN.openTempoPanel(); });
   }
 }
 function togglePanel(t) {

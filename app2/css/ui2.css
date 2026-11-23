@@ -1139,3 +1139,11 @@ html.ui2 .fw-body :is(.lv-tab, .lv-btn) .led, html.ui2 .fw .lv-tab::before { bac
 html.ui2 #bar2 { height: calc(52px + var(--sab, 0px)) !important; min-height: 0 !important; padding-top: 0 !important; padding-bottom: var(--sab, 0px) !important; box-sizing: border-box; align-items: center !important; }
 html.ui2 #bar2 > div, html.ui2 #bar2 > nav { align-self: center !important; }
 html.ui2 #bar2 { height: calc(52px + max(0px, var(--sab, 0px) - 10px)) !important; padding-bottom: max(0px, calc(var(--sab, 0px) - 10px)) !important; }
+html.ui2 #top2 .bpm { touch-action: none; } html.ui2 #top2 .bpm > * { pointer-events: none; }
+
+/* the module's own display on the card's screen: between the title bar and the foot */
+.u2c.v3 .u2s > .u2real { position: absolute; left: 6px; right: 6px; top: 46px; bottom: 6px; overflow: hidden; border-radius: 12px; }
+.u2c.v3.inst .u2s > .u2real { bottom: 40px; }
+.u2c.v3 .u2s > .u2real > * { display: block; }
+.u2c.v3 .u2s > .u2real canvas { display: block; border-radius: 12px; }
+.u2c.v3 .u2s-foot .u2chip.prog { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

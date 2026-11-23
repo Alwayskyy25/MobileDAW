@@ -93,6 +93,11 @@ if (items.includes('Salin ke playhead')) {
 // the mixer: the tracks and the Master (no return strips), each with Mute / Solo / Rekam
 { const m = await page.evaluate(async () => { const M = await import('./js/ui2/mixer2.js'), P = await import('./js/project.js'); M.build(); const n = document.querySelectorAll('#mix2 .m2-strip').length; return { n, want: P.state.tracks.filter((t) => t.kind !== 'auto').length + 1, msr: document.querySelectorAll('#mix2 .m2-strip:not(.bus) .m2-row .m2-b').length, full: !!document.querySelector('.m2-full') }; });
   ok(m.n === m.want && m.msr === (m.want - 1) * 3 && !m.full, `the mixer shows the tracks + Master as its only view, without return strips, with M / S / R (${m.n} strips)`); }
+// BPM: a finger tap opens the Tempo window
+{ const r = await page.evaluate(() => { const b = document.querySelector('#top2 .bpm').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+  await page.touchscreen.tap(r.x, r.y); await page.waitForTimeout(500);
+  ok(await page.evaluate(() => !!document.querySelector('.u2p .tp2c')), 'a finger tap on BPM opens the Tempo window');
+  await page.evaluate(() => { for (const m of document.querySelectorAll('.u2p')) m.remove(); }); }
 // main menu
 await page.click('#logo2'); await page.waitForTimeout(400);
 ok(await page.evaluate(() => document.querySelector('#mm2').classList.contains('open') && document.querySelectorAll('#mm2 .u2m-t').length === 5), 'the logo button opens the main menu (5 tabs)');
@@ -129,6 +134,12 @@ ok(mods.fx.every(([k, , flm]) => flm || k === 16) && mods.fx.some(([k]) => k ===
     const side = cs.length < 2 || cs.slice(1).every((c, k) => Math.abs(c.getBoundingClientRect().top - cs[k].getBoundingClientRect().top) < 2);
     return { n: cs.length, side, bad }; });
   ok(lay.n >= 2 && lay.side && !lay.bad.length, `module cards sit side by side and no control runs out of its card (${lay.n} cards${lay.bad.length ? ', cut: ' + lay.bad.join(', ') : ''})`); }
+// the module's own display on the card screen (real formulas, not decoration): an FLM effect and MiniSynth, painted
+{ const rd = await page.evaluate(async () => { const P = await import('./js/project.js'); P.addDevice(0, 103); P.setInstrument(0, 32); await new Promise((r) => setTimeout(r, 900));
+    const fx = document.querySelector('.dev-scroll > .card.u2c.fx .u2real'), ins = document.querySelector('.dev-scroll > .card.u2c.inst .u2real canvas');
+    let painted = 0; if (ins) { const d = ins.getContext('2d').getImageData(0, 0, ins.width, ins.height).data, set = new Set(); for (let k = 0; k < d.length; k += 32) set.add(d[k] + ',' + d[k + 1] + ',' + d[k + 2]); painted = set.size; }
+    return { fx: !!fx, ins: !!ins, painted }; });
+  ok(rd.fx && rd.ins && rd.painted > 8, `effect and synth cards show the module's own display (synth display colours: ${rd.painted})`); }
 ok(await page.evaluate(() => !!document.querySelector('#tcol2 .tc-top .snap, #tcol2 .tc-top [aria-label*="Snap"]') && !document.querySelector('#top2 .tg [aria-label*="Snap"]')), 'Snap sits in the corner above the track column (not in the top bar)');
 // its own settings: 1.0's preferences are untouched, MobileDAW 2 writes mobiledaw2.prefs.v1
 await page.evaluate(async () => { const { prefs, savePrefs } = await import('./js/prefs.js'); prefs.ui2Wide = false; savePrefs(); });

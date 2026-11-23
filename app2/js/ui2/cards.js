@@ -12,6 +12,8 @@ import { FLM_LAYOUT } from '../flmlayout.js';
 import { offerAutomation } from '../automate.js';
 import { gestureTiming } from '../gesture.js';
 import { fxDisplay } from './fxdisp.js';
+import { realScreen } from './realdisp.js';
+import { kitView, instKitView } from '../fxkit.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const tabMem = new Map();                        // the open tab per card (device id / instrument track id), kept across re-renders
@@ -144,6 +146,8 @@ const SECTIONS = {
   32: [['Osc', [0, 1, 2, 3, 43]], ['Filter', R(4, 7)], ['Filter Env', R(8, 12)], ['LFO', R(13, 18)], ['Master', R(19, 24)], ['Distorsi', R(25, 27)], ['Delay', R(28, 32)], ['Chorus', R(33, 36)], ['Phaser', R(37, 42)]],
   33: [['Osc', R(0, 4)], ['Unison', R(5, 9)], ['Sync', R(10, 17)], ['Filter', R(18, 26)], ['LFO', R(27, 33)], ['Amp', R(34, 39)], ['Wheels', R(40, 42)], ['Voices', R(43, 51)], ['Distorsi', [52, 53]], ['Delay', R(54, 57)]],
 };
+// card tab -> the full editor's page (its tabs: DirectWave 5, GMS 8, MiniSynth 6, SuperSaw 8)
+const TABMAP = { 30: [0, 1, 2, 3, 4], 31: [0, 1, 2, 3, 4, 5, 6, 7, 7, 7], 32: [0, 1, 2, 3, 4, 5, 5, 5, 5], 33: [0, 0, 1, 2, 3, 4, 5, 6, 7, 7] };
 function instGroups(def, type) {
   if (SECTIONS[type]) {
     const used = new Set(), out = SECTIONS[type].map(([n, ks]) => [n, ks.filter((k) => def.params[k] && !def.params[k].hidden && !used.has(k) && used.add(k)), '']).filter((g) => g[1].length);
@@ -179,11 +183,11 @@ function fxGroups(def) {
 const tidy = (n, pf) => { let s = String(n); if (pf && s.startsWith(pf + ' ')) s = s.slice(pf.length + 1); s = s.trim(); return /^[A-Z0-9 .\-/]+$/.test(s) && s.length > 3 ? s[0] + s.slice(1).toLowerCase() : s; };
 
 // a card body with tabs (more than one section) and a grid of controls
-function body(key, groups, mk, every, bigTabs) {
+function body(key, groups, mk, every, bigTabs, onTab) {
   const box = h('div', { class: 'u2c-b' }), tabs = h('div', { class: 'u2c-tabs', role: 'tablist' }), grid = h('div', { class: 'u2c-g' });
   let live = [], shownOnce = false;
   const show = (gi) => {
-    tabMem.set(key, gi); const g = groups[gi]; live = [];
+    tabMem.set(key, gi); const g = groups[gi]; live = []; if (onTab) onTab(gi);
     [...tabs.children].forEach((b, j) => { b.classList.toggle('on', j === gi); b.setAttribute('aria-selected', String(j === gi)); });
     const parts = [];
     const ctl = g[1].map((k) => { const c = mk(k, g[2], g[3] || {}); live.push(c); return { k, c }; });
@@ -285,7 +289,9 @@ export function fxCard(i, d, di, n, api) {
   mk.get = get; mk.def = pdef;
   const kids = [];
   if (d.type === 16) kids.push(h('div', { class: 'u2c-cta' }, h('p', {}, 'Meter, spektrum, osiloskop dan stereo di satu jendela.'), h('button', { class: 'u2btn fill', onclick: () => api.openWindow() }, 'Buka MiniMeters')));
-  const hero = d.type === 16 ? null : fxDisplay({ def, d, family: famOf(d.type), strip: i, every: api.every, get: (k) => d.params[k] ?? def.params[k].def });
+  // the module's own display (real formulas, real parameters) when it has one, else the card's drawn graphic
+  const real = d.type === 16 || !def.kit ? null : realScreen(() => kitView({ i, di, d, def, every: api.every, set: (k, v) => P.setDeviceParam(i, di, k, v), refreshKnobs: () => {} }), api.every);
+  const hero = d.type === 16 ? null : real || fxDisplay({ def, d, family: famOf(d.type), strip: i, every: api.every, get: (k) => d.params[k] ?? def.params[k].def });
   if (groups.length) kids.push(body('d' + d.id, groups, mk, api.every));
   else kids.push(h('div', { class: 'u2c-empty' }, 'Modul ini tidak punya parameter.'));
   return cardV3('fx' + (off ? ' off' : ''), cat[1], head, hero, null, kids);
@@ -302,6 +308,11 @@ export function instCard(i, t, api) {
   const foot = [];
   if (midi) foot.push(h('button', { class: 'u2chip', onclick: (e) => { e.stopPropagation(); api.presetMenu(e.currentTarget.getBoundingClientRect()); } }, 'Preset'));
   if (def.zones || def.floatOnly || t.inst.type === 6 || t.inst.type === 35 || t.inst.type === 38 || !midi) foot.push(h('button', { class: 'u2chip fill', onclick: () => api.openWindow() }, t.inst.type === 6 ? 'SoundFont' : def.zones ? 'Sample' : t.inst.type === 35 ? 'Irisan' : !midi ? 'Pad & sample' : 'Editor'));
+  if (t.inst.type === 6 && t.inst.sf && (t.inst.sf.presets || []).length) {   // SoundFont: the program, chosen from the file's list
+    const pr = t.inst.sf.presets, cur = pr[t.inst.sf.preset || 0], nm = (q) => (typeof q === 'string' ? q : q && (q.name || q.n)) || 'Program';
+    foot.push(h('button', { class: 'u2chip prog', onclick: (e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect();
+      menu(pr.map((q, k) => ({ label: nm(q), check: k === (t.inst.sf.preset || 0), fn: () => P.setSfPreset(i, k) })), r.left, r.top - 8); } }, nm(cur)));
+  }
   for (const x of api.extra.slice(0, 1)) foot.push(h('button', { class: 'u2chip', onclick: (e) => x.fn(e.currentTarget.getBoundingClientRect()) }, x.label.replace(/\u2026$/, '').replace(/^Zona sample$/, 'Zona')));
   const kids = [];
   if (t.inst.missing) { const x = t.inst.missing; kids.push(h('div', { class: 'u2c-warn' }, (x.name || 'Instrumen') + ': ' + (x.sample ? 'sample ' + x.sample.split('/').pop() : 'program') + ' tidak tersedia')); }
@@ -314,9 +325,12 @@ export function instCard(i, t, api) {
   const mk = (k, pf) => { const p = def.params[k];
     return control(p, tidy(p.n, pf), () => get(k), (v) => P.setInstParam(i, k, v), (rect) => offerAutomation(rect, { kind: 5, strip: P.stripOf(i), param: k, def: p }, `${t.name} \u2022 ${p.n}`)); };
   mk.get = get; mk.def = (k) => def.params[k];
-  if (groups.length) kids.push(body('i' + t.id, groups, mk, api.every));
+  // the instrument's own display (FL Studio Mobile's synths: the page of the card's tab; 3x Osc: its oscillators)
+  const real = midi && def.view === 'kit' && t.inst.type !== 6 ? realScreen(() => instKitView(i, t, api.every), api.every) : null;
+  const tmap = TABMAP[t.inst.type];
+  if (groups.length) kids.push(body('i' + t.id, groups, mk, api.every, false, real && real.setTab ? (gi) => real.setTab(tmap ? (tmap[gi] ?? 0) : 0) : null));
   else kids.push(h('div', { class: 'u2c-empty' }, 'Diatur lewat editornya.'));
-  const hero = fxDisplay({ def, d: null, family: 'inst', strip: i, every: api.every, get });
+  const hero = real || fxDisplay({ def, d: null, family: 'inst', strip: i, every: api.every, get });
   return cardV3('inst', t.color || 'var(--accent)', head, hero, foot, kids);
 }
 
