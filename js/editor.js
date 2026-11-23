@@ -83,7 +83,7 @@ const keyLabel = (p) => { if (isDrum()) { const d = padList().find((x) => x.pitc
 const pan0 = (n) => n.pan || 0;
 function dims() {
   KEYS = isDrum() || isAuto() ? 54 : 48;   // v66: wider piano ruler (Live's is wider than a thumb); every hit test and drawing uses KEYS
-  VEL = cfg.velH ? clamp(cfg.velH, 40, Math.max(40, Math.round(H * 0.55))) : clamp(Math.round(H * 0.24), 44, 84);   // small panel: the lane shrinks so the note grid is not eaten by it
+  VEL = cfg.velH ? clamp(cfg.velH, 40, Math.max(40, Math.round(H * 0.75))) : clamp(Math.round(H * 0.24), 44, 84);   // small panel: the lane shrinks so the note grid is not eaten by it
 }
 
 // ------------------------------------------------------------------ geometry
@@ -201,8 +201,7 @@ function drawRoll(t, c) {
   for (const n of c.notes) {
     const x = px(n.t), w = Math.max(3, n.d * v.ppt), y = py(n.p) - v.keyH;
     if (x + w < KEYS || x > W || y > gb || y + v.keyH < RULER) continue;
-    const s = sel.has(n), nc = noteHex(t, n), dim = mv && cfg.vokFocus >= 0 && (n.img || 0) !== cfg.vokFocus && !s;
-    ctx.globalAlpha = dim ? 0.18 : 1;
+    const s = sel.has(n), nc = noteHex(t, n);
     ctx.fillStyle = velCol(nc, n.v, s); ctx.fillRect(x, y + 1, w - 1, v.keyH - 1);
     ctx.strokeStyle = s ? C('#ffffff') : shadeC(nc, 0.6); ctx.lineWidth = s ? 1.5 : 1; ctx.strokeRect(x + 0.5, y + 1.5, w - 2, v.keyH - 2);   // flat note, hairline outline (Live: no bevel)
     if (w > 16 && (s || w > 30)) { ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x + w - 5, y + 4, 2, Math.max(2, v.keyH - 7)); }   // right edge: resize grip, kept for touch
@@ -215,7 +214,7 @@ function drawRoll(t, c) {
     const BH = 13, ns = [...c.notes].sort((a, b) => a.t - b.t); ctx.fillStyle = 'rgba(30,30,34,.92)'; ctx.fillRect(KEYS, RULER, W - KEYS, BH);
     let lastG = -1, lastX = -1e9; ctx.font = FONT(700, 9); ctx.textBaseline = 'middle';
     for (const n of ns) { const g = n.img || 0, x = px(n.t), w = Math.max(2, n.d * v.ppt); if (x + w < KEYS || x > W) { lastG = g; continue; }
-      ctx.globalAlpha = cfg.vokFocus >= 0 && g !== cfg.vokFocus ? 0.25 : 1; ctx.fillStyle = VOC[g & 7]; ctx.fillRect(x, RULER + 2, w, BH - 4);
+      ctx.fillStyle = cfg.vokFocus >= 0 && g !== cfg.vokFocus ? VOC_OFF : t.color; ctx.fillRect(x, RULER + 2, w, BH - 4);
       if (g !== lastG && x - lastX > 40) { ctx.fillStyle = '#f4f4f6'; ctx.fillText(vocName(t, g), Math.max(KEYS + 2, x) + 2, RULER + BH / 2 + 0.5, 90); lastX = x; }
       lastG = g; }
     ctx.globalAlpha = 1;
@@ -228,7 +227,7 @@ function drawRoll(t, c) {
   ctx.fillStyle = C('#101011'); ctx.fillRect(0, RULER, KEYS, gb - RULER);
   const bw = Math.round(KEYS * 0.58);   // black key length
   for (let i = i0; i <= i1; i++) {
-    const p = rP(i), y = py(p) - v.keyH, pc = p % 12, blk = BLACK.has(pc), lit = previewHeld && previewHeld.p === p;
+    const p = rP(i), y = py(p) - v.keyH, pc = p % 12, blk = BLACK.has(pc), lit = (previewHeld && previewHeld.p === p) || playKeys.has(p);
     if (foldRows) {                                                              // folded: every row named, a strip in the key's colour (Live's folded key column)
       ctx.fillStyle = lit ? C('#ffa722') : blk ? T('--key-b') : T('--key-w'); ctx.fillRect(0, y, 7, v.keyH);
       ctx.fillStyle = C('#2c2c2f'); ctx.fillRect(7, y, KEYS - 8, v.keyH); ctx.fillStyle = C('#1f1f21'); ctx.fillRect(0, y + v.keyH - 1, KEYS, 1);
@@ -289,7 +288,8 @@ function ccPaint(c, x, y) {
 const isHarmor = () => { const t = P.state.tracks[P.state.sel.track]; return !!(t && t.inst && t.inst.type === 38); };
 // a Harmor with more than one vocal: each vocal its own note colour and name, so imut / body notes read apart in one pattern
 const VOC = P.VOC_COLORS, vocals = P.vocList, vocName = P.vocName, vocShort = P.vocShort, multiVoc = (t) => vocals(t).length > 1;
-const noteHex = (t, n) => (multiVoc(t) ? VOC[(n.img || 0) & 7] : t.color);
+const VOC_OFF = '#55555c';   // notes of the vocals not selected: dark grey
+const noteHex = (t, n) => (multiVoc(t) && cfg.vokFocus >= 0 && (n.img || 0) !== cfg.vokFocus ? VOC_OFF : t.color);
 function laneChooser(x, y) {
   const c = cur().clip, has = (k, n) => (c.cc || []).some((l) => l.k === k && l.n === n && l.pts.length);
   menu([
@@ -339,7 +339,6 @@ function drawVel(t, c, gb) {
     for (const n of c.notes) {
       const s = sel.has(n); if ((pass === 1) !== s) continue;
       const x = Math.round(px(n.t)) + 0.5; if (x < KEYS - 4 || x > W + 4) continue;
-      ctx.globalAlpha = multiVoc(t) && cfg.vokFocus >= 0 && (n.img || 0) !== cfg.vokFocus && !s ? 0.18 : 1;
       const vv = Math.min(1, n.v), col = s ? C('#ffffff') : velCol(noteHex(t, n), isPan ? 1 : vv, false);   // an imported FLM boost (velocity above 1) sits at the top
       const y = isPan ? cy + pan0(n) * hh / 2 : isImg ? top + (1 - (n.img || 0) / 7) * hh : top + (1 - vv) * hh, from = isPan ? cy : bottom;
       ctx.fillStyle = col; ctx.fillRect(x - 0.75, Math.min(from, y), 1.5, Math.max(1, Math.abs(from - y)));          // stem
@@ -455,6 +454,10 @@ export function frame() {
       if (target > v.x0 || rel < v.x0 || rel > v.x0 + vis) { if (target !== v.x0) { v.x0 = target; dirty = true; } }
     }
   }
+  { let ks = '';                                                    // the keys the playing notes press (Follow on)
+    if (state.playing && cfg.follow && c.clip.notes && !stepsMode()) { const w = winOf(c.clip); let r = P.currentTick() - c.clip.start + w.lp; if (w.S > 0 && r >= w.S) r %= w.S;
+      const on = new Set(); if (r >= 0) for (const n of c.clip.notes) if (!n.sl && n.t <= r && r < n.t + n.d) on.add(n.p); ks = [...on].sort().join(','); if (ks !== playSig) { playKeys = on; playSig = ks; dirty = true; } }
+    else if (playSig) { playKeys = new Set(); playSig = ''; dirty = true; } }
   if (dirty) {
     dirty = false;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -467,7 +470,7 @@ export function frame() {
 
 // ------------------------------------------------------------------ note operations
 const selNotes = () => [...sel];
-let previewHeld = null;
+let previewHeld = null, playKeys = new Set(), playSig = '';   // playKeys: the pitches under the playhead (keys drawn pressed while playing with Follow on)
 function notePreview(p, vel = 0.8) {
   const c = cur(); if (!c) return;
   if (previewHeld) eng.preview(previewHeld.track, previewHeld.p, 0, false);   // release the previous preview first, otherwise its note-off is lost and it hangs
@@ -734,7 +737,7 @@ function rollHandlers() {
       } else if (drag.k === 'lane') {
         if (laneSet(c, x, y)) { P.touchClips(cur().track); P.emit('notes'); }
       } else if (drag.k === 'tsel') { const q = snapT(tk(x)); tsel = { a: Math.min(drag.a, q), b: Math.max(drag.a, q) }; }
-      else if (drag.k === 'lsplit') { cfg.velH = clamp(Math.round(H - y), 40, Math.round(H * 0.55)); dims(); clampV(c); }
+      else if (drag.k === 'lsplit') { const hh = Math.round(H - y); if (hh < 26) { if (cfg.vel) { cfg.vel = false; cfg.velH = 0; dims(); clampV(c); toolbar(); toast('Lane ditutup \u2022 tombol Lane membukanya lagi', 1400); } } else { if (!cfg.vel) { cfg.vel = true; toolbar(); } cfg.velH = clamp(hh, 40, Math.round(H * 0.75)); dims(); clampV(c); } }
       invalidate();
     },
     dragEnd(x, y, t, cancel) {
@@ -1264,11 +1267,11 @@ function toolbar() {
   // Harmor with several vocals: one coloured button per vocal. Tap = the selected notes play that vocal, and new notes are drawn with it
   if (multiVoc(t)) { const cv = cfg.vok || 0;
     tools.append(SEP(), h('div', { class: 'ed-g ed-voc' }, ...vocals(t).map((g) => {
-      const b = h('button', { class: 'b ed-vocb' + (g === cv ? ' on' : ''), title: sel.size ? 'Jadikan ' + sel.size + ' not terpilih vokal ini' : 'Not baru memakai vokal ini', onclick: () => {
-        cfg.vok = g; if (sel.size) { checkpoint(); for (const n of sel) { if (g) n.img = g; else delete n.img; } changed(); toast(sel.size + ' not \u2192 ' + vocName(t, g), 1300); }
-        else { cfg.vokFocus = cfg.vokFocus === g ? -1 : g; toast(cfg.vokFocus >= 0 ? 'Fokus: ' + vocName(t, g) + ' (vokal lain diredupkan) \u2022 not baru = ' + vocName(t, g) : 'Semua vokal tampil', 1600); }
-        toolbar(); invalidate(); } }, h('i', { class: 'ed-vocdot' }), vocName(t, g), h('span', { class: 'ed-vocn' }, String(c.clip.notes.filter((n) => (n.img || 0) === g).length)));
-      b.style.setProperty('--voc', VOC[g]); if (cfg.vokFocus === g) b.classList.add('focus'); return b; }),
+      const b = h('button', { class: 'b ed-vocb' + (g === cv ? ' on' : ''), title: 'Pilih vokal ini (vokal lain abu-abu). Saat vokal ini sudah dipilih: ketuk lagi = not terpilih jadi vokal ini', onclick: () => {
+        cfg.vok = g; if (sel.size && cfg.vokFocus === g) { checkpoint(); for (const n of sel) { if (g) n.img = g; else delete n.img; } changed(); toast(sel.size + ' not \u2192 ' + vocName(t, g), 1300); }
+        else { cfg.vokFocus = cfg.vokFocus === g ? -1 : g; toast(cfg.vokFocus >= 0 ? vocName(t, g) + ' dipilih: notnya berwarna, vokal lain abu-abu \u2022 not baru = ' + vocName(t, g) : 'Semua vokal satu warna', 1600); }
+        toolbar(); invalidate(); } }, vocName(t, g), h('span', { class: 'ed-vocn' }, String(c.clip.notes.filter((n) => (n.img || 0) === g).length)));
+      b.style.setProperty('--voc', t.color); if (cfg.vokFocus === g) b.classList.add('focus'); return b; }),
       B('Semua', () => { cfg.vokFocus = -1; toolbar(); invalidate(); }, !(cfg.vokFocus >= 0))));
   }
   // Live 12's velocity tools (refs/live12/010): Randomize and Ramp, on the selected notes (all notes when none is selected)

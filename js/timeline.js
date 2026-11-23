@@ -299,8 +299,7 @@ function drawClip(t, c, y, hh) {
     }
   } else if (c.notes && bh > 6) {
     const [lo, hi] = noteBox(c), span = hi - lo + 1, nh = Math.max(2, Math.min(bh / span * 0.8, 7));   // Live: solid note bars, about 4/5 of a pitch row
-    ctx.fillStyle = c.muted ? INK : shade(t.color, 0.85);   // Live 12: notes nearly black, in the clip colour's darkest tone
-    const voc = !c.muted && P.vocList(t).length > 1;              // Harmor with several vocals: each note in its vocal's colour
+    ctx.fillStyle = c.muted ? INK : currentTone() === 'light' ? '#141414' : '#f2f2f4';   // notes: black on a light theme, white on a dark one (no colours)
     for (const g of P.loopSegs(c)) {                            // looped MIDI: the notes are drawn again in every repeat (no empty bars)
       const gx = x + g.o * view.ppt;
       if (gx > xe || gx + g.len * view.ppt < xs) continue;
@@ -309,7 +308,6 @@ function drawClip(t, c, y, hh) {
         const nx = gx + (n.t - g.s) * view.ppt, nw = Math.max(1.5, Math.min(n.d, g.s + g.len - n.t) * view.ppt - 0.5);
         if (nx + nw < xs || nx > xe) continue;
         const ny = by + (hi - n.p) / span * (bh - nh);
-        if (voc) { ctx.fillStyle = 'rgba(16,16,20,.9)'; ctx.fillRect(nx - 1, ny - 1, nw + 2, nh + 2); ctx.fillStyle = P.VOC_COLORS[(n.img || 0) & 7]; ctx.fillRect(nx, ny, nw, nh); continue; }   // the piano roll's colours, a dark outline so they read on the clip
         ctx.fillRect(nx, ny, nw, nh);
       }
     }
