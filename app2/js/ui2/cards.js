@@ -163,7 +163,7 @@ function body(key, groups, mk, every, bigTabs) {
     [...tabs.children].forEach((b, j) => { b.classList.toggle('on', j === gi); b.setAttribute('aria-selected', String(j === gi)); });
     const parts = [];
     const ctl = g[1].map((k) => { const c = mk(k, g[2], g[3] || {}); live.push(c); return { k, c }; });
-    const env = envView(ctl.map(({ k }) => ({ k, p: mk.def(k) })), mk.get); if (env) live.push(env);
+    const env = null;   // v3 cards draw the envelope on their screen (fxdisp.js), not again among the controls
     // order: lists and switches first (full-width rows), then the dials
     const rows = ctl.filter(({ c }) => !c.classList.contains('u2d')).map(({ c }) => c), dials = ctl.filter(({ c }) => c.classList.contains('u2d')).map(({ c }) => c);
     // one grid that fills the rack's height row by row and then grows sideways (a field takes two dial cells): nothing is cut off

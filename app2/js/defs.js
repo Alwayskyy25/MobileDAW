@@ -70,7 +70,13 @@ export const INSTRUMENTS = {
     { n: 'Arp Oct', min: 1, max: 3, def: 1, step: 1, fmt: 'int' },
     { n: 'Gate', min: 0.1, max: 1, def: 0.7, unit: '%' } ] },
   6: { name: 'SoundFont', view: 'kit', params: [
-    { n: 'Gain', min: 0, max: 1, def: 0.8, unit: '%' } ] },
+    { n: 'Gain', min: 0, max: 1, def: 0.8, unit: '%' },
+    { n: 'Preset', min: 0, max: 9999, def: 0, step: 1, hidden: true },   // index 1 = the program (t.inst.sf.preset): never sent from here
+    // 2..5: the SoundFont's own volume envelope times these (x1 = as the file has it, so old songs sound the same)
+    { n: 'Attack', min: 0.1, max: 10, def: 1, curve: 'log', fmt: 'mul' },
+    { n: 'Decay', min: 0.1, max: 10, def: 1, curve: 'log', fmt: 'mul' },
+    { n: 'Sustain', min: 0, max: 1, def: 1, unit: '%' },
+    { n: 'Release', min: 0.1, max: 10, def: 1, curve: 'log', fmt: 'mul' } ] },
   7: { name: 'Moisture Klasik', params: [
     { n: 'Pos A', min: 0, max: 1, def: 0.25, unit: '%' },
     { n: 'Pos B', min: 0, max: 1, def: 0.6, unit: '%' },
@@ -904,6 +910,7 @@ export const noteName = (p) => ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#',
 
 export function fmtParam(p, v) {
   switch (p.fmt) {
+    case 'mul': return '\u00d7' + (v < 9.95 ? v.toFixed(2) : v.toFixed(1));   // a multiplier (SoundFont envelope)
     case 'wave': return ['Saw', 'Square', 'Tri'][Math.round(v)] || '';
     case 'wave4': return ['Saw', 'Square', 'Tri', 'Sine'][Math.round(v)] || '';
     case 'filt3': return ['Low-pass', 'High-pass', 'Band-pass'][Math.round(v)] || '';

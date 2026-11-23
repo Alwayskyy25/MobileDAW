@@ -838,7 +838,7 @@ export function applyPreset(i, preset) {
   const t = state.tracks[i], def = INSTRUMENTS[t.inst.type];
   if (HK.on) HK.add({ t: 'ipar', s: t.id, v: { ...t.inst.params } });
   t.inst.params = {};
-  def.params.forEach((p, k) => { if (k === 90 && t.inst.type === 11) return; const v = preset.p[k] ?? p.def; t.inst.params[k] = v; eng.instParam(i, k, v); });
+  def.params.forEach((p, k) => { if (k === 90 && t.inst.type === 11) return; if (p.hidden && t.inst.type === 6) return; /* SoundFont: index 1 is the program, kept */ const v = preset.p[k] ?? p.def; t.inst.params[k] = v; eng.instParam(i, k, v); });
   emit('devices');
 }
 export const presetsFor = (type) => PRESETS[type] || [];
@@ -2677,7 +2677,7 @@ export function swapRec(e) {
       if (!t || !t.inst) return;
       const cur = { ...t.inst.params }; t.inst.params = { ...e.v }; e.v = cur;
       const def = INSTRUMENTS[t.inst.type];
-      if (def) def.params.forEach((p, k) => { if (k === 90 && t.inst.type === 11) return; eng.instParam(i, k, t.inst.params[k] ?? p.def); });
+      if (def) def.params.forEach((p, k) => { if (k === 90 && t.inst.type === 11) return; if (p.hidden && t.inst.type === 6) return; /* SoundFont: index 1 is the program, kept */ eng.instParam(i, k, t.inst.params[k] ?? p.def); });
       emit('devices'); return;
     }
   }

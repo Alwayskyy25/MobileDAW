@@ -707,15 +707,16 @@ export class Gms extends Base {
 
 // ------------------------------------------------------------------------------- SoundFont player
 // sf = { data: Int16Array, shdr: [{start,end,loopStart,loopEnd,rate}], presets: [{name, zones:[...]}] }  (see sf2.js)
-// params: 0 gain, 1 preset index, 100 soundfont id
+// params: 0 gain, 1 preset index, 2..5 attack / decay / sustain / release multipliers, 100 soundfont id
 export class SfPlayer extends Base {
   constructor(sr, sfs) {
     super(sr);
-    this.sfs = sfs; this.sfId = -1; this.gain = 0.8; this.preset = 0;
+    this.sfs = sfs; this.sfId = -1; this.gain = 0.8; this.preset = 0; this.aM = 1; this.dM = 1; this.sM = 1; this.rM = 1;   // 2..5: envelope multipliers (1 = the file's own)
     this.v = mkVoices(40, () => ({ pos: 0, ratio: 1, z: null, sf: null, g: 0, pl: 1, pr: 1, ap: adsrParams(0, 0, 1, 0, 48000) }));
   }
   setParam(i, x) {
     if (i === 100) { this.sfId = x | 0; this.allOff(); } else if (i === 0) this.gain = x; else if (i === 1) { this.preset = Math.max(0, x | 0); this.allOff(); }
+    else if (i === 2) this.aM = clamp(x, 0.01, 100); else if (i === 3) this.dM = clamp(x, 0.01, 100); else if (i === 4) this.sM = clamp(x, 0, 1); else if (i === 5) this.rM = clamp(x, 0.01, 100);
   }
   noteOn(p, vel) {
     const sf = this.sfs[this.sfId]; if (!sf) return;
@@ -728,7 +729,7 @@ export class SfPlayer extends Base {
       v.on = v.held = true; v.pitch = p; v.vel = vel; v.age = ++this.counter; v.z = z; v.sf = sf;
       v.pos = z.start; v.ratio = (sh.rate / this.sr) * Math.pow(2, (p - z.root + z.tune / 100) / 12);
       v.g = Math.pow(10, -z.atten / 20); const pan = clamp(z.pan, -1, 1); v.pl = Math.cos((pan + 1) * 0.7853982) * 1.4142; v.pr = Math.sin((pan + 1) * 0.7853982) * 1.4142;
-      adsrInto(v.ap, z.a, z.d, z.s, z.r, this.sr); v.env.start();
+      adsrInto(v.ap, z.a * this.aM, z.d * this.dM, z.s * this.sM, z.r * this.rM, this.sr); v.env.start();
     }
   }
   render(L, R, from, to) {

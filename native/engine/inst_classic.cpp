@@ -518,6 +518,7 @@ void DrumSynth::rackCmd(int op, double c, double j, double a, double b, Device* 
 // ================================================================ SoundFont player
 void SfPlayer::setParam(int i, double x) {
   if (i == 100) { sfId = toInt32(x); allOff(); } else if (i == 0) gain = x; else if (i == 1) { preset = (int)jsMax(0, toInt32(x)); allOff(); }
+  else if (i == 2) aM = clamp(x, 0.01, 100); else if (i == 3) dM = clamp(x, 0.01, 100); else if (i == 4) sM = clamp(x, 0, 1); else if (i == 5) rM = clamp(x, 0.01, 100);
 }
 void SfPlayer::noteOn(int p, double vel) {
   const SoundFont* sf = sfId >= 0 && sfId < 8 ? bank->sf[sfId] : nullptr; if (!sf || sf->presets.empty()) return;
@@ -530,7 +531,7 @@ void SfPlayer::noteOn(int p, double vel) {
     x.on = x.held = true; x.pitch = p; x.vel = vel; x.age = ++counter; x.z = &z; x.sf = sf;
     x.pos = z.start; x.ratio = (sf->rate[si] / sr) * std::pow(2, (p - z.root + z.tune / 100) / 12);
     x.g = std::pow(10, -z.atten / 20); double pan = clamp(z.pan, -1, 1); x.pl = std::cos((pan + 1) * 0.7853982) * 1.4142; x.pr = std::sin((pan + 1) * 0.7853982) * 1.4142;
-    x.ap = adsrParams(z.a, z.d, z.s, z.r, sr); x.env.start();
+    x.ap = adsrParams(z.a * aM, z.d * dM, z.s * sM, z.r * rM, sr); x.env.start();
   }
 }
 void SfPlayer::render(float* L, float* R, int from, int to) {

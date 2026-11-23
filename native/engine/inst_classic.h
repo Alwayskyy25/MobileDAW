@@ -137,6 +137,7 @@ class SfPlayer : public PolyBase<SfVoice, 40> {
  public:
   SfPlayer(double rate, Bank* b) : PolyBase(rate), bank(b) {}
   Bank* bank; int sfId = -1, preset = 0; double gain = 0.8;
+  double aM = 1, dM = 1, sM = 1, rM = 1;   // params 2..5: the SoundFont's own envelope times these (1 = as the file has it)
   void setParam(int i, double x) override;
   void noteOn(int p, double vel) override;
   void render(float* L, float* R, int from, int to) override;
