@@ -29,10 +29,10 @@ ok(st.rows >= n, `the track column has a row per track (+ Master / FX rows): ${s
 ok(st.shut, 'the arrangement starts with the whole screen (the device panel is closed)');
 
 // bottom bar: play / metronome / loop
-await page.click('#bar2 .play'); await page.waitForTimeout(300);
+await page.click('#top2 .play'); await page.waitForTimeout(300);
 ok(await page.evaluate(async () => (await import('./js/project.js')).state.playing), 'Play in the bottom bar starts playback');
-await page.click('#bar2 .play'); await page.waitForTimeout(200);
-await page.click('#tools2 [aria-label="LOOP"]'); await page.waitForTimeout(120);
+await page.click('#top2 .play'); await page.waitForTimeout(200);
+await page.click('#top2 [aria-label="LOOP"]'); await page.waitForTimeout(120);
 ok(await page.evaluate(async () => (await import('./js/project.js')).state.loop.on), 'LOOP switches the arrangement loop on');
 await page.click('#bar2 [aria-label="RACK"]'); await page.waitForTimeout(300);
 ok(!(await page.evaluate(() => document.querySelector('#view-arr').classList.contains('shut'))), 'RACK opens the device panel');
@@ -50,7 +50,7 @@ await page.click('#bub2 [aria-label="Gandakan"]'); await page.waitForTimeout(200
 ok(await page.evaluate(async () => (await import('./js/project.js')).state.tracks[0].clips.length === 2), 'Gandakan puts a copy right after the clip (Honeydew Duplicate)');
 await page.click('#bub2 [aria-label="Hapus"]'); await page.waitForTimeout(200);
 ok(await page.evaluate(async () => (await import('./js/project.js')).state.tracks[0].clips.length === 1 && document.querySelector('#bub2').hidden), 'Hapus deletes the clip and hides the bubbles');
-await page.click('#bar2 [aria-label="Urungkan"]'); await page.waitForTimeout(200);
+await page.click('#top2 [aria-label="Urungkan"]'); await page.waitForTimeout(200);
 ok(await page.evaluate(async () => (await import('./js/project.js')).state.tracks[0].clips.length === 2), 'Undo in the bottom bar brings it back');
 
 // a tap on empty space of the current track: the insert menu (Klip baru / Tempel); Tempel pastes the clipboard there

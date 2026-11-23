@@ -41,6 +41,7 @@ const IC = {
   magnet: S('<path d="M6 4v8a6 6 0 0 0 12 0V4"/><path d="M6 8h3.5M14.5 8H18"/><path d="M9.5 4v8a2.5 2.5 0 0 0 5 0V4"/>'),
   follow: S('<path d="M4 12h11"/><path d="M11 7.5 15.5 12 11 16.5"/><path d="M19 5v14"/>'),
   save: S('<path d="M5 4.5h11l3.5 3.5v11.5h-14.5z"/><path d="M8 4.5v5h7v-5"/><rect x="8" y="13.5" width="8" height="6" rx="1"/>'),
+  arrange: S('<rect x="3.5" y="5" width="9" height="4.5" rx="1.4"/><rect x="8.5" y="11.5" width="12" height="4.5" rx="1.4"/><path d="M3.5 19.5h17"/>'),
   plus: S('<path d="M12 5v14M5 12h14"/>'),
   close: S('<path d="M6 6l12 12M18 6 6 18"/>'),
   dup: S('<rect x="3.5" y="6" width="8" height="12" rx="1.6"/><rect x="12.5" y="6" width="8" height="12" rx="1.6" stroke-dasharray="2.2 1.8"/><path d="M16.5 10v4M14.5 12h4"/>'),
@@ -63,27 +64,57 @@ const btn = (cls, ic, label, aria) => { const b = h('button', { class: 'u2b ' + 
 
 // ------------------------------------------------------------------ bottom bar
 let bar, el = {};
+// Two bars with fixed places, balanced left / centre / right:
+//   top:    menu + song name + undo / redo  |  back to start, record, play + the clock  |  Snap, Loop, Ikuti, metronome, BPM, save
+//   bottom: + Track  |  the views (Aransemen, Mixer, Rack, Suara, Keys), equal widths  |  CPU
+// Nothing sits over the ruler or the clips (the clip tools are a rail at the right edge of the lanes).
 function buildBar() {
-  bar = h('footer', { id: 'bar2' });
-  const L = h('div', { class: 'b2-l' }), M = h('div', { class: 'b2-c' }), R = h('div', { class: 'b2-r' });
-  el.rack = btn('tab', IC.rack, 'Rack', 'RACK'); el.mix = btn('tab', IC.mixer, 'Mixer', 'MIXER'); el.snd = btn('tab', IC.sounds, 'Suara', 'SUARA'); el.keys = btn('tab', IC.keys, 'Keys', 'Keyboard');
-  el.rew = btn('tp', IC.rew, '', 'Kembali ke awal'); el.rec = btn('tp rec', IC.rec, '', 'Rekam'); el.play = btn('tp play', IC.play, '', 'Play / pause'); el.metro = btn('tp tog', IC.metro, '', 'Metronom');
+  const top = h('header', { id: 'top2' });
+  const L = h('div', { class: 't2-l' }), M = h('div', { class: 't2-c' }), R = h('div', { class: 't2-r' });
+  logo = h('button', { id: 'logo2', 'aria-label': 'Menu utama' }, h('img', { src: 'icons/icon-192.png', alt: '' }));
+  title = h('button', { id: 'title2', 'aria-label': 'Nama lagu' }, h('b', null, ''), h('span', null, 'Lagu'));
+  el.undo = btn('ic', IC.undo, '', 'Urungkan'); el.redo = btn('ic', IC.redo, '', 'Ulangi');
+  L.append(logo, title, h('i', { class: 'sep' }), el.undo, el.redo);
+  el.rew = btn('tp', IC.rew, '', 'Kembali ke awal'); el.rec = btn('tp rec', IC.rec, '', 'Rekam'); el.play = btn('tp play', IC.play, '', 'Play / pause');
+  el.clock = h('button', { class: 'clock', 'aria-label': 'Posisi' }, h('b', null, '1.1.1'), h('span', null, '0:00'));
+  M.append(h('div', { class: 'tpill' }, el.rew, el.rec, el.play), el.clock);
+  const pill = (ic, label, aria) => btn('pill', ic, label, aria);
+  tools = { snap: pill(IC.magnet, 'Snap', 'Snap ke grid'), loop: pill(IC.loop, 'Loop', 'LOOP'), follow: pill(IC.follow, 'Ikuti', 'Ikuti playhead'), save: btn('ic save', IC.save, '', 'Simpan') };
+  el.metro = pill(IC.metro, '', 'Metronom');
   el.bpm = h('button', { class: 'u2b bpm', 'aria-label': 'Tempo' }, h('b', null, '120'), h('span', { class: 'lb' }, 'BPM'));
-  el.undo = btn('tab', IC.undo, 'Undo', 'Urungkan'); el.redo = btn('tab', IC.redo, 'Redo', 'Ulangi');
+  R.append(h('div', { class: 'tg' }, tools.snap, tools.loop, tools.follow, el.metro), el.bpm, tools.save);
+  top.append(L, M, R);
+  $('#app').insertBefore(top, $('#body'));
+
+  bar = h('footer', { id: 'bar2' });
+  const BL = h('div', { class: 'b2-l' }), BM = h('nav', { class: 'b2-c' }), BR2 = h('div', { class: 'b2-r' });
+  el.add = btn('tab add', IC.plus, 'Track', 'Tambah track');
+  el.arr = btn('tab', IC.arrange, 'Aransemen', 'ARANSEMEN'); el.mix = btn('tab', IC.mixer, 'Mixer', 'MIXER'); el.rack = btn('tab', IC.rack, 'Rack', 'RACK');
+  el.snd = btn('tab', IC.sounds, 'Suara', 'SUARA'); el.keys = btn('tab', IC.keys, 'Keys', 'Keyboard');
   el.cpu = h('div', { class: 'u2cpu', 'aria-label': 'Beban CPU audio' }, h('b', null, '0 %'), h('span', null, ''));
-  for (const [b, k] of [[el.rack, 'fx'], [el.mix, 'solo']]) { b.append(h('i', { class: 'bdg', 'data-k': k })); }   // badges: effects on the track / a solo is on
-  L.append(el.rack, el.mix, el.snd, el.keys); M.append(h('div', { class: 'tpill' }, el.rew, el.rec, el.play), el.metro, el.bpm); R.append(el.undo, el.redo, el.cpu);
-  bar.append(L, M, R);
+  for (const [b, k] of [[el.rack, 'fx'], [el.mix, 'solo']]) b.append(h('i', { class: 'bdg', 'data-k': k }));   // badges: effects on the track / a solo is on
+  BL.append(el.add); BM.append(el.arr, el.mix, el.rack, el.snd, el.keys); BR2.append(el.cpu);
+  bar.append(BL, BM, BR2);
   $('#app').append(bar);
+
+  logo.onclick = () => (mm.classList.contains('open') ? closeMenu() : openMenu());
+  title.onclick = () => openMenu('proyek');
+  el.clock.onclick = () => P.seekTo(0);
+  el.undo.onclick = undoOp; el.redo.onclick = redoOp;
+  el.rew.onclick = () => P.seekTo(0);
+  el.rec.onclick = () => api.toggleRec();
+  el.play.onclick = () => P.togglePlay();
+  el.metro.onclick = () => P.toggleMetro();
+  holdTap(tools.snap, () => { TL.v2SnapToggle(); syncSnap(); }, () => { const r = tools.snap.getBoundingClientRect(); TL.v2SnapMenu(r.left, r.bottom + 4); });
+  tools.follow.onclick = () => { TL.v2SetFollow(!TL.v2Follow()); syncSnap(); };
+  tools.loop.onclick = () => { P.setLoop({ on: !state.loop.on }); syncSnap(); toast(state.loop.on ? 'Loop nyala.' : 'Loop mati.', 900); };
+  holdTap(tools.save, () => QS.quickSave(), () => QS.saveAs());
+  el.add.onclick = () => { const r = el.add.getBoundingClientRect(); TL.v2AddMenu(r.left, r.top - 170); };
+  el.arr.onclick = () => { closeMenu(); if (BR.isOpen()) BR.closeBrowser(); if (api.getView() !== 'arr') api.showView('arr'); api.setShut(true); };
   el.mix.onclick = () => { closeMenu(); api.showView(api.getView() === 'mix' ? 'arr' : 'mix'); };
   el.rack.onclick = () => togglePanel('dev');
   el.keys.onclick = () => togglePanel('keys');
   el.snd.onclick = () => { closeMenu(); BR.toggleBrowser(); };
-  el.rec.onclick = () => api.toggleRec();
-  el.rew.onclick = () => P.seekTo(0);
-  el.play.onclick = () => P.togglePlay();
-  el.metro.onclick = () => P.toggleMetro();
-  el.undo.onclick = undoOp; el.redo.onclick = redoOp;
   { // BPM: tap = the Tempo window (tap tempo, time signature), a vertical drag = change the tempo
     const b = el.bpm; let d = null;
     b.addEventListener('pointerdown', (e) => { b.setPointerCapture(e.pointerId); d = { y: e.clientY, b: state.bpm, moved: false }; });
@@ -102,15 +133,17 @@ export function readouts() {
   if (!on) return;
   const tab = api.getTab(), shut = api.isShut(), v = api.getView();
   const t = state.tracks[state.sel.track], nfx = t && t.devices ? t.devices.length : 0, solo = state.tracks.some((q) => q.solo);
-  { const sec = Math.max(0, P.tickToSec(Math.max(0, state.pos))), tt = Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0'), nm = state.projectName || 'Tanpa nama';
-    if (title && (title._t !== tt || title._n !== nm)) { title._t = tt; title._n = nm; title.firstChild.textContent = nm; title.lastChild.textContent = tt; } }
+  { const p = Math.max(0, state.pos), bi = P.barAt(p), bt = P.beatLenAt(p), off = p - P.barStart(bi), pos = `${bi + 1}.${Math.floor(off / bt) + 1}.${Math.floor((off % bt) / Math.max(60, bt / 4)) + 1}`;
+    const sec = P.tickToSec(p), tt = Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0'), nm = state.projectName || 'Tanpa nama';
+    if (el.clock._p !== pos || el.clock._t !== tt) { el.clock._p = pos; el.clock._t = tt; el.clock.firstChild.textContent = pos; el.clock.lastChild.textContent = tt; }
+    if (title._n !== nm) { title._n = nm; title.firstChild.textContent = nm; } }
   const k = [state.playing, P.rec.on, state.metro, state.loop.on, Math.round(state.bpm * 100), canUndo(), canRedo(), v, tab, shut, BR.isOpen(), Math.round(state.cpu * 100), nfx, solo].join('|');
   if (k === last) return; last = k;
   el.play.innerHTML = state.playing ? IC.pause : IC.play; el.play.classList.toggle('on', !!state.playing);
   el.rec.classList.toggle('on', !!P.rec.on); el.metro.classList.toggle('on', !!state.metro); syncSnap();
   el.bpm.firstChild.textContent = Number.isInteger(state.bpm) ? String(state.bpm) : state.bpm.toFixed(1);
   el.undo.disabled = !canUndo(); el.redo.disabled = !canRedo();
-  el.mix.classList.toggle('on', v === 'mix'); el.rack.classList.toggle('on', v === 'arr' && tab === 'dev' && !shut); el.keys.classList.toggle('on', v === 'arr' && tab === 'keys' && !shut);
+  el.arr.classList.toggle('on', v === 'arr' && shut && !BR.isOpen()); el.mix.classList.toggle('on', v === 'mix'); el.rack.classList.toggle('on', v === 'arr' && tab === 'dev' && !shut); el.keys.classList.toggle('on', v === 'arr' && tab === 'keys' && !shut);
   el.snd.classList.toggle('on', BR.isOpen());
   { const a = el.rack.querySelector('.bdg'), b = el.mix.querySelector('.bdg'); a.textContent = nfx ? String(nfx) : ''; a.hidden = !nfx; b.textContent = 'S'; b.hidden = !solo; }
   const c = Math.round(clamp(state.cpu * 100, 0, 999)); el.cpu.firstChild.textContent = c + ' %'; el.cpu.classList.toggle('hot', c > 80); el.cpu.classList.toggle('warm', c > 55 && c <= 80);
@@ -124,11 +157,9 @@ function buildCol() {
   const va = $('#view-arr');
   col = h('div', { id: 'tcol2' });
   topEl = h('div', { class: 'tc-top' });
-  addEl = btn('add', IC.plus, '', 'Tambah track'); topEl.append(addEl);
   rowsEl = h('div', { class: 'tc-rows' });
   col.append(topEl, rowsEl);
   va.prepend(col);
-  addEl.onclick = (e) => { const r = addEl.getBoundingClientRect(); TL.v2AddMenu(r.right + 4, r.top); };
   // a vertical drag anywhere on the column scrolls the tracks with the timeline
   let d = null;
   rowsEl.addEventListener('pointerdown', (e) => { if (e.target.closest('.tc-vol, .tc-pan')) return; d = { y: e.clientY, id: e.pointerId, moved: false }; }, true);
@@ -293,18 +324,6 @@ function placeBub() {
 let logo, mm, mmBody, mmTab = 'lagu', tools = null, title = null;
 const TABS = [['lagu', 'LAGU'], ['proyek', 'PROYEK'], ['ekspor', 'EKSPOR'], ['atur', 'PENGATURAN'], ['bantu', 'BANTUAN']];
 function buildMenu() {
-  logo = h('button', { id: 'logo2', 'aria-label': 'Menu utama' }, h('img', { src: 'icons/icon-192.png', alt: '' }));
-  logo.onclick = () => (mm.classList.contains('open') ? closeMenu() : openMenu());
-  const pill = (ic, label, aria) => { const b = btn('pill', ic, label, aria); return b; };
-  tools = { snap: pill(IC.magnet, 'Snap', 'Snap ke grid'), follow: pill(IC.follow, 'Ikuti', 'Ikuti playhead'), loop: pill(IC.loop, 'Loop', 'LOOP'), save: pill(IC.save, '', 'Simpan') };
-  const grp = h('div', { id: 'tools2' }, h('div', { class: 'tg' }, tools.snap, tools.follow, tools.loop), tools.save);
-  holdTap(tools.snap, () => { TL.v2SnapToggle(); syncSnap(); }, () => { const r = tools.snap.getBoundingClientRect(); TL.v2SnapMenu(r.left, r.bottom + 4); });
-  tools.follow.onclick = () => { TL.v2SetFollow(!TL.v2Follow()); syncSnap(); };
-  tools.loop.onclick = () => { P.setLoop({ on: !state.loop.on }); syncSnap(); toast(state.loop.on ? 'Loop nyala.' : 'Loop mati.', 900); };
-  holdTap(tools.save, () => QS.quickSave(), () => QS.saveAs());
-  title = h('button', { id: 'title2', 'aria-label': 'Nama lagu dan waktu' }, h('b', null, ''), h('span', null, '0:00'));
-  title.onclick = () => openMenu('proyek');
-  $('#view-arr').append(grp, title, logo);
   mm = h('div', { id: 'mm2', 'aria-hidden': 'true' });
   const scrim = h('div', { class: 'u2m-scrim' }), pan = h('aside', { class: 'u2m-pan' });
   const x = btn('u2m-x', IC.close, '', 'Tutup');
@@ -313,7 +332,7 @@ function buildMenu() {
   pan.append(h('header', { class: 'u2m-hd' }, h('img', { src: 'icons/icon-192.png', alt: '' }), h('div', null, h('b', null, 'MobileDAW 2'), h('span', null, 'versi 2.0')), x), tabs, mmBody);
   mm.append(scrim, pan); $('#app').append(mm);
   scrim.onclick = closeMenu; x.onclick = closeMenu;
-  QS.onSaveState((d) => { logo.classList.toggle('unsaved', d); tools.save.classList.toggle('unsaved', d); });
+  QS.onSaveState((d) => { logo.classList.toggle('unsaved', d); tools.save.classList.toggle('unsaved', d); title.lastChild.textContent = d ? 'Belum disimpan' : 'Tersimpan'; });
 }
 export function openMenu(tab) { if (tab) mmTab = tab; renderMenu(); mm.classList.add('open'); mm.setAttribute('aria-hidden', 'false'); }
 export function closeMenu() { if (!mm || !mm.classList.contains('open')) return false; mm.classList.remove('open'); mm.setAttribute('aria-hidden', 'true'); return true; }
