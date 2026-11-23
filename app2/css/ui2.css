@@ -326,3 +326,90 @@ html.ui2 #app .b { border-radius: 8px; }
 .m2-strip.sel .m2-kind { background: var(--tc); color: rgba(0, 0, 0, .8); }
 .m2-strip.muted :is(.m2-fad, .m2-name) { opacity: .45; }
 .m2-full { flex: none; align-self: flex-end; margin: 0 10px 8px; height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); font: var(--fw-m, 500) 12px/1 var(--font); cursor: pointer; }
+
+/* ======================================================================================================================================
+   Material You (Material 3): big rounded corners, tonal surfaces, pill buttons, filled-tonal controls, the primary colour for what is on.
+   Shapes: extra-large 28 px (sheets, dialogs), large 24 px (cards, strips), medium 16 px (tiles, FABs), full (buttons, chips, sliders).
+   ====================================================================================================================================== */
+html.ui2 { --m3-xl: 28px; --m3-l: 24px; --m3-m: 16px; --m3-s: 12px; --m3-tonal: color-mix(in srgb, var(--accent) 16%, var(--raise)); }
+/* bars: a surface, the views as a tonal segmented pill */
+html.ui2 #top2 { background: var(--bg); border-bottom: 0; }
+html.ui2 #bar2 { background: var(--bg); border-top: 0; }
+html.ui2 #top2 .tpill, html.ui2 #top2 .tg, html.ui2 #top2 .bpm, html.ui2 #bar2 .b2-c { background: var(--panel2); }
+html.ui2 #bar2 .b2-c { border-radius: 999px; padding: 4px; }
+html.ui2 #bar2 .tab { border-radius: 999px; }
+html.ui2 #bar2 .b2-c .tab.on { background: var(--m3-tonal); color: var(--text); }
+html.ui2 #bar2 .b2-c .tab.on svg { color: var(--accent); }
+html.ui2 #bar2 .add { border-radius: var(--m3-m); border: 0; background: var(--m3-tonal); color: var(--text); }
+html.ui2 #top2 .play { background: var(--accent); color: var(--accent-ink); border-radius: var(--m3-m); }
+html.ui2 #top2 .pill.on { background: var(--m3-tonal); color: var(--text); }
+html.ui2 #top2 .pill.on svg { color: var(--accent); }
+/* the arrangement sits on a rounded surface between the two bars */
+html.ui2 #body { background: var(--bg); padding: 0 6px; }
+html.ui2 #main { border-radius: var(--m3-l); overflow: hidden; background: var(--panel); }
+/* track tiles: rounded tonal tiles inside the column */
+html.ui2 #tcol2 { background: var(--panel); border-right: 0; }
+html.ui2 .tc-row { border-bottom: 0; }
+html.ui2 .tc-tile { margin: 3px 4px; width: calc(var(--tc-w) - 8px); border-radius: var(--m3-m); box-shadow: none; }
+html.ui2.tc-wide .tc-row .tc-tile { top: 3px; bottom: 3px; left: 4px; }
+html.ui2 .tc-row.sel .tc-tile { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
+html.ui2.tc-wide .tc-row.sel { background: none; }
+/* bubbles, insert menu, note bar: tonal pills */
+html.ui2 #bub2 .bub, html.ui2 #ins2 .bub, html.ui2 .bar .b, html.ui2 .selbar .b { height: 44px; padding: 0 18px; background: var(--m3-tonal); color: var(--text); font: var(--fw-m, 500) 13px/1 var(--font); box-shadow: 0 3px 8px rgba(0, 0, 0, .35); }
+html.ui2 #bub2 .bub[aria-label="Edit"] { background: var(--accent); color: var(--accent-ink); }
+/* menus and dialogs: extra-large corners, tonal surface */
+html.ui2 .menu { border-radius: 20px; padding: 8px; background: var(--raise); box-shadow: 0 12px 30px rgba(0, 0, 0, .45); }
+html.ui2 .menu .mi { border-radius: 999px; padding: 0 18px; }
+html.ui2 .modal, html.ui2 .dlg, html.ui2 .u2p-card { border-radius: var(--m3-xl) !important; background: var(--panel2) !important; }
+html.ui2 #mm2 .u2m-pan { border-radius: var(--m3-xl) 0 0 var(--m3-xl); background: var(--panel2); }
+html.ui2 .u2m-big { border-radius: var(--m3-l); background: var(--raise); }
+html.ui2 .u2m-grid .u2m-big:first-child { background: var(--accent); color: var(--accent-ink); }
+html.ui2 .u2m-t.on, html.ui2 .u2m-seg button.on { background: var(--m3-tonal); color: var(--text); }
+html.ui2 .u2m-fld, html.ui2 .u2m-seg { border-radius: 999px; background: var(--raise); }
+/* the device panel (Rack / Keys): a rounded sheet with tonal tabs */
+html.ui2 #detail { margin: 6px 0 0; border-radius: var(--m3-l) var(--m3-l) 0 0; background: var(--panel2); border-top: 0; overflow: hidden; }
+html.ui2 #dtabs { background: transparent; border-bottom: 0; padding: 6px 10px 2px; }
+html.ui2 #dtabs .b { border-radius: 999px; height: 32px; padding: 0 16px; }
+html.ui2 #dtabs .b.on { background: var(--m3-tonal); color: var(--text); }
+html.ui2 #dbody { background: transparent; }
+
+/* ---- FX modules and instruments as Material 3 cards ---- */
+html.ui2 #app .card, html.ui2 .fw-body .card { border-radius: var(--m3-l) !important; background: var(--raise) !important; box-shadow: none !important; padding-bottom: 8px; }
+html.ui2 #app .card > h4, html.ui2 .fw-body .card > h4 { height: 44px !important; padding: 0 10px 0 14px !important; background: transparent !important; gap: 8px; }
+html.ui2 #app .card > h4 > span, html.ui2 #app .card > h4 button.dv-name span, html.ui2 .fw-body .card > h4 button.dv-name span { font: var(--fw-sb, 600) 15px/44px var(--font) !important; color: var(--text); }
+html.ui2 #app .card > h4 .b, html.ui2 #app .card > h4 button, html.ui2 .fw-body .card > h4 button { border-radius: 999px !important; border: 0 !important; background: color-mix(in srgb, var(--text) 8%, transparent) !important; box-shadow: none !important; }
+html.ui2 #app .card > h4 .pw, html.ui2 #app .card > h4 .dv-on { border-radius: 999px !important; }
+html.ui2 #app .card :is(.lv-btn, .fv-b, .fv-t, .lv-tab, .lv-fld, .st, .b), html.ui2 .fw-body .card :is(.lv-btn, .fv-b, .fv-t, .lv-tab, .lv-fld, .st, .b) { border-radius: 999px !important; border: 0 !important; background-color: color-mix(in srgb, var(--text) 8%, transparent); box-shadow: none !important; }
+html.ui2 #app .card :is(.lv-btn, .fv-b, .fv-t, .lv-tab, .b).on, html.ui2 .fw-body .card :is(.lv-btn, .fv-b, .fv-t, .lv-tab, .b).on { background: var(--m3-tonal) !important; color: var(--text) !important; }
+html.ui2 #app .card :is(.lv-tabs, .lv-tabbar) { gap: 4px; padding: 4px; border-radius: 999px; background: var(--panel2); border: 0; }
+html.ui2 #app .card :is(.lv-disp, .lv-well, canvas) { border-radius: var(--m3-m); }
+html.ui2 #app .card :is(.lv-sec, .lk-sec, section) { border: 0 !important; }
+/* knobs: a thick arc with round ends on a tonal dial, the needle in the primary colour */
+html.ui2 .knob svg path { stroke-width: 4.6px !important; stroke-linecap: round !important; }
+html.ui2 .knob svg circle { fill: var(--panel2) !important; }
+html.ui2 .knob svg line { stroke: var(--accent) !important; stroke-width: 2.6px !important; }
+html.ui2 .knob .k-v { color: var(--text); font-weight: var(--fw-m, 500); }
+/* sliders and switches in the cards */
+html.ui2 #app .card input[type=range], html.ui2 .u2m-body input[type=range] { accent-color: var(--accent); }
+html.ui2 #app .card .lv-sw, html.ui2 #app .card .sw { border-radius: 999px !important; }
+/* add-effect slot: a dashed rounded area */
+html.ui2 #app .add-slot, html.ui2 #app .dv-add, html.ui2 #app .fx-add { border-radius: var(--m3-l) !important; }
+
+/* mixer strips, panels and FABs */
+html.ui2 .m2-strip { border-radius: var(--m3-l); background: var(--raise); }
+html.ui2 .m2-strip.sel { box-shadow: inset 0 0 0 2px var(--accent); }
+html.ui2 .m2-kind { border-radius: var(--m3-m); }
+html.ui2 .m2-fad em { border-radius: 999px; height: 16px; }
+html.ui2 .m2-full { background: var(--m3-tonal); }
+html.ui2 #mix2 { background: var(--panel); }
+html.ui2 #mix2 .m2-list { padding: 10px; gap: 8px; }
+html.ui2 #edf2 .ef { border-radius: var(--m3-m); width: 52px; height: 52px; min-width: 52px; background: var(--m3-tonal); }
+html.ui2 #edf2 .ef.shut, html.ui2 #edf2 .ef.on { background: var(--accent); color: var(--accent-ink); }
+html.ui2 .mg-arr { border-radius: var(--m3-m); border: 0; background: var(--m3-tonal); }
+html.ui2 .tp2-step, html.ui2 .tp2-chip { background: var(--m3-tonal); }
+html.ui2 .pf2-cell, html.ui2 .pf2-graph { border-radius: var(--m3-m); background: var(--raise); }
+html.ui2 #browser { border-radius: 0 var(--m3-l) var(--m3-l) 0; overflow: hidden; }
+html.ui2 #browser .bs-i { border-radius: 999px; }
+html.ui2 #browser .bs-i.on { background: var(--m3-tonal); color: var(--text); }
+/* the panel's own Device / Keys tabs are gone: Rack and Keys in the bottom bar switch the panel (owner's request) */
+html.ui2 #dtabs .b[data-tab] { display: none !important; }

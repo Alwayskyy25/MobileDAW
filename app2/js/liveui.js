@@ -99,7 +99,12 @@ export function lvTabs(tabs, cur, onSel, o = {}) {
 }
 
 // Dark display with an orange / blue drawing, sharp at any pixel density. draw(g, w, h) gets a ready 2D context in CSS pixels.
-export const DISPC = { bg: '#282828', grid: '#3a3a3e', grid2: '#4a4a4f', ink: '#9a9aa2', or: '#fdb443', orD: '#a8731f', bl: '#62cffa', sel: '#3c7e8d', selD: '#2f5b66' };
+// MobileDAW 2 (Material You): the display colours of the device cards follow the theme (the accent = primary instead of Live's orange / blue)
+const tokC = new Map();
+if (typeof window !== 'undefined') window.addEventListener('themechange', () => tokC.clear());
+const tok = (k, d) => { let v = tokC.get(k); if (v === undefined) { try { v = (getComputedStyle(document.documentElement).getPropertyValue(k) || '').trim() || d; } catch (_) { v = d; } tokC.set(k, v); } return v; };
+export const DISPC = { get bg() { return tok('--bg', '#282828'); }, get grid() { return tok('--raise', '#3a3a3e'); }, get grid2() { return tok('--raise2', '#4a4a4f'); }, get ink() { return tok('--dim', '#9a9aa2'); },
+  get or() { return tok('--accent', '#fdb443'); }, orD: '#7f67be', get bl() { return tok('--accent', '#62cffa'); }, sel: '#4a4458', selD: '#332d41' };
 export function lvDisp(w, hh, draw, o = {}) {
   const c = document.createElement('canvas'), d = Math.min(3, window.devicePixelRatio || 1);
   c.width = Math.round(w * d); c.height = Math.round(hh * d); c.className = 'lv-disp' + (o.cls ? ' ' + o.cls : '');
