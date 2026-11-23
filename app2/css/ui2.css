@@ -547,3 +547,18 @@ html.ui2 #app .dev-scroll > .card.u2c, html.ui2 .dev-scroll > .card.u2c { width:
 .u2c-dials > .u2seg-f, .u2c-dials > .u2env { grid-column: span 3; }
 .u2c-dials > .u2env { height: 70px; align-self: center; }
 .u2c-dials > .u2d { padding: 2px 0; }
+/* + Track: a pill like the nav bar next to it */
+html.ui2 #bar2 .add { border-radius: 999px !important; }
+
+/* module cards: every control is a tile of one size (one row = 78 px, a field two cells, a choice three), so a page reads as an even grid */
+.u2c-g > .u2c-dials { gap: 8px; align-items: stretch; }
+.u2c-dials > * { box-sizing: border-box; height: 100%; margin: 0; border-radius: 16px !important; background: var(--panel2); }
+.u2c-dials > .u2d { justify-content: center; padding: 4px 0; gap: 0; }
+.u2c-dials > .u2d svg { width: 40px; height: 40px; }
+.u2d .disc { fill: color-mix(in srgb, var(--text) 7%, transparent); }
+.u2c-dials > .u2dd { min-height: 0; align-content: center; padding: 0 14px; }
+.u2c-dials > .u2t { min-height: 0; padding: 0 8px 0 14px; }
+.u2c-dials > .u2seg-f { justify-content: center; gap: 6px; padding: 0 10px; }
+.u2c-dials > .u2seg-f > .n { padding-left: 4px; }
+.u2c-dials > .u2seg-f .u2seg { height: 34px; }
+.u2c-dials > .u2env { padding: 0; }
