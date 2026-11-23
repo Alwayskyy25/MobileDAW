@@ -1,5 +1,5 @@
 // MobileDAW 2's mixer: one strip per track, then the returns and the master, each with its name in the track colour, a tall fader with a
-// round thumb, its level meter, a pan ring, on / off and solo, and the track's kind at the bottom (tap = select, the strip lights up).
+// round thumb, its level meter, a pan ring, Mute / Solo / Rekam, and the track's kind at the bottom (tap = select, the strip lights up).
 // "Lengkap" opens the full mixer (sends, routing, width, phase): nothing of 1.0's mixer is lost, it is one tap away.
 import { h, clamp } from '../ui.js';
 import * as P from '../project.js';
@@ -17,7 +17,8 @@ const ICON = {
   bus: '<path d="M5 19V10M9.5 19V5M14 19v-7M18.5 19V8"/>',
 };
 const svg = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
-const order = () => { const o = []; state.tracks.forEach((t, i) => { if (t.kind !== 'auto') o.push(i); }); state.returns.forEach((_, k) => o.push(RET0 + k)); o.push(MASTER); return o; };
+// the tracks, then the Master (the return channels A / B live in "Mixer lengkap", not here)
+const order = () => { const o = []; state.tracks.forEach((t, i) => { if (t.kind !== 'auto') o.push(i); }); o.push(MASTER); return o; };
 const colorOf = (i) => (i === MASTER ? (state.master.color || '#c9c9cf') : i >= RET0 ? (state.returns[i - RET0].color || '#a89be0') : state.tracks[i].color);
 const nameOf = (i) => (i === MASTER ? 'Master' : P.tr(i).name);
 const dbTxt = (v) => (v > 1e-4 ? (20 * Math.log10(v)).toFixed(1) : '-∞');
@@ -41,17 +42,19 @@ function strip(i) {
   const isT = i < MASTER, t = P.tr(i), kind = isT ? t.kind : 'bus';
   const name = h('div', { class: 'm2-name' }), fad = h('div', { class: 'm2-fad', 'aria-label': 'Volume' }, h('i', { class: 'trk' }), h('i', { class: 'fill' }), h('em'));
   const met = h('div', { class: 'm2-met' }, h('i'), h('i')), db = h('div', { class: 'm2-db' });
-  const pan = h('div', { class: 'm2-pan', 'aria-label': 'Pan' }, h('i')), on = h('button', { class: 'm2-on', 'aria-label': 'Nyala / mati' }), solo = h('button', { class: 'm2-solo' }, 'Solo');
+  const pan = h('div', { class: 'm2-pan', 'aria-label': 'Pan' }, h('i'));
+  const on = h('button', { class: 'm2-b m2-m', 'aria-label': 'Mute' }, 'M'), solo = h('button', { class: 'm2-b m2-s', 'aria-label': 'Solo' }, 'S'), rec = h('button', { class: 'm2-b m2-r', 'aria-label': 'Rekam' }, h('i'));
   const kindB = h('button', { class: 'm2-kind', 'aria-label': 'Pilih track' }); kindB.innerHTML = svg(ICON[kind] || ICON.midi);
-  const el = h('div', { class: 'm2-strip' + (isT ? '' : ' bus') }, name, h('div', { class: 'm2-mid' }, fad, met), db, pan, h('div', { class: 'm2-row' }, isT ? on : h('span'), isT ? solo : h('span')), kindB);
+  const el = h('div', { class: 'm2-strip' + (isT ? '' : ' bus') }, name, h('div', { class: 'm2-mid' }, fad, met), db, pan, h('div', { class: 'm2-row' }, ...(isT ? [on, solo, rec] : [])), kindB);
   el.style.setProperty('--tc', colorOf(i));
   drag(fad, 'y', () => Math.sqrt(clamp(P.tr(i).vol / VMAX, 0, 1)), (u) => { P.setVol(i, u * u * VMAX); paint(s); }, () => { P.setVol(i, 1); paint(s); }, () => Math.max(60, fad.clientHeight - 20));
   drag(pan, 'x', () => (clamp(P.tr(i).pan || 0, -1, 1) + 1) / 2, (u) => { P.setPan(i, Math.round((u * 2 - 1) * 100) / 100); paint(s); }, () => { P.setPan(i, 0); paint(s); }, () => 90);
   on.onclick = () => { P.toggleMute(i); paint(s); };
   solo.onclick = () => { P.toggleSolo(i); paint(s); };
+  rec.onclick = () => { P.toggleArm(i); paint(s); };
   kindB.onclick = () => { P.selectTrack(i); };
   name.onclick = () => { P.selectTrack(i); };
-  const s = { i, el, name, fad, met, db, pan, on, solo, kindB, lv: [0, 0] };
+  const s = { i, el, name, fad, met, db, pan, on, solo, rec, kindB, lv: [0, 0] };
   paint(s); return s;
 }
 function paint(s) {
@@ -59,7 +62,8 @@ function paint(s) {
   s.name.textContent = nameOf(s.i);
   const u = Math.sqrt(clamp(t.vol / VMAX, 0, 1)); s.fad.style.setProperty('--u', u.toFixed(4)); s.db.textContent = dbTxt(t.vol);
   s.pan.style.setProperty('--a', ((clamp(t.pan || 0, -1, 1)) * 135).toFixed(1) + 'deg');
-  s.on.classList.toggle('on', !t.mute); s.solo.classList.toggle('on', !!t.solo);
+  s.on.classList.toggle('on', !!t.mute); s.solo.classList.toggle('on', !!t.solo);
+  if (s.i < MASTER) { const can = ['audio', 'midi', 'drum'].includes(t.kind); s.rec.classList.toggle('on', !!t.arm); s.rec.disabled = !can; }
   s.el.classList.toggle('sel', state.sel.track === s.i); s.el.classList.toggle('muted', !!t.mute);
 }
 

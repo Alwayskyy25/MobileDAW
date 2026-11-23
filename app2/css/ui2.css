@@ -667,3 +667,23 @@ html.ui2 #view-mix .mxs { padding: 0 6px; }
 html.ui2 #view-mix .mx-title { margin: 2px 4px 0; height: 22px; line-height: 22px !important; font-size: 12px !important; }
 html.ui2 #view-mix .mxs { gap: 0 !important; padding: 0 0 4px !important; margin: 4px 3px; min-height: calc(100% - 8px); border-radius: var(--m3-m); border-right: 0 !important; background: var(--raise) !important; overflow: hidden; }
 html.ui2 #view-mix .mx-fader { min-height: 96px; }
+
+/* ===== Mute / Solo / Rekam: round buttons, the same in the track column and the mixer ===== */
+.tc-bs { display: flex; gap: 4px; flex: none; }
+.tc-b, .m2-b { flex: none; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50% !important; display: grid; place-items: center; background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--dim); font: 700 11.5px/1 var(--font); cursor: pointer; }
+:is(.tc-b, .m2-b) > i { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+:is(.tc-m, .m2-m).on { background: #f2b8b5; color: #601410; }
+:is(.tc-solo, .m2-s).on { background: var(--tc); color: rgba(0, 0, 0, .82); }
+:is(.tc-rec, .m2-r).on { background: #ff5449; color: #fff; }
+:is(.tc-b, .m2-b):disabled { opacity: .3; cursor: default; }
+html.tc-wide .tc-row .tc-name { height: 28px; }
+.tc-ctl .tc-pl { flex: none; color: var(--dim); font: 500 10.5px/22px var(--font); }
+.tc-ctl .tc-pan { flex: 1; width: auto; min-width: 60px; }
+.tc-ctl .db { width: 30px; }
+.m2-row { gap: 4px; }
+.m2-strip.muted :is(.m2-fad, .m2-name, .m2-pan) { opacity: .45; }
+.tc-name .tc-b.tc-solo { width: 26px; height: 26px; padding: 0; border-radius: 50% !important; font: 700 11.5px/1 var(--font); color: var(--dim); background: color-mix(in srgb, var(--text) 10%, transparent); }
+.tc-name .tc-b.tc-solo::after { content: none !important; }
+.tc-name .tc-b.tc-solo.on { background: var(--tc); color: rgba(0, 0, 0, .82); }
+.tc-name .tc-b.tc-m.on { background: #f2b8b5; color: #601410; }
+.tc-name .tc-b.tc-rec.on { background: #ff5449; color: #fff; }
