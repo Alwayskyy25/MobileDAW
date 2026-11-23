@@ -1299,3 +1299,52 @@ html.ui2 #browser .chips { padding: 2px 10px 6px !important; }
 .u2c-chips { overflow-x: auto; scrollbar-width: none; max-width: 150px; }
 .u2c-chips::-webkit-scrollbar { display: none; }
 .u2sf b { font-size: 10.5px; }
+
+/* ===== mixer gain meter: always-visible slots, level, peak line, clip light ===== */
+html.ui2 .m2-met { position: relative; display: flex !important; gap: 2px !important; padding: 10px 0 !important; align-items: stretch !important; }
+.m2-met .ch { position: relative; width: 5px; border-radius: 3px; background: rgba(0, 0, 0, .45); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .6); overflow: hidden; }
+.m2-met .ch i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; border-radius: 3px; background: linear-gradient(0deg, #6fcf8a 0, #6fcf8a 62%, #d9c95a 80%, #e2725f 100%) !important; background-size: 100% var(--mh, 160px) !important; background-position: bottom !important; width: auto !important; }
+.m2-met .ch b { position: absolute; left: 0; right: 0; height: 2px; bottom: 0; margin-bottom: -1px; background: #ececef; opacity: 0; }
+.m2-met .clip { position: absolute; left: 0; right: 0; top: 2px; height: 5px; border-radius: 2px; background: rgba(255, 255, 255, .08); }
+.m2-met .clip.on { background: #e2725f; }
+/* ===== Material You sliders ===== */
+/* mixer fader: a thick rounded track, the active part in the track colour below a thin handle line with a gap */
+html.ui2 .m2-fad { width: 34px !important; --gap: 5px; }
+html.ui2 .m2-fad .trk { width: 14px !important; margin-left: -7px !important; border-radius: 7px !important; background: color-mix(in srgb, var(--tc) 18%, rgba(255, 255, 255, .06)) !important; box-shadow: none !important;
+  top: 10px !important; bottom: calc(10px + (100% - 20px) * var(--u) + var(--gap)) !important; height: auto !important; }
+html.ui2 .m2-fad .fill { width: 14px !important; margin-left: -7px !important; border-radius: 7px 7px 7px 7px !important; height: calc((100% - 20px) * var(--u) - var(--gap)) !important; background: var(--tc) !important; }
+html.ui2 .m2-fad em { width: 30px !important; height: 4px !important; margin: 0 0 -2px -15px !important; border-radius: 2px !important; background: var(--tc) !important; box-shadow: 0 0 0 2px var(--panel2) !important; }
+html.ui2 .m2-fad em::after { display: none !important; }
+/* mixer pan: a slim M3 track, the active part from the centre, a handle line */
+.m2-pan2::before { height: 8px !important; margin-top: -4px !important; border-radius: 4px !important; background: color-mix(in srgb, var(--tc) 16%, rgba(255, 255, 255, .06)) !important; }
+.m2-pan2 .val { height: 8px !important; margin-top: -4px !important; border-radius: 4px !important; background: var(--tc) !important; }
+.m2-pan2 .mid { display: none; }
+.m2-pan2 em { width: 4px !important; height: 18px !important; margin: -9px 0 0 -2px !important; border-radius: 2px !important; background: #ececef !important; box-shadow: 0 0 0 2px var(--panel2) !important; }
+/* card slider: a 14 px rounded track, the active part in the family colour, a thin tall handle with gaps */
+.u2sl .tr { height: 14px !important; border-radius: 7px !important; background: color-mix(in srgb, var(--ccm, var(--accent)) 18%, rgba(255, 255, 255, .06)) !important; box-shadow: none !important; overflow: visible; }
+.u2sl .f { border-radius: 7px !important; width: max(0px, calc(100% * var(--n) - 6px)) !important; background: var(--ccm, var(--accent)) !important; }
+.u2sl em { width: 4px !important; height: 26px !important; margin: -13px 0 0 -2px !important; border-radius: 2px !important; background: var(--ccm, var(--accent)) !important; box-shadow: 0 0 0 3px var(--panel2) !important; }
+.u2c.v3 .u2c-dials > .u2sl em { box-shadow: 0 0 0 3px #1d1e22 !important; }
+.u2sl.act em { width: 3px !important; margin-left: -1.5px !important; }
+
+/* ===== consistent, tight control panel (effects and instruments alike) =====
+   columns of 64 px (never stretched), rows in order without slotting (a new kind starts a new row), the panel as wide as its controls
+   (300 px at least) and the tabs wrapping inside that width */
+.u2c.v3 .u2c-g > .u2c-dials { grid-template-columns: repeat(var(--cols, 4), 64px) !important; grid-auto-flow: row !important; justify-content: start !important; }
+.u2c.v3 .u2c-dials > .brk { grid-column-start: 1 !important; }
+.u2c.v3 .u2c-p { width: max-content; min-width: 300px !important; max-width: none; }
+.u2c.v3 .u2c-tabs { width: 0 !important; min-width: 100% !important; max-width: none !important; flex-wrap: wrap !important; }
+.u2c.v3 .u2c-tabs button { flex: 1 1 auto !important; }
+.u2c.v3 .u2c-dials > .brk.u2sl, .u2c.v3 .u2c-dials > .brk.u2dd { grid-column: 1 / span 2 !important; }
+.u2c.v3 .u2c-dials > .brk.u2seg-f { grid-column: 1 / span 3 !important; }
+/* labels on one line (the full name stays in the tooltip), the same height in every row; tabs that wrap start at the left */
+.u2c.v3 .u2c-dials > .u2t > span, .u2c.v3 .u2c-dials > .u2d .n { display: block !important; white-space: nowrap !important; text-overflow: ellipsis !important; overflow: hidden !important; -webkit-line-clamp: none !important; max-width: 60px !important; }
+.u2c.v3 .u2c-dials > .u2d svg { width: 34px !important; height: 34px !important; }
+.u2c.v3 .u2c-g > .u2c-dials { grid-template-rows: repeat(var(--rows, 1), minmax(56px, 1fr)) !important; grid-auto-rows: minmax(56px, 1fr) !important; }
+.u2c.v3 .u2c-tabs { justify-content: flex-start !important; }
+.u2c.v3 .u2c-tabs button { flex: 0 1 auto !important; padding-left: 10px !important; padding-right: 10px !important; }
+/* tabs on one line that scrolls sideways: their height never changes with the panel's width (no back-and-forth between rows and columns) */
+.u2c.v3 .u2c-tabs { flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; }
+.u2c.v3 .u2c-tabs::-webkit-scrollbar { display: none; }
+.u2c.v3 .u2c-tabs button { flex: 0 0 auto !important; }
+.u2c.v3 .u2c-tabs { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }

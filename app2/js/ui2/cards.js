@@ -87,7 +87,7 @@ function dial(p, label, get, set, onLong) {
   paint(); return el;
 }
 function toggle(p, label, get, set) {
-  const sw = h('i', { class: 'u2sw' }), el = h('button', { class: 'u2t', role: 'switch' }, h('span', {}, label), sw);
+  const sw = h('i', { class: 'u2sw' }), el = h('button', { class: 'u2t', role: 'switch' }, h('span', { title: label }, label), sw);
   const paint = () => { const on = get() >= (p.min + p.max) / 2; el.classList.toggle('on', on); el.setAttribute('aria-checked', String(on)); };
   el.onclick = (e) => { e.stopPropagation(); set(get() >= (p.min + p.max) / 2 ? p.min : p.max); paint(); };
   el.sync = paint; paint(); return el;
@@ -211,6 +211,10 @@ function body(key, groups, mk, every, bigTabs, onTab) {
     // order: lists and switches first (full-width rows), then the dials
     const rows = ctl.filter(({ c }) => !c.classList.contains('u2d') && !c.classList.contains('u2sl')).map(({ c }) => c), dials = ctl.filter(({ c }) => c.classList.contains('u2d')).map(({ c }) => c), sliders = ctl.filter(({ c }) => c.classList.contains('u2sl')).map(({ c }) => c);
     // one grid that fills the rack's height row by row and then grows sideways (a field takes two dial cells): nothing is cut off
+    // one kind per line: lists and switches, then the knobs, then the sliders (each kind starts a new row; nothing is slotted in between)
+    for (const c of [...rows, ...dials, ...sliders]) { c.classList.remove('brk'); delete c.dataset.brk; }
+    if (dials.length && rows.length) dials[0].classList.add('brk');
+    if (sliders.length && (rows.length || dials.length)) sliders[0].classList.add('brk');
     if (env || rows.length || dials.length || sliders.length) parts.push(h('div', { class: 'u2c-dials' }, ...(env ? [env] : []), ...rows, ...dials, ...sliders));
     grid.replaceChildren(...parts); fit();
     const dl = grid.firstElementChild; if (dl && shownOnce) { dl.classList.remove('swap'); void dl.offsetWidth; dl.classList.add('swap'); } shownOnce = true;
@@ -223,12 +227,17 @@ function body(key, groups, mk, every, bigTabs, onTab) {
     const bottom = Math.min(card.getBoundingClientRect().bottom, sc.getBoundingClientRect().bottom) - 8, dl0 = grid.querySelector('.u2c-dials'), hh = bottom - (dl0 || grid).getBoundingClientRect().top;
     if (!(hh > 0)) return;
     const kids = dl ? [...dl.children] : [], span = (e) => (e.classList.contains('u2seg-f') ? 3 : e.classList.contains('u2dd') || e.classList.contains('u2sl') ? 2 : 1);
-    const cells = kids.reduce((a, e) => a + span(e), 0) || 1, rows = Math.max(1, Math.min(Math.floor((hh + 4) / 54), kids.length || 1));
+    const cells = kids.reduce((a, e) => a + span(e), 0) || 1, rows = Math.max(1, Math.min(Math.floor((hh + 6) / 62), kids.length || 1));
     // the fewest columns whose row-by-row packing (wide controls take 2 or 3 cells, 'dense' fills gaps) fits in the rows
-    const fits = (cols) => { const g = []; let used = 0; for (const e of kids) { const w = span(e); let placed = false;
-      for (let r = 0; r < 64 && !placed; r++) { g[r] = g[r] || new Array(cols).fill(0); for (let c = 0; c + w <= cols; c++) { if (g[r].slice(c, c + w).every((x) => !x)) { for (let q = c; q < c + w; q++) g[r][q] = 1; used = Math.max(used, r + 1); placed = true; break; } } }
-    } return used <= rows; };
-    let cols = Math.max(Math.ceil(cells / rows), ...kids.map(span), 1); while (cols < cells && !fits(cols)) cols++;   // read left to right, top to bottom
+    const fits = (cols) => { let r = 1, c = 0; for (const e of kids) { const w = span(e);   // row by row in order, a new kind starts a new row
+      if (c > 0 && (e.classList.contains('brk') || c + w > cols)) { r++; c = 0; } c += w; } return r <= rows; };
+    // a kind starts a new row while the rack is tall enough; if not, the sliders join the knobs' last row, then the knobs follow the switches
+    const brks = kids.filter((e) => e.classList.contains('brk') || e.dataset.brk);
+    for (const e of brks) { e.dataset.brk = '1'; e.classList.add('brk'); }
+    const best = () => { let c = Math.max(Math.ceil(cells / rows), ...kids.map(span), 1); while (c < cells && !fits(c)) c++; return fits(c) ? c : 0; };
+    let cols = best();
+    for (let i = brks.length - 1; !cols && i >= 0; i--) { brks[i].classList.remove('brk'); cols = best(); }
+    if (!cols) cols = cells;   // read left to right, top to bottom
     const v = String(rows); if (grid.style.getPropertyValue('--rows') !== v) grid.style.setProperty('--rows', v);
     if (grid.style.getPropertyValue('--cols') !== String(cols)) grid.style.setProperty('--cols', String(cols));
   };

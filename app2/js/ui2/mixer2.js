@@ -43,7 +43,8 @@ function strip(i) {
   // fader with its dB scale and the stereo meter beside it
   const scale = h('div', { class: 'm2-scale', 'aria-hidden': 'true' }, ...[6, 0, -6, -12, -24, -48].map((db) => h('span', { style: `--u:${Math.sqrt(clamp(Math.pow(10, db / 20) / VMAX, 0, 1)).toFixed(4)}` }, db > 0 ? '+' + db : String(db))));
   const fad = h('div', { class: 'm2-fad', 'aria-label': 'Volume' }, h('i', { class: 'trk' }), h('i', { class: 'fill' }), h('em'));
-  const met = h('div', { class: 'm2-met' }, h('i'), h('i')), db = h('div', { class: 'm2-db' });
+  // the gain meter: two channel slots always visible, the level, a falling peak line and a clip light
+  const met = h('div', { class: 'm2-met' }, h('span', { class: 'ch' }, h('i'), h('b')), h('span', { class: 'ch' }, h('i'), h('b')), h('em', { class: 'clip' })), db = h('div', { class: 'm2-db' });
   // pan: a small horizontal slider, centre = C
   const pan = h('div', { class: 'm2-pan2', 'aria-label': 'Pan' }, h('i', { class: 'mid' }), h('i', { class: 'val' }), h('em')), pv = h('span', { class: 'm2-pv' });
   const on = h('button', { class: 'm2-b m2-m', 'aria-label': 'Mute' }, 'M'), solo = h('button', { class: 'm2-b m2-s', 'aria-label': 'Solo' }, 'S'), rec = h('button', { class: 'm2-b m2-r', 'aria-label': 'Rekam' }, h('i'));
@@ -80,9 +81,17 @@ export function build() {
 export function update() { if (!root) return; if (order().join(',') !== sig) build(); for (const s of strips) { s.el.style.setProperty('--tc', colorOf(s.i)); paint(s); } }
 export function frame() {
   if (!root || root.hidden) return;
-  for (const s of strips) for (let ch = 0; ch < 2; ch++) {   // meters: instant attack, a gentle release
-    const lv = (state.meters[s.i * 2 + ch] || 0) / 1000, f = meterFrac(lv); s.lv[ch] = f > s.lv[ch] ? f : Math.max(f, s.lv[ch] - 0.02);
-    const bar = s.met.children[ch], hgt = (s.lv[ch] * 100).toFixed(1) + '%'; if (bar.style.height !== hgt) bar.style.height = hgt;
+  const now = performance.now();
+  for (const s of strips) {
+    s.pk = s.pk || [0, 0]; s.clip = s.clip || 0;
+    for (let ch = 0; ch < 2; ch++) {   // instant attack, a gentle release; the peak holds, then falls
+      const lv = (state.meters[s.i * 2 + ch] || 0) / 1000, f = meterFrac(lv); s.lv[ch] = f > s.lv[ch] ? f : Math.max(f, s.lv[ch] - 0.02);
+      s.pk[ch] = f >= s.pk[ch] ? f : Math.max(f, s.pk[ch] - 0.004);
+      if (lv >= 1) s.clip = now;
+      const slot = s.met.children[ch], bar = slot.firstChild, pk = slot.lastChild, hgt = (s.lv[ch] * 100).toFixed(1) + '%', pkb = (s.pk[ch] * 100).toFixed(1) + '%';
+      if (bar.style.height !== hgt) bar.style.height = hgt; if (pk.style.bottom !== pkb) pk.style.bottom = pkb; pk.style.opacity = s.pk[ch] > 0.02 ? '1' : '0';
+    }
+    s.met.lastChild.classList.toggle('on', now - s.clip < 1500);
   }
 }
 export function show(on) { if (root) { root.hidden = !on; if (on) update(); } }
