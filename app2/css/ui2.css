@@ -1,6 +1,6 @@
 /* MobileDAW 2 (js/ui2/shell.js): the frame around the arrangement. Warm, quiet surfaces from the theme (Studio by default), the accent for
    what is on, round transport, text tabs, pill tools. Every value comes from the theme tokens, so the other themes work too. */
-html.ui2 { --b2-h: 56px; --tc-w: 66px; --tc-ww: 320px; --u2-r: 10px; --u2-pill: 999px; }
+html.ui2 { --b2-h: 56px; --tc-w: 116px; --tc-ww: 370px; --u2-r: 10px; --u2-pill: 999px; }
 html.ui2.tc-wide { --tc-cur: var(--tc-ww); }
 html.ui2:not(.tc-wide) { --tc-cur: var(--tc-w); }
 html.ui2 #top { display: none; }
@@ -350,9 +350,10 @@ html.ui2 #main { border-radius: var(--m3-l); overflow: hidden; background: var(-
 /* track tiles: rounded tonal tiles inside the column */
 html.ui2 #tcol2 { background: var(--panel); border-right: 0; }
 html.ui2 .tc-row { border-bottom: 0; }
-html.ui2 .tc-tile { margin: 3px 4px; width: calc(var(--tc-w) - 8px); border-radius: var(--m3-m); box-shadow: none; }
-html.ui2.tc-wide .tc-row .tc-tile { top: 3px; bottom: 3px; left: 4px; }
-html.ui2 .tc-row.sel .tc-tile { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
+/* the channel header stays square (owner's choice): a full-width tile with a 1 px line between rows, the selection as an inner ring */
+html.ui2 .tc-tile { margin: 0; width: var(--tc-w); border-radius: 0; box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .3); }
+html.ui2.tc-wide .tc-row .tc-tile { top: 0; bottom: 0; left: 0; }
+html.ui2 .tc-row.sel .tc-tile { box-shadow: inset 0 0 0 3px var(--accent); }
 html.ui2.tc-wide .tc-row.sel { background: none; }
 /* bubbles, insert menu, note bar: tonal pills */
 html.ui2 #bub2 .bub, html.ui2 #ins2 .bub, html.ui2 .bar .b, html.ui2 .selbar .b { height: 44px; padding: 0 18px; background: var(--m3-tonal); color: var(--text); font: var(--fw-m, 500) 13px/1 var(--font); box-shadow: 0 3px 8px rgba(0, 0, 0, .35); }
@@ -413,3 +414,21 @@ html.ui2 #browser .bs-i { border-radius: 999px; }
 html.ui2 #browser .bs-i.on { background: var(--m3-tonal); color: var(--text); }
 /* the panel's own Device / Keys tabs are gone: Rack and Keys in the bottom bar switch the panel (owner's request) */
 html.ui2 #dtabs .b[data-tab] { display: none !important; }
+
+/* ---- the channel header as in the owner's reference: a square block in the track colour, a fold ring and the name at its top left */
+html.ui2 .tc-tile { flex-direction: row; align-items: flex-start; justify-content: flex-start; gap: 7px; padding: 7px 8px; color: rgba(0, 0, 0, .82); }
+html.ui2 .tc-tile svg { width: auto; height: auto; }
+html.ui2 .tc-tile .tc-fold { flex: none; display: flex; width: 20px; height: 20px; margin: -1px 0 0; }
+html.ui2 .tc-tile .tc-fold svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+html.ui2 .tc-tile .tc-fold svg path { fill: currentColor; stroke: none; }
+html.ui2 .tc-tile .tc-nm { display: block; min-width: 0; flex: 1; text-align: left; color: rgba(0, 0, 0, .85); font: var(--fw-m, 500) 13px/18px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ui2 .tc-row.xrow .tc-tile .tc-nm { color: var(--text); padding-left: 2px; }
+html.ui2 .tc-row.sel .tc-tile { box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .85); }
+html.ui2 .tc-row.fold .tc-tile { padding-top: 2px; padding-bottom: 2px; align-items: center; }
+html.ui2.tc-wide .tc-row:not(.xrow) .tc-nm { display: block; }
+html.ui2.tc-wide .tc-name .nm { visibility: hidden; }
+/* the arrangement and the panel under it are two rounded surfaces with a gap between them (owner's request) */
+html.ui2 #main { background: var(--bg); }
+html.ui2 #view-arr:not(.shut):not(.edfull) #arr { border-bottom-right-radius: var(--m3-l); overflow: hidden; }
+html.ui2 #view-arr:not(.shut):not(.edfull) #tcol2 { border-bottom-left-radius: var(--m3-l); }
+html.ui2 #view-arr:not(.shut) #detail { margin-top: 8px; }

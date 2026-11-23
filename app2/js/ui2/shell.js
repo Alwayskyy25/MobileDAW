@@ -63,6 +63,8 @@ const IC = {
   bus: S('<path d="M5 19V10M9.5 19V5M14 19v-7M18.5 19V8"/>'),
   back: S('<path d="M14.5 6 8.5 12l6 6"/>'),
 };
+// the track header's fold button (Live): a ring with a triangle, down = open, right = folded
+const FOLD = (folded) => `<i class="tc-fold" aria-label="Lipat track"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/><path d="${folded ? 'M8 6l5 4-5 4z' : 'M6 8h8l-4 5z'}"/></svg></i>`;
 const kindIcon = (t) => (t.kind === 'drum' ? IC.drum : t.kind === 'audio' ? IC.wave : t.kind === 'auto' ? IC.auto : IC.piano);
 const btn = (cls, ic, label, aria) => { const b = h('button', { class: 'u2b ' + cls, 'aria-label': aria || label || '' }); b.innerHTML = ic + (label ? `<span class="lb">${label}</span>` : ''); return b; };
 
@@ -206,6 +208,7 @@ function rowEl(kind, i) {
     dragVal(pan, 'x', () => (clamp(state.tracks[r._i].pan, -1, 1) + 1) / 2, (u) => P.setPan(r._i, Math.round((u * 2 - 1) * 100) / 100), () => P.setPan(r._i, 0));
   }
   // the tile: tap = widen / narrow the column (and select the track), long press = the track menu
+  tile.addEventListener('click', (e) => { const f = e.target.closest && e.target.closest('.tc-fold'); if (!f) return; e.stopPropagation(); e.preventDefault(); if (r._kind === 'trk') { TL.v2Fold(r._i); colSig = ''; } }, true);
   holdTap(tile, () => {
     if (r._kind === 'trk') P.selectTrack(r._i); else if (r._kind === 'x') P.selectTrack(r._strip);
     prefs.ui2Wide = !wide(); savePrefs(); applyWide();
@@ -247,7 +250,7 @@ function syncCol() {
       r._i = i;
       const tile = r.firstChild;
       if (kind === 'trk') {
-        const t = state.tracks[i]; r.style.setProperty('--tc', t.color); tile.innerHTML = kindIcon(t);
+        const t = state.tracks[i]; r.style.setProperty('--tc', t.color); tile.innerHTML = FOLD(!!t.fold) + '<span class="tc-nm"></span>'; tile.lastChild.textContent = t.name;
         r.classList.toggle('sel', state.sel.track === i); r.classList.toggle('muted', !!t.mute); r.classList.toggle('auto', t.kind === 'auto'); r.classList.toggle('fold', !!t.fold);
         r.querySelector('.tc-name .nm').textContent = t.name;
         r.querySelector('.tc-on').classList.toggle('on', !t.mute); r.querySelector('.tc-solo').classList.toggle('on', !!t.solo);
@@ -255,7 +258,7 @@ function syncCol() {
         r.querySelector('.tc-pan').style.setProperty('--u', ((clamp(t.pan, -1, 1) + 1) / 2).toFixed(4));
         tile.setAttribute('aria-label', t.name);
       } else {
-        const x = TL.v2XRow(i); r._strip = x.strip; r.style.setProperty('--tc', x.color); tile.innerHTML = IC.bus; r.classList.toggle('sel', state.sel.track === x.strip); r.classList.add('xrow'); tile.setAttribute('aria-label', x.name);
+        const x = TL.v2XRow(i); r._strip = x.strip; r.style.setProperty('--tc', x.color); tile.innerHTML = '<span class="tc-nm"></span>'; tile.lastChild.textContent = x.name; r.classList.toggle('sel', state.sel.track === x.strip); r.classList.add('xrow'); tile.setAttribute('aria-label', x.name);
       }
     }
     syncSnap();
