@@ -308,8 +308,9 @@ function drawClip(t, c, y, hh) {
         if (n.t < g.s || n.t >= g.s + g.len) continue;              // the piece of the cycle this repeat plays (g.s = where in the pattern it starts)
         const nx = gx + (n.t - g.s) * view.ppt, nw = Math.max(1.5, Math.min(n.d, g.s + g.len - n.t) * view.ppt - 0.5);
         if (nx + nw < xs || nx > xe) continue;
-        if (voc) ctx.fillStyle = shade(P.VOC_COLORS[(n.img || 0) & 7], 0.35);
-        ctx.fillRect(nx, by + (hi - n.p) / span * (bh - nh) , nw, nh);
+        const ny = by + (hi - n.p) / span * (bh - nh);
+        if (voc) { ctx.fillStyle = 'rgba(16,16,20,.9)'; ctx.fillRect(nx - 1, ny - 1, nw + 2, nh + 2); ctx.fillStyle = P.VOC_COLORS[(n.img || 0) & 7]; ctx.fillRect(nx, ny, nw, nh); continue; }   // the piano roll's colours, a dark outline so they read on the clip
+        ctx.fillRect(nx, ny, nw, nh);
       }
     }
   }
