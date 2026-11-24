@@ -163,6 +163,7 @@ function control(p, label, get, set, onLong, vert) {
     if (!isSwitch(p) && (ENV_RE.test(String(p.n).trim()) || FADER_RE.test(String(p.n).trim()))) return vslider(p, label, get, set, onLong);
     if (!isSwitch(p)) return dial(p, label, get, set, onLong);   // gain, level, pan, cutoff, pitch, rate...: a knob
   }
+  if (vert === 'fx' && !isList(p) && !isSwitch(p) && SLIDER_RE.test(String(p.n).trim())) return vslider(p, label, get, set, onLong);   // effects: every slider stands upright
   if (!isList(p) && !isSwitch(p) && SLIDER_RE.test(String(p.n).trim())) return hslider(p, label, get, set, onLong);
   if (vert === 'fx' && !isList(p) && !isSwitch(p) && (FX_FADER_RE.test(String(p.n).trim()) || BAND_RE.test(String(p.n).trim()))) return vslider(p, label, get, set, onLong);
   if (isList(p)) return choice(p, label, get, set);
@@ -279,7 +280,7 @@ function body(key, groups, mk, every, bigTabs, onTab) {
     const bottom = Math.min(card.getBoundingClientRect().bottom, sc.getBoundingClientRect().bottom) - 8, dl0 = grid.querySelector('.u2c-dials'), hh = bottom - (dl0 || grid).getBoundingClientRect().top;
     if (!(hh > 0)) return;
     const kids = dl ? [...dl.children] : [], span = (e) => (e.classList.contains('u2seg-f') ? 3 : e.classList.contains('u2dd') || e.classList.contains('u2sl') ? 2 : 1);
-    const cells = kids.reduce((a, e) => a + span(e), 0) || 1, rows = Math.max(1, Math.min(Math.floor((hh + 4) / 54), kids.length || 1));
+    const cells = kids.reduce((a, e) => a + span(e), 0) || 1, rows = Math.max(1, Math.min(Math.floor((hh + 6) / 76), kids.length || 1));   // rows of 70 px: a knob of 40 px or more
     // the fewest columns whose row-by-row packing (wide controls take 2 or 3 cells, 'dense' fills gaps) fits in the rows
     const tall = rows >= 2; if (dl) dl.classList.toggle('vs2', tall);   // a fader stands two rows tall when there are two
     const fits = (cols) => { const g = []; let used = 0; for (const e of kids) { const w = span(e), ht = tall && e.classList.contains('u2vs') ? 2 : 1; let placed = false;

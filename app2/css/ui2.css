@@ -1417,3 +1417,7 @@ html.ui2 .m2-fad em::after { display: none !important; }
 .u2c.v3 .u2c-dials.vs2 > .u2vs { grid-row: span 2; }
 .u2c.v3 .u2c-dials > .u2vs { min-width: 0 !important; flex: none !important; padding: 4px 2px !important; }
 .u2c.v3:not(.inst) .u2c-dials > .u2vs .tr { min-height: 14px !important; }
+/* effects: a knob as large as its cell allows (no more tiny knobs in a roomy cell) */
+.u2c.v3:not(.inst) .u2c-dials > .u2d { container-type: size; min-height: 0; justify-content: center !important; gap: 2px !important; padding: 3px 2px !important; }
+.u2c.v3:not(.inst) .u2c-dials > .u2d svg { width: clamp(30px, min(100cqw - 14px, 100cqh - 30px), 64px) !important; height: clamp(30px, min(100cqw - 14px, 100cqh - 30px), 64px) !important; flex: none; }
+.u2c.v3:not(.inst) .u2c-dials > .u2d .n, .u2c.v3:not(.inst) .u2c-dials > .u2d .v { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
