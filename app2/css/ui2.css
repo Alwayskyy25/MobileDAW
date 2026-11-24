@@ -1413,3 +1413,7 @@ html.ui2 .m2-fad em::after { display: none !important; }
 .u2c.v3.inst .u2vs { flex: 0 0 50px !important; min-width: 50px !important; }
 .u2c.v3.inst .u2st { flex: 0 0 76px !important; min-width: 76px !important; }
 .u2c.v3.inst .u2col.kn { grid-auto-columns: minmax(60px, 74px); flex-grow: 0 !important; }
+/* effects: faders among the knobs, two rows tall when the card has two rows */
+.u2c.v3 .u2c-dials.vs2 > .u2vs { grid-row: span 2; }
+.u2c.v3 .u2c-dials > .u2vs { min-width: 0 !important; flex: none !important; padding: 4px 2px !important; }
+.u2c.v3:not(.inst) .u2c-dials > .u2vs .tr { min-height: 14px !important; }

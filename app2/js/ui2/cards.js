@@ -127,6 +127,9 @@ function hslider(p, label, get, set, onLong) {
 const ENV_RE = /(^|\s)(attack|atk|att|decay|dec|sustain|sus|release|rel|hold|delay|dly|predelay|pre ?delay)$/i;
 // faders for the close-set controls (amounts, depths, tracking, detune / spread / phase, mixes); knobs for the main tone controls
 const FADER_RE = /(^|\s)(amount|amt|depth|kbd|kbd ?trk|key ?(trk|track)|vel|vel ?(trk|track|sens)|velocity|detune|dtn\.? spread|spread|phase|phase rand|slide|glide|sub osc|noise|unison pan|mix|dry|wet|er|width)$/i;
+// an effect's faders: time stages, thresholds, feedback, damping, cuts, stereo width; a graphic EQ's bands
+const FX_FADER_RE = /(^|\s)(attack|atk|release|release time|rel|hold|decay|thresh|threshold|feedback|fdbk|damping|high damp|damp|predelay|pre-delay|delay|early refl\.?|er|width|spread|separation|lo-cut|hi-cut|low cut|high cut|stereo|focus|timbre|bias|asymmetry|return|floor|async\.?|dry level|wet level|dry|wet)$/i;
+const BAND_RE = /^\d+(\.\d+)? ?k?Hz$/i;
 function vslider(p, label, get, set, onLong) {
   const tr = h('div', { class: 'tr' }, h('i', { class: 'f' }), h('em')), v = h('span', { class: 'v' });
   const el = h('div', { class: 'u2vs', role: 'slider', 'aria-label': label, 'aria-orientation': 'vertical', tabindex: 0 }, h('span', { class: 'n', title: p.n }, label), tr, v);
@@ -155,12 +158,13 @@ function stepper(p, label, get, set) {
   el.sync = paint; paint(); return el;
 }
 function control(p, label, get, set, onLong, vert) {
-  if (vert) {   // an instrument's panel: lists as steppers, envelope stages and levels as vertical sliders
+  if (vert === true) {   // an instrument's panel: lists as steppers, envelope stages and levels as vertical sliders
     if (isList(p)) return stepper(p, label, get, set);
     if (!isSwitch(p) && (ENV_RE.test(String(p.n).trim()) || FADER_RE.test(String(p.n).trim()))) return vslider(p, label, get, set, onLong);
     if (!isSwitch(p)) return dial(p, label, get, set, onLong);   // gain, level, pan, cutoff, pitch, rate...: a knob
   }
   if (!isList(p) && !isSwitch(p) && SLIDER_RE.test(String(p.n).trim())) return hslider(p, label, get, set, onLong);
+  if (vert === 'fx' && !isList(p) && !isSwitch(p) && (FX_FADER_RE.test(String(p.n).trim()) || BAND_RE.test(String(p.n).trim()))) return vslider(p, label, get, set, onLong);
   if (isList(p)) return choice(p, label, get, set);
   if (isSwitch(p)) return toggle(p, label, get, set);
   return dial(p, label, get, set, onLong);
@@ -245,7 +249,8 @@ function body(key, groups, mk, every, bigTabs, onTab) {
     const ctl = g[1].map((k) => { const c = mk(k, g[2], g[3] || {}); live.push(c); return { k, c }; });
     const env = null;   // v3 cards draw the envelope on their screen (fxdisp.js), not again among the controls
     // order: lists and switches first (full-width rows), then the dials
-    const rows = ctl.filter(({ c }) => !c.classList.contains('u2d') && !c.classList.contains('u2sl')).map(({ c }) => c), dials = ctl.filter(({ c }) => c.classList.contains('u2d')).map(({ c }) => c), sliders = ctl.filter(({ c }) => c.classList.contains('u2sl')).map(({ c }) => c);
+    const rows = ctl.filter(({ c }) => !c.classList.contains('u2d') && !c.classList.contains('u2sl') && !c.classList.contains('u2vs')).map(({ c }) => c), dials = ctl.filter(({ c }) => c.classList.contains('u2d')).map(({ c }) => c), sliders = ctl.filter(({ c }) => c.classList.contains('u2sl')).map(({ c }) => c);
+    dials.push(...ctl.filter(({ c }) => c.classList.contains('u2vs')).map(({ c }) => c));   // the faders after the knobs, side by side
     // one grid that fills the rack's height row by row and then grows sideways (a field takes two dial cells): nothing is cut off
     if (mk.cols) {   // an instrument: columns across the whole panel, one kind each: switches, lists, knobs (stacked), sliders
       const of = (c) => ctl.filter((x) => x.c.classList.contains(c)).map((x) => x.c), tg = of('u2t'), st = of('u2st'), kn = of('u2d'), vs = of('u2vs');
@@ -276,8 +281,11 @@ function body(key, groups, mk, every, bigTabs, onTab) {
     const kids = dl ? [...dl.children] : [], span = (e) => (e.classList.contains('u2seg-f') ? 3 : e.classList.contains('u2dd') || e.classList.contains('u2sl') ? 2 : 1);
     const cells = kids.reduce((a, e) => a + span(e), 0) || 1, rows = Math.max(1, Math.min(Math.floor((hh + 4) / 54), kids.length || 1));
     // the fewest columns whose row-by-row packing (wide controls take 2 or 3 cells, 'dense' fills gaps) fits in the rows
-    const fits = (cols) => { const g = []; let used = 0; for (const e of kids) { const w = span(e); let placed = false;
-      for (let r = 0; r < 64 && !placed; r++) { g[r] = g[r] || new Array(cols).fill(0); for (let c = 0; c + w <= cols; c++) { if (g[r].slice(c, c + w).every((x) => !x)) { for (let q = c; q < c + w; q++) g[r][q] = 1; used = Math.max(used, r + 1); placed = true; break; } } }
+    const tall = rows >= 2; if (dl) dl.classList.toggle('vs2', tall);   // a fader stands two rows tall when there are two
+    const fits = (cols) => { const g = []; let used = 0; for (const e of kids) { const w = span(e), ht = tall && e.classList.contains('u2vs') ? 2 : 1; let placed = false;
+      for (let r = 0; r < 64 && !placed; r++) { for (let q = r; q < r + ht; q++) g[q] = g[q] || new Array(cols).fill(0);
+        for (let c = 0; c + w <= cols; c++) { let free = true; for (let q = r; q < r + ht && free; q++) free = g[q].slice(c, c + w).every((x) => !x);
+          if (free) { for (let q = r; q < r + ht; q++) for (let x = c; x < c + w; x++) g[q][x] = 1; used = Math.max(used, r + ht); placed = true; break; } } }
     } return used <= rows; };
     let cols = Math.max(Math.ceil(cells / rows), ...kids.map(span), 1); while (cols < cells && !fits(cols)) cols++;   // read left to right, top to bottom
     const v = String(rows); if (grid.style.getPropertyValue('--rows') !== v) grid.style.setProperty('--rows', v);
@@ -392,7 +400,7 @@ export function fxCard(i, d, di, n, api) {
     const p = pdef(k), wet = k === 'mix' || k === 'gain';
     const set = wet ? (v) => P.setDeviceWet(i, di, k, v) : (v) => P.setDeviceParam(i, di, k, v);
     const auto = wet && k === 'gain' ? null : (rect) => offerAutomation(rect, { kind: 4, strip: P.stripOf(i), devId: d.id, param: wet ? MIX_P : k, def: p }, `${api.stripName(i)} • ${def.name} ${p.n}`);
-    return control(p, wet ? p.n : tidy(names[k] || p.n, pf), () => get(k), set, auto);
+    return control(p, wet ? p.n : tidy(names[k] || p.n, pf), () => get(k), set, auto, 'fx');
   };
   mk.get = get; mk.def = pdef;
   const kids = [];
