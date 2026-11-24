@@ -123,9 +123,13 @@ ok(mods.fx.every(([k, , flm]) => flm || k === 16) && mods.fx.some(([k]) => k ===
   ok(!r.bad.length, 'every instrument and effect has a Material You card' + (r.bad.length ? ': missing ' + r.bad.join(', ') : ''));
   await page.evaluate(() => { [...document.querySelectorAll('.dev-scroll > .card.u2c:not(.inst)')].pop().scrollIntoView(); }); await page.waitForTimeout(700);   // let the rack settle on the card (scroll snap)
   const dl = await page.evaluate(() => { const c = [...document.querySelectorAll('.dev-scroll > .card.u2c:not(.inst)')].pop(); const d = c.querySelector('.u2d'); const b = d.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + 22 }; });
-  const pv = async () => page.evaluate(async () => { const P = await import('./js/project.js'); const d = P.tr(0).devices[P.tr(0).devices.length - 1]; return d.params[1] ?? null; });
-  const v0 = await pv(); await page.mouse.move(dl.x, dl.y); await page.mouse.down(); await page.mouse.move(dl.x, dl.y - 40, { steps: 6 }); await page.mouse.up(); const v1 = await pv();
-  ok(v1 !== null && v1 !== v0 && (v0 === null || v1 > v0), `dragging a dial up raises the value (${v0} -> ${v1})`);
+  // the dragged knob's own parameter (whichever it is): the one value that changed must have gone up
+  const pv = async () => page.evaluate(async () => { const P = await import('./js/project.js'), D = await import('./js/defs.js'); const d = P.tr(0).devices[P.tr(0).devices.length - 1]; return D.DEVICES[d.type].params.map((q, k) => d.params[k] ?? q.def); });
+  // (down first: the knob may already sit at its top) then up again
+  const drag = async (dy) => { const a0 = await pv(); await page.mouse.move(dl.x, dl.y); await page.mouse.down(); await page.mouse.move(dl.x, dl.y + dy, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(400);
+    const ch = (await pv()).map((v, k) => [k, a0[k], v]).filter(([, x, y]) => x !== y); return ch.length === 1 ? ch[0] : [null, null, null]; };
+  const dn = await drag(40), up = await drag(-40);
+  ok(dn[0] !== null && dn[2] < dn[1] && up[0] === dn[0] && up[2] > up[1], `dragging a dial down lowers its value and up raises it (${dn[1]} -> ${dn[2]} -> ${up[2]})`);
   await page.evaluate(() => [...document.querySelectorAll('.dev-scroll > .card.u2c:not(.inst) .u2sw-b')].pop().click()); await page.waitForTimeout(100);
   ok(await page.evaluate(async () => { const P = await import('./js/project.js'); return P.tr(0).devices[P.tr(0).devices.length - 1].bypass === true && !!document.querySelector('.dev-scroll > .card.u2c.off'); }), 'the switch in the card header bypasses the effect'); }
 { await page.waitForTimeout(600);
