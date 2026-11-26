@@ -16,6 +16,9 @@ concurrency:
   group: android-native-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   apk-native:
     runs-on: ubuntu-latest
@@ -58,3 +61,15 @@ jobs:
           name: MobileDAW-native-debug-apk
           path: dist/*.apk
           retention-days: 30
+
+      # Attach the APK straight to the v0.1.0 release (when it exists) so it
+      # can be downloaded from the Releases page, not only from Artifacts.
+      - name: Attach APK to release native-v0.1.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view native-v0.1.0 > /dev/null 2>&1; then
+            gh release upload native-v0.1.0 dist/*.apk --clobber
+          else
+            echo "Release native-v0.1.0 not found - skipping release upload."
+          fi
