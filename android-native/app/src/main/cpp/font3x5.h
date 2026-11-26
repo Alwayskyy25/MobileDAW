@@ -1,5 +1,6 @@
 // font3x5.h - tiny 3x5 pixel font (rows of 3 bits) for UI labels.
-// Charset: A-Z 0-9 and . - + / : % ( ) - anything else renders as a blank.
+// Charset: A-Z 0-9 and . , - + / : % ( ) ! ? ' _ = * # < > - anything else
+// renders as a blank. Lowercase maps to the uppercase glyphs (see glyph()).
 #pragma once
 #include <cstdint>
 
@@ -26,6 +27,10 @@ inline const uint8_t* glyph(char c) {
       {'.', {0, 0, 0, 0, 2}}, {'-', {0, 0, 7, 0, 0}}, {'+', {0, 2, 7, 2, 0}},
       {'/', {1, 1, 2, 4, 4}}, {':', {0, 2, 0, 2, 0}}, {'%', {5, 1, 2, 4, 5}},
       {'(', {1, 2, 2, 2, 1}}, {')', {4, 2, 2, 2, 4}},
+      {',', {0, 0, 0, 2, 4}}, {'!', {2, 2, 2, 0, 2}}, {'?', {6, 1, 2, 0, 2}},
+      {'\'', {2, 2, 0, 0, 0}}, {'_', {0, 0, 0, 0, 7}}, {'=', {0, 7, 0, 7, 0}},
+      {'*', {0, 5, 2, 5, 0}}, {'#', {5, 7, 5, 7, 5}}, {'<', {1, 2, 4, 2, 1}},
+      {'>', {4, 2, 1, 2, 4}}, {'[', {3, 2, 2, 2, 3}}, {']', {6, 2, 2, 2, 6}},
   };
   if (c >= 'a' && c <= 'z') c = char(c - 'a' + 'A');
   for (const G& g : table)
