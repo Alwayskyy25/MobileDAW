@@ -1,0 +1,22 @@
+// MobileDAW Native - standalone native app (no Capacitor, no WebView).
+// AGP version matches the repo's existing android/ project (8.13.0).
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.0'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
