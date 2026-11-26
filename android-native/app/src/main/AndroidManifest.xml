@@ -6,6 +6,7 @@
          (app/src/main/cpp/native_main.cpp via android_native_app_glue). -->
     <application
         android:hasCode="false"
+        android:icon="@drawable/ic_launcher"
         android:label="MobileDAW Native"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
 
