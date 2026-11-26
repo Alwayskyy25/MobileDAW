@@ -1,0 +1,44 @@
+// font3x5.h - tiny 3x5 pixel font (rows of 3 bits) for UI labels.
+// Charset: A-Z 0-9 and . - + / : % ( ) - anything else renders as a blank.
+#pragma once
+#include <cstdint>
+
+namespace mdnative {
+namespace font3x5 {
+
+// Each glyph: 5 rows, bit2..bit0 = left..right pixel.
+inline const uint8_t* glyph(char c) {
+  struct G { char c; uint8_t r[5]; };
+  static const G table[] = {
+      {'A', {2, 5, 7, 5, 5}}, {'B', {6, 5, 6, 5, 6}}, {'C', {3, 4, 4, 4, 3}},
+      {'D', {6, 5, 5, 5, 6}}, {'E', {7, 4, 6, 4, 7}}, {'F', {7, 4, 6, 4, 4}},
+      {'G', {3, 4, 5, 5, 3}}, {'H', {5, 5, 7, 5, 5}}, {'I', {7, 2, 2, 2, 7}},
+      {'J', {1, 1, 1, 5, 2}}, {'K', {5, 5, 6, 5, 5}}, {'L', {4, 4, 4, 4, 7}},
+      {'M', {5, 7, 7, 5, 5}}, {'N', {5, 7, 5, 5, 5}}, {'O', {2, 5, 5, 5, 2}},
+      {'P', {6, 5, 6, 4, 4}}, {'Q', {2, 5, 5, 2, 1}}, {'R', {6, 5, 6, 5, 5}},
+      {'S', {3, 4, 2, 1, 6}}, {'T', {7, 2, 2, 2, 2}}, {'U', {5, 5, 5, 5, 7}},
+      {'V', {5, 5, 5, 5, 2}}, {'W', {5, 5, 7, 7, 5}}, {'X', {5, 5, 2, 5, 5}},
+      {'Y', {5, 5, 2, 2, 2}}, {'Z', {7, 1, 2, 4, 7}},
+      {'0', {3, 5, 5, 5, 6}}, {'1', {2, 6, 2, 2, 7}}, {'2', {6, 1, 2, 4, 7}},
+      {'3', {6, 1, 2, 1, 6}}, {'4', {5, 5, 7, 1, 1}}, {'5', {7, 4, 6, 1, 6}},
+      {'6', {3, 4, 6, 5, 2}}, {'7', {7, 1, 2, 2, 2}}, {'8', {2, 5, 2, 5, 2}},
+      {'9', {2, 5, 3, 1, 6}},
+      {'.', {0, 0, 0, 0, 2}}, {'-', {0, 0, 7, 0, 0}}, {'+', {0, 2, 7, 2, 0}},
+      {'/', {1, 1, 2, 4, 4}}, {':', {0, 2, 0, 2, 0}}, {'%', {5, 1, 2, 4, 5}},
+      {'(', {1, 2, 2, 2, 1}}, {')', {4, 2, 2, 2, 4}},
+  };
+  if (c >= 'a' && c <= 'z') c = char(c - 'a' + 'A');
+  for (const G& g : table)
+    if (g.c == c) return g.r;
+  static const uint8_t blank[5] = {0, 0, 0, 0, 0};
+  return blank;
+}
+
+inline float textWidth(const char* s, float scale) {
+  float w = 0;
+  for (const char* p = s; *p; p++) w += 4 * scale;  // 3px glyph + 1px gap
+  return w;
+}
+
+}  // namespace font3x5
+}  // namespace mdnative
