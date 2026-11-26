@@ -1,14 +1,15 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.mobiledaw.native"
-    compileSdk = 35
+    namespace = "com.mobiledaw.nativeapp"
+    compileSdk = 36
     defaultConfig {
         // Separate applicationId: installs NEXT TO the web/Capacitor app
         // (com.mobiledaw.app), same precedent as app2 (com.mobiledaw.app2).
-        applicationId "com.mobiledaw.native"
+        // NOTE: "com.mobiledaw.native" is NOT usable - "native" is a Java keyword.
+        applicationId "com.mobiledaw.nativeapp"
         minSdkVersion 26
-        targetSdkVersion 35
+        targetSdkVersion 36
         versionCode 1
         versionName "0.1.0-native-v1"
         // Redmi Note 9 is arm64; x86_64 kept for emulator testing.
