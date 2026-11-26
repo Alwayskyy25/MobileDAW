@@ -19,5 +19,11 @@ add_library(mobiledaw_native SHARED
     engine_link.cpp
     gles_renderer.cpp)
 target_compile_options(mobiledaw_native PRIVATE -O2 -ffp-contract=off -Wall)
+# Keep ANativeActivity_onCreate (defined in the native_app_glue static lib)
+# in the shared library: NativeActivity resolves it by name at launch, and
+# nothing in the app references it, so the linker may otherwise drop the
+# archive member and the activity crashes the moment it opens. Belt and
+# braces next to the app_dummy() call in native_main.cpp.
+target_link_options(mobiledaw_native PRIVATE -Wl,-u,ANativeActivity_onCreate)
 target_link_libraries(mobiledaw_native
     mdaw_engine oboe::oboe native_app_glue android EGL GLESv2 log)
