@@ -5,6 +5,7 @@
 #include "engine_link.h"
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include "cmds.h"
 #include "engine_link_stub.h"
@@ -21,8 +22,12 @@ class Stub : public EngineLink {
  public:
   bool start(int sr, std::vector<int>* inst, std::vector<int>* fx) override {
     sr_ = sr;
-    if (inst) *inst = {0, 1};        // pretend Mini Synth + SuperSaw are ported
-    if (fx) *fx = {};
+    if (inst) { inst->clear(); for (int t = 1; t <= 38; t++) inst->push_back(t); }
+    if (fx) {
+      fx->clear();
+      for (int t = 0; t <= 52; t++) fx->push_back(t);
+      for (int t = 103; t <= 151; t++) fx->push_back(t);  // FLM range (approx)
+    }
     last_ = std::chrono::steady_clock::now();
     return true;
   }
@@ -38,6 +43,11 @@ class Stub : public EngineLink {
       if (line == cmds::kPlay) playing_ = true;
       else if (line == cmds::kStop) { playing_ = false; pos_ = 0; }
       else if (line.rfind(cmds::kTempo, 0) == 0) bpm_ = std::atof(line.c_str() + 6);
+      else if (line.rfind("seek ", 0) == 0) pos_ = std::atof(line.c_str() + 5);
+      else if (line.rfind("loop ", 0) == 0) {
+        double on, a, b;
+        if (std::sscanf(line.c_str() + 5, "%lf %lf %lf", &on, &a, &b) == 3) { loopOn_ = on != 0; loopA_ = a; loopB_ = b; }
+      }
     }
     return "";
   }
@@ -49,8 +59,8 @@ class Stub : public EngineLink {
     if (playing_ && active_) {
       // ticks per beat = steps-per-beat(4) * ticks-per-step
       pos_ += dt * (bpm_ / 60.0) * 4 * cmds::kTicksPerStep;
-      double bar = cmds::kStepsPerBar * cmds::kTicksPerStep;
-      if (pos_ >= bar) pos_ -= bar;  // v1 pattern loops one bar
+      if (loopOn_ && loopB_ > loopA_ && pos_ >= loopB_) pos_ = loopA_ + std::fmod(pos_ - loopA_, loopB_ - loopA_);
+      else if (pos_ >= 3840.0 * 64) pos_ = 0;  // safety wrap
     }
     out->posTicks = pos_;
     out->playing = playing_;
@@ -66,6 +76,8 @@ class Stub : public EngineLink {
   int sr_ = 48000;
   bool playing_ = false, active_ = false;
   double bpm_ = 120, pos_ = 0;
+  bool loopOn_ = false;
+  double loopA_ = 0, loopB_ = 3840;
   std::chrono::steady_clock::time_point last_ = std::chrono::steady_clock::now();
 };
 }  // namespace
