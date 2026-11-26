@@ -7,8 +7,13 @@
 #include <android/input.h>
 #include <android/log.h>
 #include <android_native_app_glue.h>
+#include <dirent.h>
 #include <EGL/egl.h>
+#include <cctype>
 #include <chrono>
+#include <cstdio>
+#include <cstring>
+#include <string>
 #include <thread>
 #include <vector>
 #include "engine_link.h"
@@ -114,6 +119,7 @@ void handleCmd(android_app* app, int32_t cmd) {
           LOGI("engine start threw - UI continues without audio");
           s->ui.setStatus("ENGINE ERROR: AUDIO OFF - UI ONLY");
         }
+        s->ui.requestAutoLoad();  // restore autosave (fresh session) + list files
       }
       break;
     case APP_CMD_TERM_WINDOW:
@@ -133,14 +139,85 @@ void handleCmd(android_app* app, int32_t cmd) {
 int32_t handleInput(android_app* app, AInputEvent* ev) {
   State* s = static_cast<State*>(app->userData);
   if (AInputEvent_getType(ev) != AINPUT_EVENT_TYPE_MOTION || s->width <= 0) return 0;
-  int32_t action = AMotionEvent_getAction(ev) & AMOTION_EVENT_ACTION_MASK;
-  int a = action == AMOTION_EVENT_ACTION_DOWN ? 0 : action == AMOTION_EVENT_ACTION_UP ? 1 : action == AMOTION_EVENT_ACTION_MOVE ? 2 : -1;
-  if (a < 0) return 0;
+  int32_t raw = AMotionEvent_getAction(ev);
+  int32_t action = raw & AMOTION_EVENT_ACTION_MASK;
   mdnative::ViewTransform t = mdnative::ViewTransform::fit(s->width, s->height);
-  float lx, ly;
-  t.toLogical(AMotionEvent_getX(ev, 0), AMotionEvent_getY(ev, 0), &lx, &ly);
-  s->ui.onTouch(lx, ly, a);
-  return 1;
+  auto sendPtr = [&](size_t idx, int a) {
+    float lx, ly;
+    t.toLogical(AMotionEvent_getX(ev, idx), AMotionEvent_getY(ev, idx), &lx, &ly);
+    s->ui.onTouchP(lx, ly, a, AMotionEvent_getPointerId(ev, idx));
+  };
+  size_t count = AMotionEvent_getPointerCount(ev);
+  switch (action) {
+    case AMOTION_EVENT_ACTION_DOWN: sendPtr(0, 0); return 1;
+    case AMOTION_EVENT_ACTION_UP: case AMOTION_EVENT_ACTION_CANCEL: sendPtr(0, 1); return 1;
+    case AMOTION_EVENT_ACTION_POINTER_DOWN:
+      sendPtr((raw & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT, 0);
+      return 1;
+    case AMOTION_EVENT_ACTION_POINTER_UP:
+      sendPtr((raw & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT, 1);
+      return 1;
+    case AMOTION_EVENT_ACTION_MOVE:
+      for (size_t i = 0; i < count; i++) sendPtr(i, 2);
+      return 1;
+    default: return 0;
+  }
+}
+
+// ------------------------------------------------------------ file bridge
+// The UI is platform-neutral; project save/load/list requests arrive as
+// App::FileOp and are executed here against the app's external data dir
+// (no Java, no SAF). Names are sanitised to a flat "<name>.mdaw" file.
+std::string fileDir(android_app* app) {
+  const char* d = app->activity->externalDataPath;
+  if (!d || !*d) d = app->activity->internalDataPath;
+  return d ? d : "";
+}
+bool safeName(const std::string& n) {
+  if (n.empty() || n.size() > 60) return false;
+  for (char c : n)
+    if (!(std::isalnum((unsigned char)c) || c == ' ' || c == '-' || c == '_' || c == '.')) return false;
+  return n.find("..") == std::string::npos;
+}
+void processFileOps(State* s) {
+  mdnative::App::FileOp op;
+  while (s->ui.takeFileOp(&op)) {
+    try {
+      std::string dir = fileDir(s->app);
+      if (op.kind == 2) {  // list
+        std::vector<std::string> names;
+        if (DIR* d = opendir(dir.c_str())) {
+          while (dirent* e = readdir(d)) {
+            std::string f = e->d_name;
+            if (f.size() > 5 && f.compare(f.size() - 5, 5, ".mdaw") == 0) names.push_back(f.substr(0, f.size() - 5));
+          }
+          closedir(d);
+        }
+        s->ui.deliverFileList(names);
+      } else if (safeName(op.name)) {
+        std::string path = dir + "/" + op.name + ".mdaw";
+        if (op.kind == 0) {  // save
+          if (FILE* f = std::fopen(path.c_str(), "wb")) {
+            std::fwrite(op.data.data(), 1, op.data.size(), f);
+            std::fclose(f);
+          }
+        } else {  // load
+          std::string data;
+          bool ok = false;
+          if (FILE* f = std::fopen(path.c_str(), "rb")) {
+            char buf[16384];
+            size_t n;
+            while ((n = std::fread(buf, 1, sizeof buf, f)) > 0) data.append(buf, n);
+            std::fclose(f);
+            ok = true;
+          }
+          s->ui.deliverLoad(op.name, ok, data, op.silent);
+        }
+      }
+    } catch (...) {
+      LOGI("file op failed (kind %d)", op.kind);
+    }
+  }
 }
 
 }  // namespace
@@ -175,6 +252,7 @@ void android_main(android_app* app) {
       timeout = 0;
     }
     if (s.running) {
+      processFileOps(&s);
       mdnative::Snapshot snap;
       if (s.engine && s.engine->poll(&snap)) s.ui.onSnapshot(snap);
       if (s.rendererOk && s.display != EGL_NO_DISPLAY && s.surface != EGL_NO_SURFACE) {
