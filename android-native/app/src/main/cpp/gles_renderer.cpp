@@ -24,26 +24,46 @@ static const char* FS =
 
 static GLuint compile(GLenum type, const char* src) {
   GLuint s = glCreateShader(type);
+  if (!s) return 0;
   glShaderSource(s, 1, &src, nullptr);
   glCompileShader(s);
+  // v1 never checked the result: a failed compile produced a broken program
+  // that init() still reported as success.
+  GLint ok = GL_FALSE;
+  glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
+  if (ok != GL_TRUE) { glDeleteShader(s); return 0; }
   return s;
 }
 
 bool GlesRenderer::init() {
+  GLuint vs = compile(GL_VERTEX_SHADER, VS), fs = compile(GL_FRAGMENT_SHADER, FS);
+  if (!vs || !fs) { if (vs) glDeleteShader(vs); if (fs) glDeleteShader(fs); return false; }
   prog_ = glCreateProgram();
-  glAttachShader(prog_, compile(GL_VERTEX_SHADER, VS));
-  glAttachShader(prog_, compile(GL_FRAGMENT_SHADER, FS));
+  if (!prog_) { glDeleteShader(vs); glDeleteShader(fs); return false; }
+  glAttachShader(prog_, vs);
+  glAttachShader(prog_, fs);
   glLinkProgram(prog_);
+  glDeleteShader(vs);
+  glDeleteShader(fs);
+  GLint linked = GL_FALSE;
+  glGetProgramiv(prog_, GL_LINK_STATUS, &linked);
   locPos_ = glGetAttribLocation(prog_, "aPos");
   locColor_ = glGetAttribLocation(prog_, "aColor");
+  if (linked != GL_TRUE || locPos_ < 0 || locColor_ < 0) {
+    glDeleteProgram(prog_);
+    prog_ = 0;
+    locPos_ = locColor_ = -1;
+    return false;
+  }
   glGenBuffers(1, &vbo_);
-  return prog_ != 0;
+  return true;
 }
 
 void GlesRenderer::destroy() {
   if (vbo_) glDeleteBuffers(1, &vbo_);
   if (prog_) glDeleteProgram(prog_);
   vbo_ = prog_ = 0;
+  locPos_ = locColor_ = -1;
 }
 
 void GlesRenderer::pushRect(float x, float y, float w, float h, uint32_t c, const ViewTransform& t, int W, int H) {
@@ -62,7 +82,7 @@ void GlesRenderer::pushRect(float x, float y, float w, float h, uint32_t c, cons
 }
 
 void GlesRenderer::draw(const std::vector<DrawCmd>& list, int surfW, int surfH) {
-  if (!prog_ || surfW <= 0 || surfH <= 0) return;
+  if (!prog_ || locPos_ < 0 || locColor_ < 0 || surfW <= 0 || surfH <= 0) return;
   ViewTransform t = ViewTransform::fit(surfW, surfH);
   verts_.clear();
   glViewport(0, 0, surfW, surfH);
@@ -84,6 +104,7 @@ void GlesRenderer::draw(const std::vector<DrawCmd>& list, int surfW, int surfH) 
       }
     }
   }
+  if (verts_.empty()) return;  // nothing to paint this frame (clear already done)
   glUseProgram(prog_);
   glBindBuffer(GL_ARRAY_BUFFER, vbo_);
   glBufferData(GL_ARRAY_BUFFER, verts_.size() * sizeof(float), verts_.data(), GL_DYNAMIC_DRAW);
