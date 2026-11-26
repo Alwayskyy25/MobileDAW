@@ -16,6 +16,14 @@ target_include_directories(native_app_glue PUBLIC ${ANDROID_NDK}/sources/android
 add_library(mobiledaw_native SHARED
     native_main.cpp
     ui_core.cpp
+    ui_model.cpp
+    ui_topbar.cpp
+    ui_arrange.cpp
+    ui_editor.cpp
+    ui_mixer.cpp
+    ui_device.cpp
+    ui_keys.cpp
+    ui_browser.cpp
     engine_link.cpp
     gles_renderer.cpp)
 target_compile_options(mobiledaw_native PRIVATE -O2 -ffp-contract=off -Wall)
