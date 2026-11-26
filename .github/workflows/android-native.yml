@@ -29,7 +29,11 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      # Pin Gradle 8.14.3 (the project's own wrapper version): AGP 8.13 is
+      # incompatible with Gradle 9.6+ (removed internal Problems API).
       - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: 8.14.3
 
       # ubuntu-latest ships the Android SDK; install the NDK + CMake the
       # native build needs (versions match app/build.gradle: cmake 3.22.1).
