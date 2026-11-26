@@ -39,6 +39,9 @@ class App {
   static constexpr int kChannels = 4;      // mixer channels (+ master)
 
   void setEngine(EngineLink* e) { eng_ = e; }
+  // Shell-level status override (e.g. engine/audio failed at launch but the
+  // app stays open) - drawn on the same status line as engine command errors.
+  void setStatus(const std::string& s) { status_ = s; }
   void onSnapshot(const Snapshot& s) { snap_ = s; }
   void onTouch(float lx, float ly, int action);  // action: 0=down 1=up 2=move
   void draw(std::vector<DrawCmd>* out);
