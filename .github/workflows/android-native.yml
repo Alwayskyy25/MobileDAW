@@ -1,0 +1,56 @@
+# GitHub Actions workflow for the NATIVE app.
+# Parent agent: copy this file to .github/workflows/android-native.yml in the
+# repo (workflows only run from that directory). It builds android-native/
+# only - the web app and the Capacitor projects are untouched.
+name: Android Native APK (debug)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'android-native/**'
+      - 'native/**'
+      - '.github/workflows/android-native.yml'
+
+concurrency:
+  group: android-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      # JDK 21 (same as the existing Android workflow; AGP 8.13 needs it)
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      # ubuntu-latest ships the Android SDK; install the NDK + CMake the
+      # native build needs (versions match app/build.gradle: cmake 3.22.1).
+      - name: Install NDK and CMake
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "ndk;27.2.12479018" "cmake;3.22.1"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Build native debug APK
+        working-directory: android-native
+        run: gradle assembleDebug --no-daemon
+
+      - name: Name the APK
+        run: |
+          mkdir -p dist
+          cp android-native/app/build/outputs/apk/debug/app-debug.apk "dist/MobileDAW-Native-debug-${GITHUB_SHA::7}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MobileDAW-native-debug-apk
+          path: dist/*.apk
+          retention-days: 30
